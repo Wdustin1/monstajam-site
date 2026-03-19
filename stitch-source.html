@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MonstaJam - Unreleased Beats</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="custom-fonts-and-animations">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #050505;
+      color: #ffffff;
+    }
+
+    .neon-text-cyan {
+      color: #00ffff;
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.7), 0 0 20px rgba(0, 255, 255, 0.5);
+    }
+    .neon-text-purple {
+      color: #ff00ff;
+      text-shadow: 0 0 10px rgba(255, 0, 255, 0.7), 0 0 20px rgba(255, 0, 255, 0.5);
+    }
+    
+    .neon-border-purple {
+      border: 2px solid #ff00ff;
+      box-shadow: 0 0 10px rgba(255, 0, 255, 0.5), inset 0 0 10px rgba(255, 0, 255, 0.5);
+    }
+    
+    .neon-bg-cyan {
+      background-color: #00ffff;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+      color: #000;
+    }
+
+    .card-neon-border {
+      border: 2px solid rgba(255, 0, 255, 0.5);
+      box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+    .card-neon-border:hover {
+      border-color: rgba(255, 0, 255, 0.9);
+      box-shadow: 0 0 30px rgba(255, 0, 255, 0.6);
+    }
+
+    .hero-bg-gradient {
+      background: radial-gradient(circle at 75% 40%, rgba(255,0,255,0.1) 0%, rgba(0,255,255,0.05) 25%, rgba(5,5,5,1) 60%);
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+      40% {transform: translateY(-10px);}
+      60% {transform: translateY(-5px);}
+    }
+    .animate-bounce-slow {
+      animation: bounce 2s infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-fuchsia-500 selection:text-white">
+<!-- BEGIN: Header -->
+<header class="w-full py-6 px-8 flex items-center justify-between z-50 fixed top-0 bg-[#050505]/80 backdrop-blur-md border-b border-white/5">
+<div class="flex items-center gap-3">
+<!-- Placeholder Logo -->
+<div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-400 flex items-center justify-center p-0.5">
+<div class="w-full h-full bg-black rounded-full flex items-center justify-center">
+<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+</div>
+<span class="text-2xl font-black tracking-widest text-white">MONSTA<span class="text-cyan-400">JAM</span></span>
+</div>
+<nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+<a class="hover:text-white transition-colors" href="#">Beats</a>
+<a class="hover:text-white transition-colors" href="#">Featured</a>
+<a class="hover:text-white transition-colors" href="#">Community</a>
+<a class="hover:text-white transition-colors" href="#">Contact</a>
+</nav>
+<div class="flex items-center gap-6">
+<a class="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#">Log In</a>
+<a class="px-5 py-2 rounded-full border border-white/20 text-sm font-medium hover:bg-white hover:text-black transition-all" href="#">Sign Up</a>
+</div>
+</header>
+<!-- END: Header -->
+<!-- BEGIN: Main Content -->
+<main class="flex-grow pt-24 hero-bg-gradient">
+<!-- BEGIN: Hero Section -->
+<section class="max-w-7xl mx-auto px-8 pt-20 pb-32 flex flex-col lg:flex-row items-center justify-between">
+<!-- Hero Text -->
+<div class="w-full lg:w-1/2 flex flex-col gap-6 z-10">
+<h1 class="text-6xl md:text-8xl font-black leading-none tracking-tight flex flex-col">
+<span class="neon-text-cyan">UNRELEASED.</span>
+<span class="neon-text-purple">EXCLUSIVE.</span>
+<span class="text-white" style="text-shadow: 0 0 15px rgba(0,255,255,0.8), 0 0 30px rgba(0,255,255,0.4);">YOURS.</span>
+</h1>
+<p class="text-lg text-gray-400 max-w-md mt-4">
+          Discover the beats and tracks that never made it to the mainstream. Curated for true fans.
+        </p>
+<div class="flex items-center gap-4 mt-8">
+<button class="neon-border-purple px-8 py-3.5 rounded-full font-bold flex items-center gap-2 hover:bg-fuchsia-900/30 transition-colors">
+<svg class="w-5 h-5 text-fuchsia-400" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+            Explore Library
+          </button>
+<button class="neon-bg-cyan px-8 py-3.5 rounded-full font-bold flex items-center gap-2 hover:brightness-110 transition-all">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+            Go Premium
+          </button>
+</div>
+</div>
+<!-- Hero Graphic Placeholder -->
+<div class="w-full lg:w-1/2 flex justify-center lg:justify-end mt-16 lg:mt-0 relative">
+<div class="relative w-[400px] h-[400px] md:w-[500px] md:h-[500px]">
+<!-- Glow effects -->
+<div class="absolute inset-0 rounded-full bg-fuchsia-500/50 blur-[100px]"></div>
+<div class="absolute inset-0 rounded-full bg-cyan-500/50 blur-[100px] translate-x-10 translate-y-10"></div>
+<!-- Record Graphic Placeholder -->
+<div class="absolute inset-0 rounded-full border border-white/10 bg-gradient-to-tr from-gray-900 to-black p-4 shadow-[0_0_50px_rgba(255,0,255,0.3)]">
+<div class="w-full h-full rounded-full border border-gray-800 bg-[#111] flex items-center justify-center relative overflow-hidden">
+<!-- Grooves simulation -->
+<div class="absolute inset-4 rounded-full border border-gray-800/50"></div>
+<div class="absolute inset-8 rounded-full border border-gray-800/50"></div>
+<div class="absolute inset-12 rounded-full border border-gray-800/50"></div>
+<div class="absolute inset-16 rounded-full border border-gray-800/50"></div>
+<div class="absolute inset-20 rounded-full border border-gray-800/50"></div>
+<div class="absolute inset-24 rounded-full border border-gray-800/50"></div>
+<!-- Center Label -->
+<div class="w-32 h-32 rounded-full bg-gray-900 border border-gray-700 flex flex-col items-center justify-center z-10 shadow-lg">
+<button class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur-sm transition-colors mb-2">
+<svg class="w-6 h-6 text-white ml-1" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4l12 6-12 6z"></path></svg>
+</button>
+<span class="text-xs font-bold text-gray-300">Lost Tapes Vol. 1</span>
+<span class="text-[10px] text-gray-500">Various Artists</span>
+</div>
+</div>
+<!-- Tonearm Placeholder -->
+<div class="absolute top-10 right-10 w-4 h-40 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full origin-top transform rotate-45 shadow-lg border border-gray-600">
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-10 bg-gray-800 rounded-sm border border-gray-600"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Hero Section -->
+<!-- Scroll Indicator -->
+<div class="flex flex-col items-center justify-center text-gray-500 text-xs tracking-widest gap-2 pb-16">
+<span>SCROLL</span>
+<svg class="w-4 h-4 animate-bounce-slow" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<!-- BEGIN: Exclusive Library Section -->
+<section class="max-w-7xl mx-auto px-8 pb-32">
+<div class="flex flex-col gap-6 mb-10">
+<h2 class="text-3xl font-black tracking-tight text-white uppercase">Exclusive Library</h2>
+<div class="flex items-center gap-3">
+<span class="text-sm text-gray-400">Filter by:</span>
+<button class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm hover:bg-white/10 transition-colors">Hip-Hop</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm hover:bg-white/10 transition-colors">R&amp;B</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm hover:bg-white/10 transition-colors">Electronic</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm hover:bg-white/10 transition-colors">Lo-Fi</button>
+</div>
+</div>
+<!-- Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Track Card 1 -->
+<article class="bg-[#0a0a0a] rounded-2xl p-4 card-neon-border relative group flex flex-col">
+<span class="absolute top-4 right-4 text-xs font-bold text-gray-500">1</span>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden relative shrink-0">
+<img alt="City Lights Album Art" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhhHgH0mnfHz3jLleLgOtp4qXn5HItzV1C0TKZtzXnBS-H2hRSmmEp9mCWS4HFBqBK2HrN-eFZL3jLrGaZZAeQ4kXyMFXz-gfq4QyppSPWUSeGTqDJ6r-eJ1LoodXHOV1frys9ERAp9xJbI_O1CuTe2i1h2QCSG7aY6cxn_w7cwvdFdsJLCRcEIYsMmx8NRC2qV5FCuFkg8P-6jvtIyD4ZdVnxCQsMyeUehjf1dTplQgdiTEVQ5N7EADiNhqEwbbxH8ujEgySEog"/>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4l12 6-12 6z"></path></svg>
+</button>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-white leading-tight truncate">City Lights (Unreleased Mix)</h3>
+<p class="text-sm text-gray-400 mt-1 truncate">Neon Pulse</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/10 text-xs font-semibold text-cyan-400">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                EXCLUSIVE
+              </span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zM20.16 9.6C16.32 7.38 9.48 7.14 5.52 8.34c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.56-1.38 12.06-1.08 16.56 1.62.54.3.72 1.02.42 1.56-.24.54-.84.72-1.68.18z"></path></svg></button>
+<button class="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"></path></svg></button>
+</div>
+</div>
+</div>
+</article>
+<!-- Track Card 2 -->
+<article class="bg-[#0a0a0a] rounded-2xl p-4 card-neon-border relative group flex flex-col">
+<span class="absolute top-4 right-4 text-xs font-bold text-gray-500">2</span>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden relative shrink-0">
+<img alt="Midnight Drive Album Art" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0uzkIYzNk66Z5ry-LmsxvBLpj8KTwRMyd4EBQ21DL6n-REBelxDHm9jBe6BnlVZrBZV71lgV3YZxIivRRkD0mdknpaM-BgjGNs8XfH1coYXvLvhbWBX8edY-iNmjJ01YSY-BUac4HyG6BFylTmSxnyqHSl1U-RuRgN3iF_hjQy9oKs4Wk27MvbTQFcWmtJz_AK_BVsfIHPSb9fywwUZ61Vp7kuDU-MewUJiL6_PjMHNBffjbLbSuSATJ2iVpJNkJLT7-1pRMOSw"/>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4l12 6-12 6z"></path></svg>
+</button>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-white leading-tight truncate">Midnight Drive - Bonus Track</h3>
+<p class="text-sm text-gray-400 mt-1 truncate">The Night Shifts</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/10 text-xs font-semibold text-cyan-400">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                EXCLUSIVE
+              </span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zM20.16 9.6C16.32 7.38 9.48 7.14 5.52 8.34c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.56-1.38 12.06-1.08 16.56 1.62.54.3.72 1.02.42 1.56-.24.54-.84.72-1.68.18z"></path></svg></button>
+<button class="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"></path></svg></button>
+</div>
+</div>
+</div>
+</article>
+<!-- Track Card 3 -->
+<article class="bg-[#0a0a0a] rounded-2xl p-4 card-neon-border relative group flex flex-col">
+<span class="absolute top-4 right-4 text-xs font-bold text-gray-500">3</span>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden relative shrink-0">
+<img alt="Synthetic Soul Album Art" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDS-NP-ZQzP7f8zSvfHp28vQstgfzYUsU_GhizWqr97tNXQdKY4DU8vp59KEGNfjCJ4JjxBMJ_XMaYwoYocp628V-yvBCf5hw5mlrRVcovvwlO30vbOCi5n6lDP-zPwqt90vKHvwRedeSvkT2qNjAhKKxzV27L1heI3_YJBvG1o6zUWoU5ru91lJ_X13EZmo00_MdxDJ-bq-0Vi7BDQ8CyCcul33OkKWy-s7_S1Tci2ua0qcAojTQQOcd8i1rG5vSlflULn71DgfA"/>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4l12 6-12 6z"></path></svg>
+</button>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-white leading-tight truncate">Synthetic Soul (Demo)</h3>
+<p class="text-sm text-gray-400 mt-1 truncate">Future Funk</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/10 text-xs font-semibold text-cyan-400">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                EXCLUSIVE
+              </span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zM20.16 9.6C16.32 7.38 9.48 7.14 5.52 8.34c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.56-1.38 12.06-1.08 16.56 1.62.54.3.72 1.02.42 1.56-.24.54-.84.72-1.68.18z"></path></svg></button>
+<button class="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"></path></svg></button>
+</div>
+</div>
+</div>
+</article>
+<!-- Track Card 4 -->
+<article class="bg-[#0a0a0a] rounded-2xl p-4 card-neon-border relative group flex flex-col">
+<span class="absolute top-4 right-4 text-xs font-bold text-gray-500">4</span>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden relative shrink-0">
+<img alt="Echoes Album Art" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRSfT2GvniAwBX_vu8ZdeVO19rksDHy7uMPePQRU5YZqvdharhSOjmuivH9o4ai34xgMN_UJk7hXuYD8veurAEqLb77Y4XmuU-OKOfYEFWY5IdxrVIecbTdjEJ5w0CXJw7cDowSHZC5b2XejaE9ddCMz-sO-a6A2n0b4l8GfLO9VNfh-IZPazIrV-ncnd1l6Qzo7uCxWiGHN-ssKhoiSsgURlxYD1jThws3djaMn80EWf609ATsU7muR8H-HkvCGBuvhwMCjK9kA"/>
+</div>
+<button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewbox="0 0 20 20"><path d="M4 4l12 6-12 6z"></path></svg>
+</button>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-white leading-tight truncate">Echoes - Extended Version</h3>
+<p class="text-sm text-gray-400 mt-1 truncate">Aural Waves</p>
+</div>
+<div class="flex items-center justify-between mt-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-500/50 bg-cyan-500/10 text-xs font-semibold text-cyan-400">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                EXCLUSIVE
+              </span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zM20.16 9.6C16.32 7.38 9.48 7.14 5.52 8.34c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.56-1.38 12.06-1.08 16.56 1.62.54.3.72 1.02.42 1.56-.24.54-.84.72-1.68.18z"></path></svg></button>
+<button class="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M9 18V5l12-2v13M9 18c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2"></path></svg></button>
+</div>
+</div>
+</div>
+</article>
+</div>
+</section>
+<!-- END: Exclusive Library Section -->
+</main>
+<!-- END: Main Content -->
+<!-- BEGIN: Footer -->
+<footer class="w-full border-t border-white/5 py-8 px-8 flex flex-col md:flex-row items-center justify-between text-sm text-gray-500">
+<div class="flex items-center gap-4 mb-4 md:mb-0">
+<span>MonstaJam © 2024</span>
+<div class="flex items-center gap-3">
+<a class="hover:text-white transition-colors" href="#"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path></svg></a>
+<a class="hover:text-white transition-colors" href="#"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path></svg></a>
+<a class="hover:text-white transition-colors text-lg font-bold" href="#">X</a>
+<a class="hover:text-white transition-colors" href="#"><svg class="w-4 h-4" fill="currentColor" viewbox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"></path></svg></a>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<a class="hover:text-white transition-colors" href="#">Terms</a>
+<a class="hover:text-white transition-colors" href="#">Privacy</a>
+<a class="hover:text-white transition-colors" href="#">Support</a>
+</div>
+</footer>
+<!-- END: Footer -->
+</body></html>
