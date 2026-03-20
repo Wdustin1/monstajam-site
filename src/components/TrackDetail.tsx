@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { usePlayer } from '@/context/PlayerContext';
 import type { TrackWithCredits } from './MusicLibrary';
 
 interface TrackDetailProps {
@@ -8,6 +10,10 @@ interface TrackDetailProps {
 }
 
 export default function TrackDetail({ track }: TrackDetailProps) {
+  const [showLyrics, setShowLyrics] = useState(false);
+  const { toggle, currentTrack, isPlaying } = usePlayer();
+  const isCurrentTrack = currentTrack?.slug === track.slug;
+
   const titleColor = track.accentCyan ? 'text-[#00ffff]' : 'text-[#ff00ff]';
   const titleShadow = track.accentCyan
     ? '0 0 10px rgba(0,255,255,0.8), 0 0 20px rgba(0,255,255,0.4)'
@@ -110,18 +116,22 @@ export default function TrackDetail({ track }: TrackDetailProps) {
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4 mt-2">
           <button
+            onClick={() => toggle(track)}
             className="bg-[#ff00ff] hover:bg-[#e600e6] text-black font-bold py-3 px-8 rounded-full flex items-center gap-2 transition-all"
             style={{ boxShadow: '0 0 15px rgba(255,0,255,0.6)' }}
             onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 25px rgba(255,0,255,0.9)')}
             onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 15px rgba(255,0,255,0.6)')}
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path clipRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" fillRule="evenodd" />
+              {isCurrentTrack && isPlaying
+                ? <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                : <path clipRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" fillRule="evenodd" />
+              }
             </svg>
-            Play Now
+            {isCurrentTrack && isPlaying ? 'Pause' : 'Play Now'}
           </button>
 
-          {track.spotifyUrl && (
+          {track.spotifyUrl && track.spotifyUrl !== '#' && (
             <a
               href={track.spotifyUrl}
               target="_blank"
@@ -136,7 +146,7 @@ export default function TrackDetail({ track }: TrackDetailProps) {
             </a>
           )}
 
-          {track.appleMusicUrl && (
+          {track.appleMusicUrl && track.appleMusicUrl !== '#' && (
             <a
               href={track.appleMusicUrl}
               target="_blank"
@@ -152,30 +162,36 @@ export default function TrackDetail({ track }: TrackDetailProps) {
           )}
         </div>
 
-        {/* Exclusive Content */}
-        <div className="flex flex-col gap-4 mt-6">
-          <h3 className="text-lg font-bold text-white uppercase tracking-wider">Exclusive Content</h3>
-          <div className="flex flex-wrap gap-4">
-            <button
-              className="bg-transparent text-[#00ffff] font-bold py-3 px-8 rounded-full text-sm tracking-wider transition-all"
-              style={{
-                border: '2px solid #00ffff',
-                boxShadow: '0 0 10px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.2)',
-              }}
-            >
-              View Lyrics
-            </button>
-            <button
-              className="bg-transparent text-[#00ffff] font-bold py-3 px-8 rounded-full text-sm tracking-wider transition-all"
-              style={{
-                border: '2px solid #00ffff',
-                boxShadow: '0 0 10px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.2)',
-              }}
-            >
-              Download 4K Wallpaper
-            </button>
+        {/* Exclusive Content — only render if there's something to show */}
+        {track.story && (
+          <div className="flex flex-col gap-4 mt-6">
+            <h3 className="text-lg font-bold text-white uppercase tracking-wider">Exclusive Content</h3>
+            <div className="flex flex-wrap gap-4">
+              <button
+                onClick={() => setShowLyrics((v) => !v)}
+                className="bg-transparent text-[#00ffff] font-bold py-3 px-8 rounded-full text-sm tracking-wider transition-all"
+                style={{
+                  border: '2px solid #00ffff',
+                  boxShadow: '0 0 10px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.2)',
+                }}
+              >
+                {showLyrics ? 'Hide Lyrics' : 'View Lyrics'}
+              </button>
+            </div>
+            {showLyrics && (
+              <div
+                className="rounded-2xl p-6 text-sm text-gray-300 leading-relaxed whitespace-pre-line"
+                style={{
+                  background: 'rgba(0,255,255,0.04)',
+                  border: '1px solid rgba(0,255,255,0.15)',
+                  boxShadow: 'inset 0 0 20px rgba(0,255,255,0.05)',
+                }}
+              >
+                {track.story}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </main>
   );

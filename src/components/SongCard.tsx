@@ -104,14 +104,14 @@ export default function SongCard({ track }: SongCardProps) {
             EXCLUSIVE
           </span>
           <div className="flex gap-2">
-            {track.spotifyUrl && (
+            {track.spotifyUrl && track.spotifyUrl !== '#' && (
               <a href={track.spotifyUrl} target="_blank" rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
                 <Music className="w-4 h-4 text-green-400 hover:text-green-300" />
               </a>
             )}
-            {track.appleMusicUrl && (
+            {track.appleMusicUrl && track.appleMusicUrl !== '#' && (
               <a href={track.appleMusicUrl} target="_blank" rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
