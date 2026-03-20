@@ -4,7 +4,7 @@ interface NavbarProps {
 
 const LINKS = [
   { label: 'Beats',         href: '/',       key: 'home' },
-  { label: 'Genres',        href: '/genres',  key: 'genres' },
+  { label: 'Music',         href: '/#library', key: 'music' },
   { label: 'Featured',      href: '#',        key: 'featured' },
   { label: 'Community',     href: '#',        key: 'community' },
   { label: 'Contact',       href: '#',        key: 'contact' },
