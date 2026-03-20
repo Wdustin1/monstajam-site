@@ -9,7 +9,7 @@ export async function generateStaticParams() {
     where: { published: true },
     select: { slug: true },
   });
-  return tracks.map((t) => ({ slug: t.slug }));
+  return tracks.map((t: { slug: string }) => ({ slug: t.slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
