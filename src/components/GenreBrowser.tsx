@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
-import { tracks } from '@/lib/tracks';
+import type { Track } from '@prisma/client';
 
 const GENRES = [
   'R&B', 'West Coast', 'Global', 'Lo-Fi', 'Trap',
@@ -33,7 +33,15 @@ const GENRE_CARDS = [
 export default function GenreBrowser() {
   const [activeGenre, setActiveGenre] = useState('R&B');
   const { toggle, currentTrack, isPlaying } = usePlayer();
-  const featuredLibraryTrack = tracks[0]; // City Lights — the first featured track
+  // Minimal stub so the player can fire while genre page doesn't have DB access
+  const featuredLibraryTrack: Track = {
+    id: 'stub', slug: 'city-lights', number: 1, title: 'City Lights',
+    subtitle: 'Unreleased Mix', artist: 'Neon Pulse', genre: 'Electronic',
+    bpm: 128, mood: 'Dark', color: 'bg-gradient-to-br from-purple-600 to-blue-500',
+    accentCyan: true, story: null, spotifyUrl: '#', appleMusicUrl: '#',
+    audioUrl: null, coverUrl: null, published: true,
+    createdAt: new Date(), updatedAt: new Date(),
+  };
 
   const featured = GENRE_CARDS.find((c) => c.featured)!;
   const rest = GENRE_CARDS.filter((c) => !c.featured);

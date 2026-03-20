@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Track } from '@/lib/tracks';
+import type { TrackWithCredits } from './MusicLibrary';
 
 interface TrackDetailProps {
-  track: Track;
+  track: TrackWithCredits;
 }
 
 export default function TrackDetail({ track }: TrackDetailProps) {

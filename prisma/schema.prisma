@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Track {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  number        Int
+  title         String
+  subtitle      String?
+  artist        String
+  genre         String
+  bpm           Int?
+  mood          String?
+  color         String
+  accentCyan    Boolean  @default(false)
+  story         String?  @db.Text
+  spotifyUrl    String?
+  appleMusicUrl String?
+  audioUrl      String?
+  coverUrl      String?
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  credits Credit[]
+
+  @@map("tracks")
+}
+
+model Credit {
+  id      String @id @default(cuid())
+  role    String
+  name    String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+
+  @@map("credits")
+}

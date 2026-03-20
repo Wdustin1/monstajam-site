@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { Play, Pause, Music, Music4 } from 'lucide-react';
-import { Track } from '@/lib/tracks';
+import type { TrackWithCredits } from './MusicLibrary';
 import { usePlayer } from '@/context/PlayerContext';
 
 interface SongCardProps {
-  track: Track;
+  track: TrackWithCredits;
 }
 
 // Album art with hover play overlay

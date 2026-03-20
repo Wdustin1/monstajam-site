@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { Track } from '@/lib/tracks';
+import type { Track } from '@prisma/client';
 
 interface PlayerContextValue {
   currentTrack: Track | null;
