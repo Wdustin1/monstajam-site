@@ -6,15 +6,15 @@ export default function NotFound() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#05000A' }}>
       <Navbar />
-      <main className="flex-grow flex flex-col items-center justify-center text-center px-8 py-32">
-        {/* Ambient glows */}
-        <div className="absolute pointer-events-none"
-          style={{
+      <main className="flex-grow flex flex-col items-center justify-center text-center px-8 py-32 relative">
+        {/* Ambient glow */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div style={{
             width: 400, height: 400,
             background: 'radial-gradient(circle, rgba(255,0,255,0.12) 0%, transparent 70%)',
             filter: 'blur(40px)',
-            top: '30%', left: '50%', transform: 'translateX(-50%)',
           }} />
+        </div>
 
         {/* 404 number */}
         <div className="relative mb-6">
