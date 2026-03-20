@@ -53,9 +53,6 @@ export default function Footer() {
         {/* Bottom: copyright + links */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-600">
           <span>© {new Date().getFullYear()} MonstaJam. All rights reserved.</span>
-          <div className="flex items-center gap-6 text-gray-700">
-            <span>All rights reserved.</span>
-          </div>
         </div>
 
       </div>
