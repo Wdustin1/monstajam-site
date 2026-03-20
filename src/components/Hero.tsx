@@ -3,8 +3,8 @@ import VinylRecord from './VinylRecord';
 export default function Hero() {
   return (
     <section
-      className="max-w-7xl mx-auto px-8 pt-32 pb-24 flex flex-col lg:flex-row items-center justify-between gap-12 relative"
-      style={{ minHeight: '100vh' }}
+      className="max-w-7xl mx-auto px-8 pt-8 pb-16 flex flex-col lg:flex-row items-center justify-between gap-12 relative"
+      style={{ minHeight: 'calc(100vh - 96px)' }}
     >
       {/* Ambient glow blobs behind content */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
