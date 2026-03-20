@@ -1,29 +1,62 @@
-export default function Navbar() {
+interface NavbarProps {
+  activeLink?: string;
+}
+
+const LINKS = [
+  { label: 'Beats',         href: '/',       key: 'home' },
+  { label: 'Genres',        href: '/genres',  key: 'genres' },
+  { label: 'Featured',      href: '#',        key: 'featured' },
+  { label: 'Community',     href: '#',        key: 'community' },
+  { label: 'Contact',       href: '#',        key: 'contact' },
+  { label: 'Video & Media', href: '/videos',  key: 'videos' },
+];
+
+export default function Navbar({ activeLink }: NavbarProps) {
   return (
-    <header className="w-full py-6 px-8 flex items-center justify-between z-50 fixed top-0 bg-[#050505]/80 backdrop-blur-md border-b border-white/5">
+    <header className="w-full py-5 px-8 flex items-center justify-between z-50 fixed top-0 bg-[#050505]/85 backdrop-blur-md border-b border-white/5">
+
+      {/* Logo */}
       <div className="flex items-center gap-3">
-        {/* Logo */}
-        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-400 flex items-center justify-center p-0.5">
-          <div className="w-full h-full bg-black rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
-            </svg>
-          </div>
+        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+              strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          </svg>
         </div>
-        <span className="text-2xl font-black tracking-widest text-white">MONSTA<span className="text-cyan-400">JAM</span></span>
+        <span className="text-xl font-black tracking-widest text-white">
+          MONSTA<span className="text-cyan-400">JAM</span>
+        </span>
       </div>
 
-      <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-        <a className="hover:text-white transition-colors" href="/">Beats</a>
-        <a className="hover:text-white transition-colors" href="/genres">Genres</a>
-        <a className="hover:text-white transition-colors" href="#">Featured</a>
-        <a className="hover:text-white transition-colors" href="#">Community</a>
-        <a className="hover:text-white transition-colors" href="#">Contact</a>
+      {/* Nav */}
+      <nav className="hidden md:flex items-center gap-7 text-sm font-medium">
+        {LINKS.map(({ label, href, key }) => {
+          const isActive = activeLink === key;
+          return (
+            <a
+              key={key}
+              href={href}
+              className={`transition-colors pb-1 ${
+                isActive
+                  ? 'text-[#00e5ff] border-b-2 border-[#00e5ff] [box-shadow:0_2px_10px_rgba(0,229,255,0.5)]'
+                  : 'text-gray-300 hover:text-white border-b-2 border-transparent'
+              }`}
+            >
+              {label}
+            </a>
+          );
+        })}
       </nav>
 
-      <div className="flex items-center gap-6">
+      {/* Auth */}
+      <div className="flex items-center gap-5">
         <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#">Log In</a>
-        <a className="px-5 py-2 rounded-full border border-white/20 text-sm font-medium hover:bg-white hover:text-black transition-all" href="#">Sign Up</a>
+        <a
+          className="px-5 py-2 rounded-full border border-white/20 bg-white/5 text-sm font-semibold text-white transition-all hover:bg-white hover:text-black"
+          href="#"
+        >
+          Sign Up
+        </a>
       </div>
     </header>
   );
