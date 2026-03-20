@@ -59,21 +59,7 @@ export default function Hero() {
             Explore Library
           </button>
 
-          {/* Go Premium — hollow magenta */}
-          <button
-            className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105"
-            style={{
-              border: '2px solid #ff00ff',
-              background: 'transparent',
-              boxShadow: '0 0 12px rgba(255,0,255,0.4), inset 0 0 12px rgba(255,0,255,0.1)',
-            }}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="#ff00ff" viewBox="0 0 24 24">
-              <rect x="3" y="11" width="18" height="11" rx="2" strokeWidth="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Go Premium
-          </button>
+
         </div>
       </div>
 

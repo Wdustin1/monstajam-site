@@ -178,18 +178,18 @@ export default function VideoGallery() {
             {/* Card info */}
             <div>
               {video.artist && (
-                <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">
+                <p className="text-xs text-gray-300 uppercase tracking-wider mb-0.5">
                   {video.artist}
                 </p>
               )}
               <div className="flex justify-between items-start gap-2">
                 <h3
                   className="font-bold leading-tight text-white group-hover:text-cyan-400 transition-colors"
-                  style={{ fontSize: 15 }}
+                  style={{ fontSize: 16 }}
                 >
                   {video.title}
                 </h3>
-                <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0 mt-0.5">
+                <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
                   {video.views}
                 </span>
               </div>

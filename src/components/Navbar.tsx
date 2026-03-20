@@ -48,16 +48,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
         })}
       </nav>
 
-      {/* Auth */}
-      <div className="flex items-center gap-5">
-        <a className="text-sm font-medium text-gray-300 hover:text-white transition-colors" href="#">Log In</a>
-        <a
-          className="px-5 py-2 rounded-full border border-white/20 bg-white/5 text-sm font-semibold text-white transition-all hover:bg-white hover:text-black"
-          href="#"
-        >
-          Sign Up
-        </a>
-      </div>
+
     </header>
   );
 }
