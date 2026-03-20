@@ -3,9 +3,28 @@
 import { useState, useMemo } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import SongCard from './SongCard';
-import type { Track, Credit } from '@prisma/client';
+import type { PlayerTrack } from '@/context/PlayerContext';
 
-export type TrackWithCredits = Track & { credits: Credit[] };
+export interface Credit {
+  id: string;
+  trackId: string;
+  role: string;
+  name: string;
+}
+
+export type TrackWithCredits = PlayerTrack & {
+  id?: string;
+  number?: number | null;
+  mood?: string | null;
+  accentCyan?: boolean | null;
+  story?: string | null;
+  spotifyUrl?: string | null;
+  appleMusicUrl?: string | null;
+  published?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+  credits?: Credit[];
+};
 
 const GENRES = ['All', 'Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi'];
 const BPMS = ['All', '< 80', '80–100', '100–120', '120+'];
@@ -58,11 +77,12 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
       if (q && !t.title.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
       if (genre !== 'All' && t.genre !== genre) return false;
       if (mood !== 'All' && t.mood !== mood) return false;
-      if (bpm !== 'All' && t.bpm !== null) {
-        if (bpm === '< 80' && t.bpm >= 80) return false;
-        if (bpm === '80–100' && (t.bpm < 80 || t.bpm > 100)) return false;
-        if (bpm === '100–120' && (t.bpm < 100 || t.bpm > 120)) return false;
-        if (bpm === '120+' && t.bpm < 120) return false;
+      if (bpm !== 'All' && t.bpm != null) {
+        const b = t.bpm;
+        if (bpm === '< 80' && b >= 80) return false;
+        if (bpm === '80–100' && (b < 80 || b > 100)) return false;
+        if (bpm === '100–120' && (b < 100 || b > 120)) return false;
+        if (bpm === '120+' && b < 120) return false;
       }
       return true;
     });
