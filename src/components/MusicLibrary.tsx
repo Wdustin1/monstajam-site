@@ -24,19 +24,21 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between px-4 py-3 rounded-full bg-[#1a1a24] border border-gray-700 hover:bg-gray-800 transition-colors text-sm gap-3 min-w-[110px]"
+        className="flex items-center justify-between px-4 py-3 rounded-full bg-[#111118] border border-white/10 hover:border-white/20 transition-colors text-sm gap-3 min-w-[110px]"
+        style={{ backdropFilter: 'blur(8px)' }}
       >
-        <span className={value === 'All' ? 'text-gray-300' : 'text-white'}>{display}</span>
+        <span className={value === 'All' ? 'text-gray-400' : 'text-[#00e5ff]'}>{display}</span>
         <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-[#111114] border border-gray-700 rounded-xl overflow-hidden z-20 shadow-xl min-w-full">
+        <div className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-20 shadow-2xl min-w-full"
+          style={{ backdropFilter: 'blur(12px)' }}>
           {options.map((opt) => (
             <button
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${
-                value === opt ? 'text-[#00ffff]' : 'text-gray-300'
+                value === opt ? 'text-[#00e5ff]' : 'text-gray-300'
               }`}
             >
               {opt}
@@ -71,24 +73,46 @@ export default function MusicLibrary() {
   }, [search, genre, bpm, mood]);
 
   return (
-    <section className="max-w-7xl mx-auto px-6 pt-8 pb-40 flex flex-col gap-10 z-10 relative">
+    <section id="library" className="max-w-7xl mx-auto px-6 pt-8 pb-40 flex flex-col gap-10 z-10 relative">
+
+      {/* Section heading */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <span className="w-8 h-[2px]" style={{ background: '#00e5ff', boxShadow: '0 0 8px #00e5ff' }} />
+          <span className="text-xs font-bold tracking-[0.2em] uppercase text-gray-500">The Collection</span>
+        </div>
+        <div className="flex items-end justify-between">
+          <h2 className="font-black tracking-tight uppercase"
+            style={{
+              fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+              background: 'linear-gradient(90deg, #00e5ff, #0088ff)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.4))',
+            }}>
+            Exclusive Library
+          </h2>
+          <span className="text-sm text-gray-500 mb-1">{filtered.length} track{filtered.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>
 
       {/* Search + Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-center w-full">
         {/* Glow search bar */}
         <div className="relative w-full md:flex-grow">
           <div
-            className="absolute inset-[-2px] rounded-full z-[-1] opacity-80 blur-[4px]"
-            style={{ background: 'linear-gradient(90deg, #00ffff, #ff00ff)' }}
+            className="absolute inset-[-1px] rounded-full z-[-1] opacity-60 blur-[5px]"
+            style={{ background: 'linear-gradient(90deg, #00e5ff, #ff00ff)' }}
           />
-          <div className="bg-[#111114] border border-white/10 flex items-center px-4 py-3 rounded-full w-full">
-            <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          <div className="bg-[#0e0e14] border border-white/10 flex items-center px-4 py-3 rounded-full w-full"
+            style={{ backdropFilter: 'blur(8px)' }}>
+            <Search className="w-5 h-5 text-gray-500 flex-shrink-0" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tracks..."
-              className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-500 w-full ml-3 text-sm"
+              className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-600 w-full ml-3 text-sm"
             />
           </div>
         </div>
@@ -101,12 +125,6 @@ export default function MusicLibrary() {
         </div>
       </div>
 
-      {/* Section heading */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-black tracking-tight text-white uppercase">Exclusive Library</h2>
-        <span className="text-sm text-gray-500">{filtered.length} track{filtered.length !== 1 ? 's' : ''}</span>
-      </div>
-
       {/* Grid */}
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -115,9 +133,9 @@ export default function MusicLibrary() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-          <Search className="w-12 h-12 mb-4 opacity-30" />
-          <p className="text-lg font-semibold">No tracks found</p>
+        <div className="flex flex-col items-center justify-center py-24 text-gray-600">
+          <Search className="w-12 h-12 mb-4 opacity-20" />
+          <p className="text-lg font-semibold text-gray-500">No tracks found</p>
           <p className="text-sm mt-1">Try adjusting your filters</p>
         </div>
       )}

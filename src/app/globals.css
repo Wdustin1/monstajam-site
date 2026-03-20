@@ -37,8 +37,25 @@ body {
   box-shadow: 0 0 30px rgba(255, 0, 255, 0.6);
 }
 
+/* Richer dual-glow ambient hero */
 .hero-bg-gradient {
-  background: radial-gradient(circle at 75% 40%, rgba(255,0,255,0.1) 0%, rgba(0,255,255,0.05) 25%, rgba(5,5,5,1) 60%);
+  background:
+    radial-gradient(ellipse at 15% 60%, rgba(255,0,255,0.13) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 35%, rgba(0,229,255,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(100,0,200,0.08) 0%, transparent 50%),
+    #050505;
+}
+
+/* Subtle grain overlay for premium texture */
+.hero-bg-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  z-index: 0;
 }
 
 @keyframes bounce {
@@ -58,4 +75,14 @@ body {
 
 .animate-spin-slow {
   animation: spin-slow 4s linear infinite;
+}
+
+/* Neon pulse for active card */
+@keyframes neon-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(255,0,255,0.5); }
+  50% { box-shadow: 0 0 30px rgba(255,0,255,0.9), 0 0 60px rgba(255,0,255,0.3); }
+}
+
+.neon-pulse-active {
+  animation: neon-pulse 2s ease-in-out infinite;
 }
