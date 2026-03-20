@@ -1,449 +1,304 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import {
-  Home, LayoutGrid, Upload, Users, Folder, Settings,
-  LogOut, Bell, ChevronDown, Plus, CloudUpload
-} from 'lucide-react';
+import { CloudUpload, Upload } from 'lucide-react';
 
-// ─── Sidebar nav ───────────────────────────────────────────────────────────────
+// ─── Published tracks mock data ────────────────────────────────────────────────
 
-const NAV = [
-  { icon: Home,        label: 'Home',      href: '/' },
-  { icon: LayoutGrid,  label: 'Dashboard',  href: '#' },
-  { icon: Upload,      label: 'Upload',     href: '/upload', active: true },
-  { icon: Users,       label: 'Audience',   href: '#' },
-  { icon: Folder,      label: 'Files',      href: '#' },
-  { icon: Settings,    label: 'Settings',   href: '#' },
+const PUBLISHED = [
+  { id: 1, title: 'Midnight City (Feat. Neon Fox)', date: '10/27/2023', highlight: true },
+  { id: 2, title: 'Synthetic Dreams',               date: '09/15/2023', highlight: false },
+  { id: 3, title: 'Quantum Beat',                   date: '08/01/2023', highlight: false },
+  { id: 4, title: 'Synthetic Dreams',               date: '07/07/2023', highlight: false },
+  { id: 5, title: 'Great Bitr',                     date: '06/01/2023', highlight: false, faded: true },
 ];
 
-// ─── Recently uploaded mock data ───────────────────────────────────────────────
+// ─── Neon input wrapper ────────────────────────────────────────────────────────
 
-type TrackStatus = 'Processing' | 'Live' | 'Draft';
-
-interface RecentTrack {
-  id: number;
-  title: string;
-  status: TrackStatus;
-  color: string; // bar color class
-  badge: string; // text color class
-  badgeBg: string;
-  borderColor: string;
-}
-
-const RECENT: RecentTrack[] = [
-  {
-    id: 1,
-    title: 'Neon Dreams',
-    status: 'Processing',
-    color: 'bg-[#00d2ff]',
-    badge: 'text-[#00d2ff]',
-    badgeBg: 'bg-[#00d2ff]/10 border-[#00d2ff]/50',
-    borderColor: 'border-[#00d2ff]/40',
-  },
-  {
-    id: 2,
-    title: 'Cyber Groove',
-    status: 'Live',
-    color: 'bg-green-400',
-    badge: 'text-green-400',
-    badgeBg: 'bg-green-500/10 border-green-500/50',
-    borderColor: 'border-green-500/30',
-  },
-  {
-    id: 3,
-    title: 'Midnight Vibe',
-    status: 'Processing',
-    color: 'bg-[#ff00cc]',
-    badge: 'text-[#ff00cc]',
-    badgeBg: 'bg-[#ff00cc]/10 border-[#ff00cc]/50',
-    borderColor: 'border-[#2a2d3d]',
-  },
-];
-
-// ─── Mini waveform icon ─────────────────────────────────────────────────────────
-
-function WaveIcon({ colorClass }: { colorClass: string }) {
-  const heights = [8, 16, 12, 16, 8];
+function NeonInput({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-[2px] h-4">
-      {heights.map((h, i) => (
-        <div key={i} className={`w-[2px] rounded-full ${colorClass}`} style={{ height: h }} />
-      ))}
+    <div>
+      <label className="block text-sm text-gray-300 mb-2 font-medium">{label}</label>
+      {children}
     </div>
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────────
+const inputStyle: React.CSSProperties = {
+  backgroundColor: '#0F172A',
+  border: '1px solid #00FFFF',
+  boxShadow: 'inset 0 0 5px rgba(0,255,255,0.5)',
+  color: 'white',
+  borderRadius: 8,
+  width: '100%',
+  padding: '12px 16px',
+  outline: 'none',
+  transition: 'box-shadow 0.3s',
+};
 
 export default function UploadDashboard() {
-  const [dragging, setDragging] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [genre, setGenre] = useState('');
-  const [collaborators, setCollaborators] = useState('');
-  const [platformLink, setPlatformLink] = useState('');
+  const [audioFile, setAudioFile]   = useState<string | null>(null);
+  const [coverFile, setCoverFile]   = useState<string | null>(null);
+  const [story, setStory]           = useState('');
+  const [ytLink, setYtLink]         = useState('');
+  const [streamLink, setStreamLink] = useState('');
+  const [audioDrag, setAudioDrag]   = useState(false);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(true);
+  const handleAudioDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setAudioDrag(false);
+    const f = e.dataTransfer.files[0];
+    if (f) setAudioFile(f.name);
   }, []);
 
-  const handleDragLeave = useCallback(() => setDragging(false), []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setFileName(file.name);
-  }, []);
-
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setFileName(file.name);
-  }, []);
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) setCoverFile(f.name);
+  };
 
   return (
     <div
-      className="h-screen w-screen overflow-hidden flex font-sans text-white"
-      style={{ backgroundColor: '#1e1e24' }}
+      className="min-h-screen w-full overflow-hidden p-6 font-sans antialiased text-white flex flex-col"
+      style={{ background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' }}
     >
-      {/* ── Icon Sidebar ── */}
-      <aside
-        className="w-16 h-full flex flex-col items-center py-4 z-20 shrink-0"
+      {/* ── Header ── */}
+      <header
+        className="flex justify-between items-center mb-8 pb-4"
         style={{
-          backgroundColor: '#1e1e24',
-          borderRight: '1px solid',
-          borderImageSource: 'linear-gradient(to bottom, #00d2ff, #ff00cc)',
-          borderImageSlice: 1,
+          borderBottom: '1px solid #FF007F',
+          boxShadow: '0 4px 15px -3px rgba(255,0,127,0.3)',
         }}
       >
-        {/* Logo */}
-        <div className="mb-8 w-8 h-8 rounded-lg relative overflow-hidden flex items-center justify-center"
-          style={{ background: 'linear-gradient(to tr, #00d2ff, #ff00cc)' }}>
-          <div className="absolute inset-[2px] rounded-md flex items-center justify-center"
-            style={{ backgroundColor: '#1e1e24' }}>
-            <span className="font-bold text-lg"
-              style={{
-                background: 'linear-gradient(to right, #00d2ff, #ff00cc)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
-              A
-            </span>
-          </div>
-        </div>
+        <h1 className="text-2xl md:text-3xl tracking-wider uppercase font-bold">
+          <span style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}>
+            Private Admin{' '}
+          </span>
+          <span style={{ color: '#00FFFF', textShadow: '0 0 10px #00FFFF' }}>
+            Backstage{' '}
+          </span>
+          <span style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}>
+            v2
+          </span>
+        </h1>
 
-        {/* Nav */}
-        <nav className="flex flex-col gap-6 w-full items-center flex-1">
-          {NAV.map(({ icon: Icon, label, href, active }) => (
-            <a
-              key={label}
-              href={href}
-              title={label}
-              className="relative flex items-center justify-center w-full transition-colors"
-              style={{ color: active ? '#ff00cc' : '#a0a5ba' }}
-            >
-              {active && (
-                <div
-                  className="absolute left-0 w-1 h-8 rounded-r-md"
-                  style={{ backgroundColor: '#ff00cc', boxShadow: '0 0 10px #ff00ff' }}
-                />
-              )}
-              <Icon
-                className="w-5 h-5"
-                style={active ? { filter: 'drop-shadow(0 0 8px rgba(255,0,255,0.8))' } : undefined}
-              />
-            </a>
-          ))}
-        </nav>
-
-        {/* Logout */}
-        <div className="mt-auto">
-          <a href="#" title="Logout" className="transition-colors" style={{ color: '#a0a5ba' }}>
-            <LogOut className="w-5 h-5" />
-          </a>
-        </div>
-      </aside>
-
-      {/* ── Main column ── */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-
-        {/* Top header */}
-        <header
-          className="h-16 flex items-center justify-between px-6 shrink-0 z-10"
+        {/* Avatar */}
+        <div
+          className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-sm font-bold"
           style={{
-            backgroundColor: 'rgba(30,30,36,0.5)',
-            backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid',
-            borderImageSource: 'linear-gradient(to right, #00d2ff, #ff00cc)',
-            borderImageSlice: 1,
+            border: '2px solid #00FFFF',
+            boxShadow: '0 0 10px rgba(0,255,255,0.5)',
+            background: 'linear-gradient(135deg, #00FFFF33, #FF007F33)',
           }}
         >
-          <h1 className="text-xl font-semibold tracking-wide">Artist Upload Dashboard</h1>
-          <div className="flex items-center gap-6">
-            {/* Bell */}
-            <button className="relative transition-colors" style={{ color: '#a0a5ba' }}>
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                1
-              </span>
-            </button>
-            {/* User */}
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                style={{
-                  background: 'linear-gradient(135deg, #00d2ff, #ff00cc)',
-                  border: '1px solid rgba(0,210,255,0.5)',
-                }}
-              >
-                AK
-              </div>
-              <div className="flex flex-col text-sm">
-                <span className="text-xs" style={{ color: '#a0a5ba' }}>Artist:</span>
-                <span className="font-medium flex items-center gap-1">
-                  Alex K.
-                  <ChevronDown className="w-3 h-3" style={{ color: '#a0a5ba' }} />
-                </span>
-              </div>
-            </div>
-          </div>
-        </header>
+          AK
+        </div>
+      </header>
 
-        {/* Workspace */}
-        <div className="flex flex-1 overflow-hidden relative">
-
-          {/* Ambient glows */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-            <div
-              className="absolute rounded-full"
-              style={{
-                width: 800, height: 600,
-                background: 'rgba(0,210,255,0.05)',
-                filter: 'blur(120px)',
-                top: -200, left: -200,
-              }}
-            />
-            <div
-              className="absolute rounded-full"
-              style={{
-                width: 800, height: 600,
-                background: 'rgba(255,0,204,0.05)',
-                filter: 'blur(120px)',
-                bottom: -200, right: -200,
-              }}
-            />
-          </div>
-
-          {/* ── Recently Uploaded panel ── */}
-          <aside
-            className="w-[300px] h-full flex flex-col z-10 shrink-0 relative"
-            style={{
-              backgroundColor: 'rgba(30,30,36,0.8)',
-              backdropFilter: 'blur(12px)',
-              borderRight: '1px solid',
-              borderImageSource: 'linear-gradient(to bottom, #00d2ff, #ff00cc)',
-              borderImageSlice: 1,
-            }}
+      {/* ── Two-panel layout ── */}
+      <main
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1"
+        style={{ height: 'calc(100vh - 120px)' }}
+      >
+        {/* LEFT: Drop New Heat */}
+        <section
+          className="lg:col-span-2 rounded-xl p-6 flex flex-col overflow-y-auto"
+          style={{
+            backgroundColor: '#12123A',
+            border: '1px solid #00FFFF',
+            boxShadow: '0 0 10px rgba(0,255,255,0.5), 0 0 20px rgba(0,255,255,0.3)',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#00FFFF transparent',
+          }}
+        >
+          <h2
+            className="text-2xl font-bold mb-6"
+            style={{ color: '#00FFFF', textShadow: '0 0 10px #00FFFF' }}
           >
-            <div className="p-6 pb-4 shrink-0">
-              <h2 className="text-lg font-medium">Recently Uploaded</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6 flex flex-col gap-4"
-              style={{ scrollbarWidth: 'thin', scrollbarColor: '#2a2d3d transparent' }}>
-              {RECENT.map((track) => (
-                <div
-                  key={track.id}
-                  className={`p-3 flex items-center gap-3 rounded-xl border ${
-                    track.status === 'Processing' && track.color === 'bg-[#00d2ff]'
-                      ? ''
-                      : `${track.borderColor} bg-[#1a1b26]/50`
-                  }`}
-                  style={
-                    track.status === 'Processing' && track.color === 'bg-[#00d2ff]'
-                      ? {
-                          background: 'linear-gradient(#1e1e24, #1e1e24) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box',
-                          border: '2px solid transparent',
-                          borderRadius: 12,
-                        }
-                      : {}
-                  }
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[#1a1b26] flex items-center justify-center flex-shrink-0">
-                    <WaveIcon colorClass={track.color} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={`text-sm font-medium ${track.status === 'Processing' && track.color !== 'bg-[#00d2ff]' ? 'text-[#a0a5ba]' : 'text-white'}`}>
-                      {track.title}
-                    </span>
-                    <span className={`text-[10px] rounded-full px-2 py-0.5 mt-1 w-max border ${track.badge} ${track.badgeBg}`}>
-                      {track.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
+            Drop New Heat
+          </h2>
 
-          {/* ── Main upload form ── */}
-          <main className="flex-1 h-full overflow-y-auto z-10 p-8 flex justify-center items-start">
-            <div className="max-w-2xl w-full flex flex-col gap-6 pt-4 pb-12">
+          <form className="flex flex-col gap-5 flex-grow">
 
-              {/* Drag & Drop zone */}
+            {/* Audio upload */}
+            <NeonInput label="Audio File (WAV, MP3)">
               <label
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className="relative w-full cursor-pointer rounded-xl flex flex-col items-center justify-center transition-colors"
+                onDragOver={(e) => { e.preventDefault(); setAudioDrag(true); }}
+                onDragLeave={() => setAudioDrag(false)}
+                onDrop={handleAudioDrop}
+                className="flex justify-center items-center gap-2 cursor-pointer rounded-lg p-4 transition-colors hover:bg-slate-800 group"
                 style={{
-                  minHeight: 200,
-                  aspectRatio: '2/1',
-                  background: `linear-gradient(${dragging ? '#1f2236' : '#1e1e24'}, ${dragging ? '#1f2236' : '#1e1e24'}) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box`,
-                  border: '2px solid transparent',
-                  boxShadow: dragging
-                    ? '0 0 25px rgba(0,210,255,0.4), 0 0 25px rgba(255,0,204,0.4)'
-                    : '0 0 15px rgba(0,240,255,0.3), 0 0 15px rgba(255,0,255,0.3)',
+                  ...inputStyle,
+                  padding: '16px',
+                  background: audioDrag ? 'rgba(0,255,255,0.05)' : '#0F172A',
                 }}
               >
                 <input
                   type="file"
-                  accept=".mp3,.wav,.flac,.aiff"
-                  className="sr-only"
-                  onChange={handleFileInput}
+                  accept=".wav,.mp3"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) setAudioFile(f.name); }}
                 />
-                <CloudUpload
-                  className="w-16 h-16 mb-4"
-                  style={{ filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.3))', color: 'white' }}
-                />
-                {fileName ? (
-                  <>
-                    <h3 className="text-xl font-medium mb-1">{fileName}</h3>
-                    <p className="text-sm" style={{ color: '#a0a5ba' }}>Click to replace</p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-xl font-medium mb-1">Drag and Drop</h3>
-                    <p className="text-sm" style={{ color: '#a0a5ba' }}>your audio files here (MP3/WAV)</p>
-                  </>
-                )}
+                <CloudUpload className="w-5 h-5" style={{ color: '#00FFFF' }} />
+                {audioFile
+                  ? <span className="text-white text-sm">{audioFile}</span>
+                  : <span className="text-gray-300 text-sm group-hover:text-white">
+                      Drag &amp; Drop or <span style={{ color: '#00FFFF' }}>Browse</span>
+                    </span>
+                }
               </label>
+            </NeonInput>
 
-              {/* Neon divider */}
-              <div
-                className="w-full mb-2"
-                style={{
-                  height: 4,
-                  background: 'linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc)',
-                  borderRadius: 2,
-                  boxShadow: '0 0 10px rgba(0,240,255,0.5), 0 0 10px rgba(255,0,255,0.5)',
-                }}
+            {/* Cover art upload */}
+            <NeonInput label="Cover Art (JPEG, PNG, 3000x3000px)">
+              <label
+                className="flex justify-center items-center cursor-pointer rounded-lg p-4 transition-colors hover:bg-slate-800"
+                style={{ ...inputStyle, padding: '16px' }}
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={handleCoverChange}
+                />
+                {coverFile
+                  ? <span className="text-white text-sm">{coverFile}</span>
+                  : <Upload className="w-5 h-5 text-gray-400" />
+                }
+              </label>
+            </NeonInput>
+
+            {/* Track story/lyrics */}
+            <NeonInput label="Track Story/Lyrics (Share the vibe)">
+              <textarea
+                value={story}
+                onChange={(e) => setStory(e.target.value)}
+                placeholder="Type your story or lyrics here..."
+                rows={5}
+                className="placeholder-gray-500 resize-none"
+                style={{ ...inputStyle, minHeight: 120 }}
               />
+            </NeonInput>
 
-              {/* Track title + Genre */}
-              <div className="grid grid-cols-2 gap-4 w-full">
-                {[
-                  { value: title, setter: setTitle, placeholder: 'Track Title' },
-                  { value: genre, setter: setGenre, placeholder: 'Genre' },
-                ].map(({ value, setter, placeholder }) => (
-                  <div
-                    key={placeholder}
-                    style={{
-                      background: 'linear-gradient(#1e1e24, #1e1e24) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box',
-                      border: '2px solid transparent',
-                      borderRadius: 12,
-                    }}
-                  >
-                    <input
-                      value={value}
-                      onChange={(e) => setter(e.target.value)}
-                      placeholder={placeholder}
-                      className="w-full px-4 py-3 bg-transparent text-white placeholder-[#a0a5ba] outline-none focus:ring-0 text-sm"
-                      style={{ borderRadius: 12 }}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Collaborators */}
-              <div className="flex items-center gap-4 w-full">
-                <div
-                  className="flex-1"
-                  style={{
-                    background: 'linear-gradient(#1e1e24, #1e1e24) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box',
-                    border: '2px solid transparent',
-                    borderRadius: 12,
-                  }}
-                >
-                  <input
-                    value={collaborators}
-                    onChange={(e) => setCollaborators(e.target.value)}
-                    placeholder="Collaborators"
-                    className="w-full px-4 py-3 bg-transparent text-white placeholder-[#a0a5ba] outline-none focus:ring-0 text-sm"
-                    style={{ borderRadius: 12 }}
-                  />
+            {/* YouTube link */}
+            <NeonInput label="YouTube Link (Official Video/Visualizer)">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                  {/* YouTube icon */}
+                  <svg className="w-5 h-5" fill="#00FFFF" viewBox="0 0 24 24">
+                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                  </svg>
                 </div>
-                <button
-                  className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-[#1e1e24] flex-shrink-0"
-                  style={{ border: '1px solid #2a2d3d', color: '#00d2ff' }}
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
+                <input
+                  value={ytLink}
+                  onChange={(e) => setYtLink(e.target.value)}
+                  type="text"
+                  className="placeholder-gray-600"
+                  style={{ ...inputStyle, paddingLeft: 44 }}
+                />
               </div>
+            </NeonInput>
 
-              {/* Platform link */}
+            {/* Spotify/Apple links */}
+            <NeonInput label="Spotify/Apple Links (Streaming Platforms)">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-3 flex items-center gap-2 pointer-events-none">
+                  {/* Spotify */}
+                  <svg className="w-4 h-4" fill="#00FFFF" viewBox="0 0 24 24">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zm.48-3.48C15.12 7.02 8.76 6.84 5.1 7.92c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.32-1.2 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.24.54-.9.72-1.5.42z"/>
+                  </svg>
+                  {/* Apple */}
+                  <svg className="w-4 h-4" fill="#00FFFF" viewBox="0 0 24 24">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                  </svg>
+                </div>
+                <input
+                  value={streamLink}
+                  onChange={(e) => setStreamLink(e.target.value)}
+                  type="text"
+                  className="placeholder-gray-600"
+                  style={{ ...inputStyle, paddingLeft: 64 }}
+                />
+              </div>
+            </NeonInput>
+
+            {/* GO LIVE */}
+            <button
+              type="button"
+              className="w-full rounded-lg py-4 font-bold tracking-widest uppercase text-lg mt-2 text-white transition-all hover:-translate-y-0.5"
+              style={{
+                backgroundColor: '#FF007F',
+                boxShadow: '0 0 15px rgba(255,0,127,0.6)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 25px rgba(255,0,127,0.8)')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 15px rgba(255,0,127,0.6)')}
+            >
+              GO LIVE
+            </button>
+
+          </form>
+        </section>
+
+        {/* RIGHT: Published Tracks */}
+        <section
+          className="rounded-xl p-6 flex flex-col h-full"
+          style={{
+            backgroundColor: '#12123A',
+            border: '1px solid #FF007F',
+            boxShadow: '0 0 10px rgba(255,0,127,0.5), 0 0 20px rgba(255,0,127,0.3)',
+          }}
+        >
+          <h2
+            className="text-2xl font-bold mb-6 flex-shrink-0"
+            style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}
+          >
+            Published Tracks
+          </h2>
+
+          <div
+            className="flex-grow overflow-y-auto space-y-4 pr-1"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#00FFFF transparent' }}
+          >
+            {PUBLISHED.map((track) => (
               <div
+                key={track.id}
+                className="flex justify-between items-center p-4 rounded-lg"
                 style={{
-                  background: 'linear-gradient(#1e1e24, #1e1e24) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box',
-                  border: '2px solid transparent',
-                  borderRadius: 12,
+                  border: `1px solid ${track.faded ? '#00FFFF' : '#FF007F'}`,
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  boxShadow: track.faded
+                    ? 'inset 0 0 10px rgba(0,255,255,0.1)'
+                    : 'inset 0 0 10px rgba(255,0,127,0.1)',
+                  opacity: track.faded ? 0.7 : 1,
                 }}
               >
-                <div className="relative flex items-center w-full">
-                  <input
-                    value={platformLink}
-                    onChange={(e) => setPlatformLink(e.target.value)}
-                    placeholder="Connect Spotify / Apple Music Link"
-                    className="w-full pl-4 pr-24 py-3 bg-transparent text-white placeholder-[#a0a5ba] outline-none focus:ring-0 text-sm"
-                    style={{ borderRadius: 12 }}
-                  />
-                  <div className="absolute right-4 flex items-center gap-3">
-                    {/* Spotify */}
-                    <button title="Spotify">
-                      <svg className="w-6 h-6 text-green-500 hover:text-green-400 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zm.48-3.48C15.12 7.02 8.76 6.84 5.1 7.92c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.32-1.2 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.24.54-.9.72-1.5.42z"/>
-                      </svg>
-                    </button>
-                    {/* Apple */}
-                    <button title="Apple Music">
-                      <svg className="w-6 h-6 text-white hover:text-gray-300 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                      </svg>
-                    </button>
-                  </div>
+                <div>
+                  <h3
+                    className="font-semibold mb-1 text-sm leading-tight"
+                    style={{ color: '#00FFFF' }}
+                  >
+                    {track.title}
+                  </h3>
+                  <p className="text-xs text-gray-400">- Published {track.date}</p>
                 </div>
-              </div>
-
-              {/* Submit */}
-              <div className="flex justify-center mt-4">
                 <button
-                  className="px-8 py-3 text-white font-medium tracking-wide hover:scale-[1.02] active:scale-95 transition-transform"
+                  className="text-xs font-bold py-1.5 px-4 rounded text-white flex-shrink-0 ml-3 transition-all hover:scale-105"
                   style={{
-                    background: 'linear-gradient(#1e1e24, #1e1e24) padding-box, linear-gradient(to right, #00d2ff, #3a7bd5, #ff00cc) border-box',
-                    border: '2px solid transparent',
-                    borderRadius: 12,
-                    boxShadow: '0 0 15px rgba(0,240,255,0.4), 0 0 15px rgba(255,0,255,0.4)',
+                    backgroundColor: '#FF007F',
+                    boxShadow: '0 0 10px rgba(255,0,127,0.5)',
                   }}
                 >
-                  Submit for Review
+                  EDIT
                 </button>
               </div>
-
-            </div>
-          </main>
-
-        </div>
-      </div>
+            ))}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
