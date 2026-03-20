@@ -14,7 +14,8 @@ export default function Navbar() {
       </div>
 
       <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-        <a className="hover:text-white transition-colors" href="#">Beats</a>
+        <a className="hover:text-white transition-colors" href="/">Beats</a>
+        <a className="hover:text-white transition-colors" href="/genres">Genres</a>
         <a className="hover:text-white transition-colors" href="#">Featured</a>
         <a className="hover:text-white transition-colors" href="#">Community</a>
         <a className="hover:text-white transition-colors" href="#">Contact</a>
