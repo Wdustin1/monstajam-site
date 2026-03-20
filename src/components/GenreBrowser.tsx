@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
-import type { Track } from '@prisma/client';
 
 const GENRES = [
   'R&B', 'West Coast', 'Global', 'Lo-Fi', 'Trap',
@@ -34,7 +33,7 @@ export default function GenreBrowser() {
   const [activeGenre, setActiveGenre] = useState('R&B');
   const { toggle, currentTrack, isPlaying } = usePlayer();
   // Minimal stub so the player can fire while genre page doesn't have DB access
-  const featuredLibraryTrack: Track = {
+  const featuredLibraryTrack = {
     id: 'stub', slug: 'city-lights', number: 1, title: 'City Lights',
     subtitle: 'Unreleased Mix', artist: 'Neon Pulse', genre: 'Electronic',
     bpm: 128, mood: 'Dark', color: 'bg-gradient-to-br from-purple-600 to-blue-500',

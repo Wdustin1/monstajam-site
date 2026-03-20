@@ -1,17 +1,29 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import type { Track } from '@prisma/client';
+// Minimal track shape needed by the player
+export interface PlayerTrack {
+  slug: string;
+  title: string;
+  artist: string;
+  color: string;
+  subtitle?: string | null;
+  audioUrl?: string | null;
+  coverUrl?: string | null;
+  genre?: string | null;
+  bpm?: number | null;
+  number?: number | null;
+}
 
 interface PlayerContextValue {
-  currentTrack: Track | null;
+  currentTrack: PlayerTrack | null;
   isPlaying: boolean;
   progress: number;      // 0–1
   duration: number;      // seconds
   currentTime: number;   // seconds elapsed
-  play: (track: Track) => void;
+  play: (track: PlayerTrack) => void;
   pause: () => void;
-  toggle: (track: Track) => void;
+  toggle: (track: PlayerTrack) => void;
   seek: (fraction: number) => void;
 }
 
@@ -30,7 +42,7 @@ const PlayerContext = createContext<PlayerContextValue>({
 const DEFAULT_DURATION = 180; // 3 minutes for demo tracks
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const duration = DEFAULT_DURATION;
@@ -62,14 +74,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setProgress(0);
   }, [currentTrack?.slug]);
 
-  const play = (track: Track) => {
+  const play = (track: PlayerTrack) => {
     setCurrentTrack(track);
     setIsPlaying(true);
   };
 
   const pause = () => setIsPlaying(false);
 
-  const toggle = (track: Track) => {
+  const toggle = (track: PlayerTrack) => {
     if (currentTrack?.slug === track.slug) {
       setIsPlaying((prev) => !prev);
     } else {
