@@ -84,28 +84,24 @@ export default function VideoGallery() {
       <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <h1
           className="text-5xl md:text-6xl font-black uppercase leading-tight"
-          style={{
-            letterSpacing: '2px',
-            // Split gradient: "MUSIC VIDEO" = magenta, "GALLERY" = cyan
-            // Use text-shadow trick from the mock: dual-color glow on white text
-            color: 'white',
-            textShadow: '-4px 0 20px #ff00ff, 4px 0 20px #00ffff',
-          }}
+          style={{ letterSpacing: '2px' }}
         >
           <span
             style={{
-              background: 'linear-gradient(90deg, #ff00ff, #cc44ff)',
+              background: 'linear-gradient(90deg, #ff44ff, #dd88ff)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
+              filter: 'drop-shadow(0 0 14px rgba(255,0,255,0.8))',
             }}
           >
             MUSIC VIDEO{' '}
           </span>
           <span
             style={{
-              background: 'linear-gradient(90deg, #44ddff, #00ffff)',
+              background: 'linear-gradient(90deg, #44eeff, #00ffff)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
+              filter: 'drop-shadow(0 0 14px rgba(0,229,255,0.8))',
             }}
           >
             GALLERY
