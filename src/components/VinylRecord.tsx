@@ -1,29 +1,38 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 
 export default function VinylRecord() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [anisotropyShift, setAnisotropyShift] = useState({ x: 0, y: 0 });
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const xAxis = (window.innerWidth / 2 - e.pageX) / 50;
+      const yAxis = (window.innerHeight / 2 - e.pageY) / 50;
+      setTilt({ x: yAxis, y: xAxis });
+      setAnisotropyShift({ x: xAxis * 2, y: yAxis * 2 });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   return (
-    <div className="relative select-none" style={{ width: 460, height: 460 }}>
+    <div ref={containerRef} className="relative select-none" style={{ width: 520, height: 520 }}>
 
-      {/* ── Ambient glow blobs behind the disc ── */}
-      <div className="absolute" style={{
-        inset: -40,
-        background: 'radial-gradient(ellipse at 40% 60%, rgba(255,0,255,0.25) 0%, transparent 65%), radial-gradient(ellipse at 65% 35%, rgba(0,255,255,0.2) 0%, transparent 65%)',
-        filter: 'blur(20px)',
-        borderRadius: '50%',
-      }} />
-
-      {/* ── Sparkle particles ── */}
+      {/* Sparkle particles */}
       {[
-        { top: '8%',  left: '12%', size: 3, delay: 0 },
-        { top: '18%', left: '82%', size: 2, delay: 0.4 },
-        { top: '72%', left: '88%', size: 3, delay: 0.9 },
-        { top: '85%', left: '15%', size: 2, delay: 1.3 },
-        { top: '45%', left: '4%',  size: 2, delay: 0.7 },
-        { top: '30%', left: '93%', size: 3, delay: 1.6 },
-        { top: '92%', left: '55%', size: 2, delay: 0.2 },
-        { top: '5%',  left: '55%', size: 2, delay: 1.1 },
+        { top: '6%',  left: '14%', size: 3, delay: 0 },
+        { top: '15%', left: '84%', size: 2, delay: 0.4 },
+        { top: '70%', left: '90%', size: 3, delay: 0.9 },
+        { top: '87%', left: '12%', size: 2, delay: 1.3 },
+        { top: '44%', left: '3%',  size: 2, delay: 0.7 },
+        { top: '28%', left: '94%', size: 3, delay: 1.6 },
+        { top: '93%', left: '56%', size: 2, delay: 0.2 },
+        { top: '4%',  left: '52%', size: 2, delay: 1.1 },
       ].map((s, i) => (
         <motion.div
           key={i}
@@ -34,145 +43,189 @@ export default function VinylRecord() {
         />
       ))}
 
-      {/* ── Outer neon glow ring (cyan → magenta) ── */}
-      <div className="absolute inset-0 rounded-full" style={{
-        background: 'conic-gradient(from 180deg, #00ffff, #8800ff, #ff00ff, #ff0088, #00ffff)',
-        padding: 4,
-        borderRadius: '50%',
-      }}>
-        <div className="w-full h-full rounded-full" style={{ background: '#050505' }} />
-      </div>
-
-      {/* ── The spinning disc ── */}
+      {/* Neon halo (drift-animated glow behind disc) */}
       <motion.div
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          filter: 'blur(40px)',
+          background: 'radial-gradient(circle at center, transparent 38%, rgba(255,0,170,0.18) 52%, rgba(0,240,255,0.15) 68%, transparent 100%)',
+          zIndex: 0,
+        }}
+        animate={{ scale: [1, 1.06, 1], opacity: [0.6, 0.85, 0.6] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Outer magenta glow ring */}
+      <div className="absolute pointer-events-none" style={{
+        inset: -10,
+        borderRadius: '50%',
+        border: '2px solid rgba(255,0,170,0.5)',
+        boxShadow: '0 0 25px rgba(255,0,170,0.4), inset 0 0 10px rgba(255,0,170,0.2)',
+        zIndex: 1,
+      }} />
+
+      {/* 3D-tilting vinyl disc wrapper */}
+      <div
         className="absolute"
-        style={{ inset: 4, borderRadius: '50%' }}
-        animate={{ rotate: 360 }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+        style={{
+          inset: 0,
+          zIndex: 5,
+          transformStyle: 'preserve-3d',
+          transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: 'transform 0.1s ease-out',
+        }}
       >
-        {/* Base vinyl — very dark with subtle warm tint */}
-        <div className="w-full h-full rounded-full" style={{
-          background: 'radial-gradient(circle at 48% 45%, #1a1015 0%, #0a080a 60%, #050505 100%)',
-        }}>
+        {/* Spinning disc */}
+        <motion.div
+          className="absolute inset-0 rounded-full overflow-hidden"
+          animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+          transition={isPlaying ? { duration: 4, repeat: Infinity, ease: 'linear' } : { duration: 0.8 }}
+          style={{
+            background: '#040404',
+            boxShadow: '0 30px 60px -12px rgba(0,0,0,1), 0 0 0 10px rgba(255,255,255,0.015), inset 0 0 40px rgba(0,0,0,0.9)',
+          }}
+        >
+          {/* Ultra-fine repeating-radial-gradient grooves */}
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'repeating-radial-gradient(circle at center, rgba(10,10,10,1) 0px, rgba(35,35,35,0.5) 0.5px, rgba(10,10,10,1) 1.5px)',
+            opacity: 0.95,
+          }} />
 
-          {/* Groove rings — lots of them for density */}
-          {Array.from({ length: 22 }, (_, i) => {
-            const inset = 6 + i * 8;
-            const alpha = 0.06 + (i % 3) * 0.04;
-            return (
-              <div key={i} className="absolute rounded-full" style={{
-                inset,
-                border: `1px solid rgba(255,255,255,${alpha})`,
-              }} />
-            );
-          })}
+          {/* Conic anisotropic highlight — simulates vinyl's light-catching surface */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `conic-gradient(
+                from 0deg at 50% 50%,
+                transparent 0%,
+                rgba(255,255,255,0.04) 10%,
+                rgba(255,255,255,0.13) 15%,
+                rgba(255,255,255,0.04) 20%,
+                transparent 40%,
+                rgba(0,240,255,0.03) 45%,
+                transparent 55%,
+                transparent 60%,
+                rgba(255,255,255,0.04) 65%,
+                rgba(255,255,255,0.13) 70%,
+                rgba(255,255,255,0.04) 75%,
+                transparent 100%
+              )`,
+              mixBlendMode: 'overlay',
+              transform: `translate(${anisotropyShift.x}px, ${anisotropyShift.y}px)`,
+              transition: 'transform 0.1s ease-out',
+            }}
+          />
 
-          {/* Rainbow prismatic reflection band across upper-left */}
-          <div className="absolute inset-0 rounded-full overflow-hidden">
-            <div style={{
-              position: 'absolute',
-              top: '5%', left: '-10%',
-              width: '65%', height: '45%',
-              background: 'linear-gradient(135deg, rgba(255,0,200,0.18) 0%, rgba(150,0,255,0.15) 30%, rgba(0,180,255,0.1) 60%, transparent 100%)',
-              borderRadius: '50%',
-              filter: 'blur(8px)',
-              transform: 'rotate(-20deg)',
-            }} />
-            {/* Second highlight band */}
-            <div style={{
-              position: 'absolute',
-              top: '20%', left: '5%',
-              width: '40%', height: '20%',
-              background: 'linear-gradient(120deg, rgba(255,180,255,0.12) 0%, rgba(100,220,255,0.1) 50%, transparent 100%)',
-              borderRadius: '60%',
-              filter: 'blur(6px)',
-              transform: 'rotate(-15deg)',
-            }} />
-          </div>
+          {/* Neon color reflection (magenta left, cyan right) */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: `
+              radial-gradient(circle at 10% 50%, rgba(255,0,170,0.18) 0%, transparent 60%),
+              radial-gradient(circle at 90% 50%, rgba(0,240,255,0.18) 0%, transparent 60%)
+            `,
+            mixBlendMode: 'screen',
+          }} />
+
+          {/* Inner cyan surface ring */}
+          <div className="absolute pointer-events-none" style={{
+            inset: 15,
+            borderRadius: '50%',
+            border: '1px solid rgba(0,240,255,0.4)',
+            boxShadow: '0 0 15px rgba(0,240,255,0.3), inset 0 0 15px rgba(0,240,255,0.3)',
+          }} />
 
           {/* Center label */}
           <motion.div
-            className="absolute rounded-full flex flex-col items-center justify-center gap-1"
+            className="absolute flex flex-col items-center justify-center"
             style={{
               inset: '37%',
-              background: 'radial-gradient(circle at 40% 40%, #2a1535, #150d20)',
-              border: '1px solid rgba(255,0,255,0.3)',
-              boxShadow: '0 0 20px rgba(255,0,255,0.15), inset 0 0 10px rgba(0,0,0,0.5)',
-              zIndex: 10,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at center, #1a1a1a 0%, #05000A 100%)',
+              border: '2px solid #222',
+              boxShadow: 'inset 0 0 20px rgba(0,0,0,1), 0 0 30px rgba(0,240,255,0.1)',
+              zIndex: 20,
             }}
             animate={{ rotate: -360 }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
           >
-            {/* Play button */}
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg width="10" height="12" viewBox="0 0 10 12" fill="white">
-                <path d="M1 1l8 5-8 5z" />
-              </svg>
-            </div>
-            <span style={{ fontSize: 7, fontWeight: 700, color: '#e0aaff', letterSpacing: 0.5, textAlign: 'center', lineHeight: 1.2, padding: '0 4px' }}>
-              LOST TAPES<br />VOL. 1
+            {/* Play icon */}
+            <svg width="18" height="20" viewBox="0 0 18 20" fill="rgba(0,240,255,0.9)" style={{ marginBottom: 4 }}>
+              <path d="M1 1l16 9L1 19z"/>
+            </svg>
+            <span style={{ fontSize: 7, fontWeight: 900, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.15em', textAlign: 'center', lineHeight: 1.3 }}>
+              LOST TAPES
             </span>
-            <span style={{ fontSize: 5.5, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.3 }}>
-              Various Artists
+            <span style={{ fontSize: 6, color: 'rgba(136,130,145,0.8)', fontWeight: 700, letterSpacing: '0.12em', marginTop: 2 }}>
+              VOL. 1 • 2024
             </span>
-            {/* Center pin hole */}
+            {/* Pin hole */}
             <div style={{
-              position: 'absolute', width: 5, height: 5, borderRadius: '50%',
-              background: '#000', border: '1px solid rgba(255,255,255,0.2)',
-              bottom: 8,
+              position: 'absolute', width: 8, height: 8, borderRadius: '50%',
+              background: '#000', border: '1px solid rgba(255,255,255,0.15)',
             }} />
           </motion.div>
+        </motion.div>
 
-        </div>
-      </motion.div>
+        {/* Clickable overlay (toggles play) */}
+        <button
+          onClick={() => setIsPlaying(p => !p)}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-full z-40 cursor-pointer bg-transparent"
+          aria-label="Toggle playback"
+        />
+      </div>
 
-      {/* ── Tonearm (does NOT spin) ── */}
-      <div className="absolute" style={{ top: 14, right: 20, width: 80, height: 180, zIndex: 20 }}>
+      {/* Mechanical Tonearm — does NOT spin, sits above disc */}
+      <div className="absolute pointer-events-none" style={{ top: 30, right: 10, width: 140, height: 420, zIndex: 30 }}>
         {/* Pivot base */}
         <div style={{
-          position: 'absolute', top: 0, right: 4,
-          width: 22, height: 22, borderRadius: '50%',
-          background: 'radial-gradient(circle at 35% 35%, #888, #333)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
-        }} />
+          position: 'absolute', top: 0, right: 0,
+          width: 70, height: 70, borderRadius: '50%',
+          background: 'linear-gradient(145deg, #333, #0a0a0a)',
+          border: '3px solid #1a1a1a',
+          boxShadow: '0 15px 30px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.05)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 15, height: 15, background: '#111', borderRadius: '50%',
+            boxShadow: 'inset 0 0 5px rgba(0,0,0,1)',
+          }} />
+        </div>
+
         {/* Counterweight */}
         <div style={{
-          position: 'absolute', top: 18, right: 6,
-          width: 10, height: 18, borderRadius: 5,
-          background: 'linear-gradient(180deg, #777, #444)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          position: 'absolute', top: -10, right: 20,
+          width: 30, height: 40, borderRadius: 4,
+          background: 'linear-gradient(to right, #222, #444, #222)',
+          border: '1px solid #111',
         }} />
+
         {/* Arm shaft — angled */}
         <div style={{
-          position: 'absolute', top: 10, right: 10,
-          width: 6, height: 140,
-          background: 'linear-gradient(90deg, #888, #555, #888)',
-          borderRadius: 3,
+          position: 'absolute', top: 35, right: 30,
+          width: 10, height: 340,
+          background: 'linear-gradient(to right, #1a1a1a, #444, #1a1a1a)',
+          borderRadius: 5,
           transformOrigin: 'top center',
-          transform: 'rotate(38deg)',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+          transform: 'rotate(22deg)',
+          boxShadow: '6px 0 15px rgba(0,0,0,0.5)',
         }} />
+
         {/* Headshell / cartridge */}
         <div style={{
-          position: 'absolute', bottom: 14, left: 2,
-          width: 14, height: 20, borderRadius: 4,
-          background: 'linear-gradient(135deg, #999, #555)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          transform: 'rotate(38deg)',
+          position: 'absolute', bottom: 10, right: 18,
+          width: 36, height: 60,
+          background: 'linear-gradient(145deg, #1a1a1a, #050505)',
+          borderRadius: '4px 4px 15px 15px',
+          transform: 'rotate(-10deg)',
+          boxShadow: '8px 8px 20px rgba(0,0,0,0.6)',
+          borderBottom: '2px solid #00F0FF',
         }} />
+
         {/* Stylus needle */}
         <div style={{
-          position: 'absolute', bottom: 4, left: 8,
-          width: 2, height: 12,
-          background: 'linear-gradient(180deg, #aaa, #555)',
+          position: 'absolute', bottom: -2, right: 41,
+          width: 2, height: 14,
+          background: '#555',
           borderRadius: 1,
-          transform: 'rotate(38deg)',
         }} />
       </div>
 

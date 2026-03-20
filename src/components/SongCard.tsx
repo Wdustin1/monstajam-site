@@ -9,18 +9,32 @@ interface SongCardProps {
   track: Track;
 }
 
-// Music note placeholder SVG for album art
-function AlbumArtPlaceholder({ color }: { color: string }) {
+// Album art with hover play overlay
+function AlbumArt({ color, onPlay, isActive }: { color: string; onPlay: () => void; isActive: boolean }) {
   return (
-    <div className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 ${color} flex items-center justify-center relative`}>
-      {/* Subtle grid pattern */}
+    <div className={`w-full aspect-square rounded-xl overflow-hidden flex-shrink-0 ${color} flex items-center justify-center relative group/art mb-4`}>
+      {/* Grid texture */}
       <div className="absolute inset-0 opacity-20"
         style={{
           backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px), repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px)'
         }} />
-      <svg className="w-8 h-8 opacity-40" fill="white" viewBox="0 0 24 24">
+      {/* Music note */}
+      <svg className="w-12 h-12 opacity-30 transition-transform duration-700 group-hover/art:scale-110" fill="white" viewBox="0 0 24 24">
         <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
       </svg>
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/art:opacity-100 transition-opacity duration-200">
+        <button
+          onClick={(e) => { e.stopPropagation(); onPlay(); }}
+          className="w-14 h-14 rounded-full flex items-center justify-center border border-white/20 hover:bg-white hover:text-black transition-all"
+          style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
+          aria-label="Play"
+        >
+          <svg className="w-6 h-6 ml-0.5" fill="white" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -31,15 +45,16 @@ export default function SongCard({ track }: SongCardProps) {
 
   return (
     <article
-      className={`bg-[#0e0e14] rounded-2xl p-4 flex flex-col group cursor-pointer relative min-h-[200px] border transition-all duration-300 ${
+      className={`rounded-2xl p-4 flex flex-col group cursor-pointer relative min-h-[200px] border transition-all duration-300 ${
         isActive
           ? 'border-[#ff00ff] neon-pulse-active'
           : 'border-white/8 hover:border-[rgba(255,0,255,0.6)] hover:shadow-[0_0_24px_rgba(255,0,255,0.35)]'
       }`}
       style={{
+        backgroundColor: '#0A0710',
         boxShadow: isActive
-          ? '0 0 28px rgba(255,0,255,0.55)'
-          : '0 4px 24px rgba(0,0,0,0.4)',
+          ? '0 0 28px rgba(255,0,170,0.55)'
+          : '0 4px 24px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(4px)',
       }}
     >
@@ -48,35 +63,32 @@ export default function SongCard({ track }: SongCardProps) {
         {String(track.number).padStart(2, '0')}
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        {/* Album art */}
-        <AlbumArtPlaceholder color={track.color} />
-
-        {/* Play button */}
-        <button
-          onClick={() => toggle(track)}
-          className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110"
-          aria-label={isActive ? 'Pause' : 'Play'}
-          style={
-            isActive
-              ? { background: '#ff00ff', boxShadow: '0 0 16px rgba(255,0,255,0.6)' }
-              : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }
-          }
-        >
-          {isActive ? (
-            <Pause className="w-4 h-4 text-white fill-current" />
-          ) : (
-            <Play className="w-4 h-4 text-white fill-current ml-0.5" />
-          )}
-        </button>
-      </div>
+      {/* Album art with hover play overlay */}
+      <AlbumArt color={track.color} onPlay={() => toggle(track)} isActive={isActive} />
 
       <div className="flex flex-col flex-grow">
-        <Link href={`/tracks/${track.slug}`} onClick={(e) => e.stopPropagation()}>
-          <h3 className="font-semibold text-sm leading-snug mb-0.5 text-white hover:text-[#00e5ff] transition-colors line-clamp-2">
-            {track.title}{track.subtitle ? ` (${track.subtitle})` : ''}
-          </h3>
-        </Link>
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <Link href={`/tracks/${track.slug}`} onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+            <h3 className="font-bold text-base leading-snug text-white hover:text-[#00e5ff] transition-colors line-clamp-2">
+              {track.title}{track.subtitle ? ` (${track.subtitle})` : ''}
+            </h3>
+          </Link>
+          {/* Small inline play/pause */}
+          <button
+            onClick={() => toggle(track)}
+            className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
+            aria-label={isActive ? 'Pause' : 'Play'}
+            style={isActive
+              ? { background: '#ff00ff', boxShadow: '0 0 12px rgba(255,0,255,0.6)' }
+              : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }
+            }
+          >
+            {isActive
+              ? <Pause className="w-3 h-3 text-white fill-current" />
+              : <Play className="w-3 h-3 text-white fill-current ml-0.5" />
+            }
+          </button>
+        </div>
         <p className="text-xs text-gray-500 mb-3">{track.artist}</p>
 
         <div className="mt-auto flex items-center justify-between">
