@@ -124,6 +124,7 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
             style={{ backdropFilter: 'blur(8px)' }}>
             <Search className="w-5 h-5 text-gray-500 flex-shrink-0" />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setSearch('')}
               placeholder="Search tracks..."
               className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-600 w-full ml-3 text-sm" />
             {search && (

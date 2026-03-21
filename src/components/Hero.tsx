@@ -2,7 +2,7 @@
 
 import VinylRecord from './VinylRecord';
 
-export default function Hero() {
+export default function Hero({ trackCount = 12 }: { trackCount?: number }) {
   return (
     <section
       className="max-w-7xl mx-auto px-8 pt-8 pb-16 flex flex-col lg:flex-row items-center justify-between gap-12 relative"
@@ -97,7 +97,7 @@ export default function Hero() {
         {/* Social proof strip */}
         <div className="flex items-center gap-5 mt-2 pt-6 border-t border-white/5">
           <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">12+</span>
+            <span className="text-white font-black text-lg leading-none">{trackCount}+</span>
             <span className="text-gray-500 text-xs mt-0.5">Exclusive Tracks</span>
           </div>
           <div className="w-px h-8 bg-white/10" />
