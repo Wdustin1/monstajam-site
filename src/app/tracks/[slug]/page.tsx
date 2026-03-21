@@ -30,6 +30,24 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
   });
   if (!track) notFound();
 
+  // Fetch all published tracks for the player queue
+  const allTracks = await prisma.track.findMany({
+    where: { published: true },
+    select: {
+      slug: true,
+      title: true,
+      artist: true,
+      genre: true,
+      bpm: true,
+      subtitle: true,
+      color: true,
+      audioUrl: true,
+      coverUrl: true,
+      number: true,
+    },
+    orderBy: { number: 'asc' },
+  });
+
   return (
     <div className="min-h-screen flex flex-col relative overflow-x-hidden" style={{ backgroundColor: '#05000A' }}>
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -38,7 +56,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
         <div className="absolute top-1/2 right-1/4 w-1.5 h-1.5 rounded-full bg-pink-400 blur-[1px] opacity-60 shadow-[0_0_8px_#ff00ff]" />
       </div>
       <Navbar />
-      <TrackDetail track={track} />
+      <TrackDetail track={track} allTracks={allTracks} />
       <Footer />
     </div>
   );

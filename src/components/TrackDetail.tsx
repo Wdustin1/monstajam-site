@@ -7,11 +7,20 @@ import type { TrackWithCredits } from './MusicLibrary';
 
 interface TrackDetailProps {
   track: TrackWithCredits;
+  allTracks?: TrackWithCredits[];
 }
 
-export default function TrackDetail({ track }: TrackDetailProps) {
+export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps) {
   const [showLyrics, setShowLyrics] = useState(false);
-  const { toggle, currentTrack, isPlaying } = usePlayer();
+  const { toggle, currentTrack, isPlaying, setQueue, play } = usePlayer();
+
+  const handlePlay = () => {
+    // Set queue with all tracks so Next/Prev work
+    if (allTracks.length > 0) {
+      setQueue(allTracks);
+    }
+    toggle(track);
+  };
   const isCurrentTrack = currentTrack?.slug === track.slug;
 
   const titleColor = track.accentCyan ? 'text-[#00ffff]' : 'text-[#ff00ff]';
@@ -116,7 +125,7 @@ export default function TrackDetail({ track }: TrackDetailProps) {
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4 mt-2">
           <button
-            onClick={() => toggle(track)}
+            onClick={handlePlay}
             className="bg-[#ff00ff] hover:bg-[#e600e6] text-black font-bold py-3 px-8 rounded-full flex items-center gap-2 transition-all"
             style={{ boxShadow: '0 0 15px rgba(255,0,255,0.6)' }}
             onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 0 25px rgba(255,0,255,0.9)')}
