@@ -184,7 +184,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
                   boxShadow: '0 0 10px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.2)',
                 }}
               >
-                {showLyrics ? 'Hide Lyrics' : 'View Lyrics'}
+                {showLyrics ? 'Hide Story' : 'Read Story'}
               </button>
             </div>
             {showLyrics && (

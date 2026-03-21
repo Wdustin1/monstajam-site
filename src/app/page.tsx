@@ -14,8 +14,8 @@ export default async function Home() {
 
   return (
     <>
-      <Navbar />
-      <main className="flex-grow pt-24 hero-bg-gradient">
+      <Navbar activeLink="home" />
+      <main id="main-content" className="flex-grow pt-24 hero-bg-gradient">
         <Hero trackCount={tracks.length} />
         <ScrollIndicator />
         <MusicLibrary tracks={tracks} />

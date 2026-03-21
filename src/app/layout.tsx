@@ -40,6 +40,14 @@ export default function RootLayout({
           <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-cyan-600/20 rounded-full blur-[120px]" />
         </div>
 
+        {/* Skip to main content — keyboard/screen reader accessibility */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#00e5ff] focus:text-black focus:font-bold focus:text-sm"
+        >
+          Skip to content
+        </a>
+
         <PlayerProvider>
           {children}
           <PersistentPlayer />

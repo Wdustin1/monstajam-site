@@ -11,6 +11,7 @@ interface PublishedTrack {
   title: string;
   artist: string;
   genre: string;
+  number: number;
   bpm: number | null;
   mood: string | null;
   story: string | null;
@@ -46,6 +47,18 @@ const inputStyle: React.CSSProperties = {
 };
 
 const GENRES = ['Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi', 'Pop', 'Trap', 'Afrobeat', 'Other'];
+
+// Map genres to gradient classes matching what SongCard/TrackDetail expect
+const GENRE_COLORS: Record<string, string> = {
+  'Hip-Hop':  'bg-gradient-to-br from-purple-600 to-blue-500',
+  'R&B':      'bg-gradient-to-br from-pink-600 to-purple-700',
+  'Electronic':'bg-gradient-to-br from-cyan-500 to-blue-700',
+  'Lo-Fi':    'bg-gradient-to-br from-indigo-500 to-purple-600',
+  'Pop':      'bg-gradient-to-br from-rose-500 to-pink-600',
+  'Trap':     'bg-gradient-to-br from-gray-700 to-gray-900',
+  'Afrobeat': 'bg-gradient-to-br from-orange-500 to-yellow-600',
+  'Other':    'bg-gradient-to-br from-slate-600 to-slate-800',
+};
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -220,7 +233,7 @@ export default function UploadDashboard() {
         genre,
         bpm: bpm ? parseInt(bpm) : undefined,
         mood: mood.trim() || undefined,
-        color: '#00ffff',
+        color: GENRE_COLORS[genre] ?? 'bg-gradient-to-br from-purple-600 to-blue-500',
         story: story.trim() || undefined,
         spotifyUrl: spotifyLink.trim() || undefined,
         appleMusicUrl: appleLink.trim() || undefined,
@@ -240,8 +253,9 @@ export default function UploadDashboard() {
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Update failed'); }
         showToast('success', `"${title}" updated ✓`);
       } else {
-        // CREATE
-        const nextNum = tracks.length + 1;
+        // CREATE — use MAX track number to avoid gaps from deletions
+        const maxNum = tracks.reduce((max, t) => t.number > max ? t.number : max, 0);
+        const nextNum = maxNum + 1;
         const res = await fetch('/api/tracks', {
           method: 'POST',
           credentials: 'include',

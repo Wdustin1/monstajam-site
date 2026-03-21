@@ -41,7 +41,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
         {LINKS.map(({ label, href, key }) => {
           const isActive = activeLink === key;
           return (
-            <a
+            <Link
               key={key}
               href={href}
               className={`transition-colors pb-1 ${
@@ -51,20 +51,21 @@ export default function Navbar({ activeLink }: NavbarProps) {
               }`}
             >
               {label}
-            </a>
+            </Link>
           );
         })}
       </nav>
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden flex flex-col gap-1.5 p-2 rounded-lg hover:bg-white/5 transition-colors"
+        className="md:hidden flex flex-col justify-center gap-[5px] p-2 w-9 h-9 rounded-lg hover:bg-white/5 transition-colors"
         onClick={() => setMenuOpen((v) => !v)}
         aria-label="Toggle menu"
+        aria-expanded={menuOpen}
       >
-        <span className={`block w-5 h-0.5 bg-white transition-transform origin-center ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-white transition-opacity ${menuOpen ? 'opacity-0' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-white transition-transform origin-center ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-white transition-all duration-300 origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-white transition-all duration-300 ${menuOpen ? 'opacity-0 scale-x-0' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-white transition-all duration-300 origin-center ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
       </button>
 
       {/* Mobile dropdown */}
@@ -80,7 +81,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
           {LINKS.map(({ label, href, key }) => {
             const isActive = activeLink === key;
             return (
-              <a
+              <Link
                 key={key}
                 href={href}
                 onClick={() => setMenuOpen(false)}
@@ -89,7 +90,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
                 }`}
               >
                 {label}
-              </a>
+              </Link>
             );
           })}
         </div>

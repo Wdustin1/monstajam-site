@@ -21,12 +21,14 @@ interface PlayerContextValue {
   progress: number;
   duration: number;
   currentTime: number;
+  volume: number;
   shuffleOn: boolean;
   repeatOn: boolean;
   play: (track: PlayerTrack) => void;
   pause: () => void;
   toggle: (track: PlayerTrack) => void;
   seek: (fraction: number) => void;
+  setVolume: (v: number) => void;
   next: () => void;
   prev: () => void;
   toggleShuffle: () => void;
@@ -38,14 +40,16 @@ const PlayerContext = createContext<PlayerContextValue>({
   currentTrack: null,
   isPlaying: false,
   progress: 0,
-  duration: 180,
+  duration: 0,
   currentTime: 0,
+  volume: 0.75,
   shuffleOn: false,
   repeatOn: false,
   play: () => {},
   pause: () => {},
   toggle: () => {},
   seek: () => {},
+  setVolume: () => {},
   next: () => {},
   prev: () => {},
   toggleShuffle: () => {},
@@ -53,107 +57,192 @@ const PlayerContext = createContext<PlayerContextValue>({
   setQueue: () => {},
 });
 
-const DEFAULT_DURATION = 180;
-
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [volume, setVolumeState] = useState(0.75);
   const [queue, setQueueState] = useState<PlayerTrack[]>([]);
   const [shuffleOn, setShuffleOn] = useState(false);
   const [repeatOn, setRepeatOn] = useState(false);
-  const duration = DEFAULT_DURATION;
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentTrackRef = useRef<PlayerTrack | null>(null);
 
+  // Keep ref in sync for use in callbacks
+  currentTrackRef.current = currentTrack;
+
+  // Create audio element once
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 1) {
-            clearInterval(intervalRef.current!);
-            // Auto-advance when track ends
-            if (repeatOn) return 0;
-            return 1;
-          }
-          return p + 0.1 / duration;
-        });
-      }, 100);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
+    const audio = new Audio();
+    audio.volume = volume;
+    audio.preload = 'metadata';
+
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setCurrentTime(audio.currentTime);
+        setProgress(audio.currentTime / audio.duration);
+      }
+    });
+
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      // Auto-advance handled via state update below
+    });
+
+    audioRef.current = audio;
+
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      audio.pause();
+      audio.src = '';
     };
-  }, [isPlaying, duration, repeatOn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Auto-next when track finishes
+  // Auto-advance when track ends
+  const [trackEnded, setTrackEnded] = useState(false);
   useEffect(() => {
-    if (progress >= 1 && !repeatOn) {
-      const timer = setTimeout(() => {
-        nextTrack();
-      }, 400);
-      return () => clearTimeout(timer);
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleEnded = () => setTrackEnded(true);
+    audio.addEventListener('ended', handleEnded);
+    return () => audio.removeEventListener('ended', handleEnded);
+  }, []);
+
+  useEffect(() => {
+    if (trackEnded) {
+      setTrackEnded(false);
+      if (repeatOn) {
+        const audio = audioRef.current;
+        if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); setIsPlaying(true); }
+      } else {
+        nextTrackFn();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress, repeatOn]);
+  }, [trackEnded, repeatOn]);
 
+  // Reset state on track change
   useEffect(() => {
     setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
   }, [currentTrack?.slug]);
 
-  const play = (track: PlayerTrack) => {
-    setCurrentTrack(track);
-    setIsPlaying(true);
-  };
+  const play = useCallback((track: PlayerTrack) => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-  const pause = () => setIsPlaying(false);
+    if (currentTrackRef.current?.slug !== track.slug) {
+      // New track
+      setCurrentTrack(track);
+      if (track.audioUrl) {
+        audio.src = track.audioUrl;
+        audio.load();
+        audio.play().catch(() => {});
+        setIsPlaying(true);
+      } else {
+        // No audio URL — still update UI but can't play
+        audio.src = '';
+        setIsPlaying(false);
+      }
+    } else {
+      // Same track — resume
+      if (track.audioUrl) {
+        audio.play().catch(() => {});
+        setIsPlaying(true);
+      }
+    }
+  }, []);
 
-  const toggle = (track: PlayerTrack) => {
-    if (currentTrack?.slug === track.slug) {
-      setIsPlaying((prev) => !prev);
+  const pause = useCallback(() => {
+    audioRef.current?.pause();
+    setIsPlaying(false);
+  }, []);
+
+  const toggle = useCallback((track: PlayerTrack) => {
+    if (currentTrackRef.current?.slug === track.slug) {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (audio.paused) {
+        if (track.audioUrl) { audio.play().catch(() => {}); setIsPlaying(true); }
+      } else {
+        audio.pause(); setIsPlaying(false);
+      }
     } else {
       play(track);
     }
-  };
+  }, [play]);
 
-  const seek = (fraction: number) => {
-    setProgress(Math.max(0, Math.min(1, fraction)));
-  };
+  const seek = useCallback((fraction: number) => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    const t = Math.max(0, Math.min(1, fraction)) * audio.duration;
+    audio.currentTime = t;
+    setCurrentTime(t);
+    setProgress(fraction);
+  }, []);
+
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolumeState(clamped);
+    if (audioRef.current) audioRef.current.volume = clamped;
+  }, []);
 
   const setQueue = useCallback((tracks: PlayerTrack[]) => {
     setQueueState(tracks);
   }, []);
 
-  const nextTrack = useCallback(() => {
-    if (!queue.length) return;
-    if (shuffleOn) {
-      const idx = Math.floor(Math.random() * queue.length);
-      play(queue[idx]);
-      return;
-    }
-    const currentIdx = currentTrack ? queue.findIndex((t) => t.slug === currentTrack.slug) : -1;
-    const nextIdx = (currentIdx + 1) % queue.length;
-    play(queue[nextIdx]);
+  const nextTrackFn = useCallback(() => {
+    setQueueState(q => {
+      if (!q.length) return q;
+      const current = currentTrackRef.current;
+      let nextIdx: number;
+      if (shuffleOn) {
+        nextIdx = Math.floor(Math.random() * q.length);
+      } else {
+        const idx = current ? q.findIndex(t => t.slug === current.slug) : -1;
+        nextIdx = (idx + 1) % q.length;
+      }
+      // Play after state update
+      setTimeout(() => play(q[nextIdx]), 0);
+      return q;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue, currentTrack, shuffleOn]);
+  }, [shuffleOn, play]);
 
   const prevTrack = useCallback(() => {
-    if (!queue.length) return;
-    // If more than 3s in, restart current track
-    if (progress > 0.03 && currentTrack) {
-      seek(0);
-      setIsPlaying(true);
+    const audio = audioRef.current;
+    // If > 3s in, restart current
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      setProgress(0);
       return;
     }
-    const currentIdx = currentTrack ? queue.findIndex((t) => t.slug === currentTrack.slug) : 0;
-    const prevIdx = (currentIdx - 1 + queue.length) % queue.length;
-    play(queue[prevIdx]);
+    setQueueState(q => {
+      if (!q.length) return q;
+      const current = currentTrackRef.current;
+      const idx = current ? q.findIndex(t => t.slug === current.slug) : 0;
+      const prevIdx = (idx - 1 + q.length) % q.length;
+      setTimeout(() => play(q[prevIdx]), 0);
+      return q;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue, currentTrack, progress]);
+  }, [play]);
 
-  const toggleShuffle = () => setShuffleOn((v) => !v);
-  const toggleRepeat = () => setRepeatOn((v) => !v);
+  const toggleShuffle = () => setShuffleOn(v => !v);
+  const toggleRepeat = () => setRepeatOn(v => !v);
 
   return (
     <PlayerContext.Provider value={{
@@ -161,14 +250,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       isPlaying,
       progress,
       duration,
-      currentTime: progress * duration,
+      currentTime,
+      volume,
       shuffleOn,
       repeatOn,
       play,
       pause,
       toggle,
       seek,
-      next: nextTrack,
+      setVolume,
+      next: nextTrackFn,
       prev: prevTrack,
       toggleShuffle,
       toggleRepeat,

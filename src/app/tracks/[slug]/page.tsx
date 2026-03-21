@@ -55,7 +55,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
         <div className="absolute bottom-1/3 left-1/3 w-3 h-3 rounded-full bg-cyan-400 blur-[3px] opacity-40 shadow-[0_0_15px_#00ffff]" />
         <div className="absolute top-1/2 right-1/4 w-1.5 h-1.5 rounded-full bg-pink-400 blur-[1px] opacity-60 shadow-[0_0_8px_#ff00ff]" />
       </div>
-      <Navbar />
+      <Navbar activeLink="music" />
       <TrackDetail track={track} allTracks={allTracks} />
       <Footer />
     </div>
