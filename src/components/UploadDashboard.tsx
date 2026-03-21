@@ -46,7 +46,6 @@ const inputStyle: React.CSSProperties = {
 };
 
 const GENRES = ['Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi', 'Pop', 'Trap', 'Afrobeat', 'Other'];
-const ADMIN_SECRET = 'monstajam-admin-2024';
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -147,7 +146,7 @@ export default function UploadDashboard() {
   const loadTracks = useCallback(async () => {
     try {
       setTracksLoading(true);
-      const res = await fetch('/api/tracks?all=true');
+      const res = await fetch('/api/tracks?all=true', { credentials: 'include' });
       if (res.ok) setTracks(await res.json());
     } catch { /* silent */ } finally {
       setTracksLoading(false);
@@ -194,7 +193,7 @@ export default function UploadDashboard() {
   async function uploadFile(file: File, bucket: string): Promise<string> {
     const fd = new FormData();
     fd.append('file', file); fd.append('bucket', bucket);
-    const res = await fetch('/api/upload', { method: 'POST', headers: { 'x-admin-secret': ADMIN_SECRET }, body: fd });
+    const res = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: fd });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Upload failed'); }
     return (await res.json()).url;
   }
@@ -234,7 +233,8 @@ export default function UploadDashboard() {
         // UPDATE
         const res = await fetch(`/api/tracks/${editingSlug}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'x-admin-secret': ADMIN_SECRET },
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Update failed'); }
@@ -244,7 +244,8 @@ export default function UploadDashboard() {
         const nextNum = tracks.length + 1;
         const res = await fetch('/api/tracks', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-admin-secret': ADMIN_SECRET },
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, slug: slugify(title), number: nextNum }),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to create track'); }
@@ -265,7 +266,8 @@ export default function UploadDashboard() {
     try {
       const res = await fetch(`/api/tracks/${track.slug}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-admin-secret': ADMIN_SECRET },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published: !track.published }),
       });
       if (!res.ok) throw new Error('Failed to update');
@@ -281,7 +283,7 @@ export default function UploadDashboard() {
     try {
       const res = await fetch(`/api/tracks/${track.slug}`, {
         method: 'DELETE',
-        headers: { 'x-admin-secret': ADMIN_SECRET },
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Delete failed');
       showToast('success', `"${track.title}" deleted.`);
@@ -319,12 +321,16 @@ export default function UploadDashboard() {
               + New Track
             </button>
           )}
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-            style={{ border: '2px solid #00FFFF', boxShadow: '0 0 10px rgba(0,255,255,0.5)', background: 'linear-gradient(135deg, #00FFFF33, #FF007F33)' }}
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+              window.location.href = '/upload/login';
+            }}
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold text-gray-400 hover:text-white transition-colors"
+            style={{ border: '1px solid #334155' }}
           >
-            AK
-          </div>
+            Sign Out
+          </button>
         </div>
       </header>
 

@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isAdminRequest } from '@/lib/auth';
 
-// GET /api/tracks — list all published tracks
+// GET /api/tracks — list tracks (published only; admin cookie required for drafts)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const genre = searchParams.get('genre');
-  const all = searchParams.get('all'); // admin: include unpublished
+  const all = searchParams.get('all') === 'true';
+
+  // ?all=true requires admin session
+  const showAll = all && isAdminRequest(req);
 
   try {
     const tracks = await prisma.track.findMany({
       where: {
-        ...(all !== 'true' && { published: true }),
+        ...(!showAll && { published: true }),
         ...(genre && genre !== 'All' && { genre }),
       },
       include: { credits: true },
@@ -25,8 +29,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/tracks — create a new track (admin only)
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-admin-secret');
-  if (secret !== process.env.ADMIN_SECRET) {
+  if (!isAdminRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
