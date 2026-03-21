@@ -1,3 +1,5 @@
+'use client';
+
 import VinylRecord from './VinylRecord';
 
 export default function Hero() {
@@ -59,6 +61,7 @@ export default function Hero() {
         <div className="flex items-center gap-4 mt-4 flex-wrap">
           {/* Explore Library — cyan glow */}
           <button
+            onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })}
             className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105"
             style={{
               border: '2px solid #00e5ff',

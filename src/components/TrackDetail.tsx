@@ -20,11 +20,11 @@ export default function TrackDetail({ track }: TrackDetailProps) {
     : '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)';
 
   return (
-    <main className="flex-grow container mx-auto px-8 py-12 md:py-20 z-10 flex flex-col lg:flex-row gap-16 lg:gap-24 items-start justify-center max-w-7xl">
+    <main className="flex-grow container mx-auto px-8 pt-28 pb-16 z-10 flex flex-col lg:flex-row gap-16 lg:gap-24 items-start justify-center max-w-7xl">
       {/* Back link */}
       <div className="absolute top-24 left-8 z-20 hidden lg:block">
         <Link
-          href="/"
+          href="/#library"
           className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,7 +59,7 @@ export default function TrackDetail({ track }: TrackDetailProps) {
       <div className="w-full lg:w-1/2 flex flex-col gap-8">
         {/* Mobile back link */}
         <Link
-          href="/"
+          href="/#library"
           className="lg:hidden text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -62,7 +62,7 @@ function Toast({ type, message, onDismiss }: { type: 'success' | 'error'; messag
 
   return (
     <div
-      className="fixed bottom-24 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-xl text-white text-sm font-medium shadow-2xl"
+      className="fixed top-6 right-6 z-[200] flex items-center gap-3 px-5 py-4 rounded-xl text-white text-sm font-medium shadow-2xl"
       style={{
         background: type === 'success' ? 'rgba(0,30,15,0.95)' : 'rgba(30,0,15,0.95)',
         border: `1px solid ${type === 'success' ? '#00FFCF' : '#FF007F'}`,
@@ -136,6 +136,7 @@ export default function UploadDashboard() {
   // UI state
   const [submitting, setSubmitting]   = useState(false);
   const [toast, setToast]             = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [titleError, setTitleError]   = useState(false);
   const [tracks, setTracks]           = useState<PublishedTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<PublishedTrack | null>(null);
@@ -200,7 +201,12 @@ export default function UploadDashboard() {
 
   // Submit (create or update)
   const handleSubmit = async () => {
-    if (!title.trim()) { showToast('error', 'Track title is required.'); return; }
+    if (!title.trim()) {
+      setTitleError(true);
+      showToast('error', 'Track title is required.');
+      return;
+    }
+    setTitleError(false);
 
     setSubmitting(true);
     try {
@@ -355,7 +361,8 @@ export default function UploadDashboard() {
             {/* Title + Artist */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <NeonInput label="Track Title *">
-                <input value={title} onChange={(e) => setTitle(e.target.value)} type="text" placeholder="e.g. Midnight City" style={inputStyle} />
+                <input value={title} onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) setTitleError(false); }} type="text" placeholder="e.g. Midnight City"
+                  style={{ ...inputStyle, borderColor: titleError ? '#FF007F' : '#00FFFF', boxShadow: titleError ? 'inset 0 0 5px rgba(255,0,127,0.5)' : inputStyle.boxShadow }} />
               </NeonInput>
               <NeonInput label="Artist Name">
                 <input value={artist} onChange={(e) => setArtist(e.target.value)} type="text" placeholder="Monsta Jam" style={inputStyle} />

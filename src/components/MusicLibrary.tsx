@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, ChevronDown, X } from 'lucide-react';
 import SongCard from './SongCard';
-import type { PlayerTrack } from '@/context/PlayerContext';
+import { usePlayer, type PlayerTrack } from '@/context/PlayerContext';
 
 export interface Credit {
   id: string;
@@ -51,7 +51,7 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
         <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-20 shadow-2xl min-w-full"
+        <div className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl min-w-full"
           style={{ backdropFilter: 'blur(12px)' }}>
           {options.map((opt) => (
             <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
@@ -70,6 +70,7 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
   const [genre, setGenre] = useState('All');
   const [bpm, setBpm] = useState('All');
   const [mood, setMood] = useState('All');
+  const { setQueue } = usePlayer();
 
   const filtered = useMemo(() => {
     return tracks.filter((t) => {
@@ -87,6 +88,11 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
       return true;
     });
   }, [search, genre, bpm, mood, tracks]);
+
+  // Keep player queue in sync with visible filtered tracks
+  useEffect(() => {
+    setQueue(filtered);
+  }, [filtered, setQueue]);
 
   return (
     <section id="library" className="max-w-7xl mx-auto px-6 pt-8 pb-40 flex flex-col gap-10 z-10 relative">
@@ -120,6 +126,11 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tracks..."
               className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-600 w-full ml-3 text-sm" />
+            {search && (
+              <button onClick={() => setSearch('')} className="ml-2 text-gray-500 hover:text-white transition-colors flex-shrink-0" aria-label="Clear search">
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
         <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">

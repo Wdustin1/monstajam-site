@@ -17,7 +17,7 @@ function formatTime(seconds: number) {
 }
 
 export default function PersistentPlayer() {
-  const { currentTrack, isPlaying, progress, currentTime, duration, pause, play, toggle, seek } = usePlayer();
+  const { currentTrack, isPlaying, progress, currentTime, duration, pause, play, toggle, seek, next, prev, shuffleOn, repeatOn, toggleShuffle, toggleRepeat } = usePlayer();
   const [tick, setTick] = useState(0);
   const rafRef = useRef<number | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -178,10 +178,20 @@ export default function PersistentPlayer() {
 
         {/* ── RIGHT: Controls ── */}
         <div className="flex items-center justify-end gap-4 w-1/4 min-w-[240px]">
-          <button className="text-gray-600 hover:text-gray-300 transition-colors" aria-label="Shuffle">
+          <button
+            onClick={toggleShuffle}
+            className="transition-colors"
+            aria-label="Shuffle"
+            style={{ color: shuffleOn ? '#00e5ff' : '#4b5563' }}
+          >
             <Shuffle className="w-4 h-4" />
           </button>
-          <button className="text-gray-400 hover:text-white transition-colors" aria-label="Previous">
+          <button
+            onClick={prev}
+            disabled={!hasTrack}
+            className="text-gray-400 hover:text-white transition-colors disabled:opacity-30"
+            aria-label="Previous"
+          >
             <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
@@ -202,10 +212,20 @@ export default function PersistentPlayer() {
             }
           </button>
 
-          <button className="text-gray-400 hover:text-white transition-colors" aria-label="Next">
+          <button
+            onClick={next}
+            disabled={!hasTrack}
+            className="text-gray-400 hover:text-white transition-colors disabled:opacity-30"
+            aria-label="Next"
+          >
             <SkipForward className="w-5 h-5 fill-current" />
           </button>
-          <button className="text-gray-600 hover:text-gray-300 transition-colors" aria-label="Repeat">
+          <button
+            onClick={toggleRepeat}
+            className="transition-colors"
+            aria-label="Repeat"
+            style={{ color: repeatOn ? '#00e5ff' : '#4b5563' }}
+          >
             <Repeat className="w-4 h-4" />
           </button>
 

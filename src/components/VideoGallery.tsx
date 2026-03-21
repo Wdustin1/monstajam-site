@@ -1,6 +1,7 @@
 'use client';
 
-import { Play, Share2, Youtube } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Share2, Youtube, Check } from 'lucide-react';
 
 interface VideoCard {
   id: number;
@@ -77,6 +78,22 @@ const VIDEOS: VideoCard[] = [
 ];
 
 export default function VideoGallery() {
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : 'https://monstajam-site.vercel.app/videos';
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // fallback: try Web Share API
+      if (navigator.share) {
+        navigator.share({ title: 'MonstaJam Videos', url });
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col gap-10">
 
@@ -111,26 +128,24 @@ export default function VideoGallery() {
         <div className="flex gap-4 flex-shrink-0">
           {/* Share — magenta hollow */}
           <button
+            onClick={handleShare}
             className="px-6 py-2 rounded-full flex items-center gap-2 font-medium text-sm text-white transition-all hover:bg-fuchsia-500/10"
             style={{
               border: '2px solid #ff00ff',
               boxShadow: '0 0 10px rgba(255,0,255,0.4), inset 0 0 10px rgba(255,0,255,0.15)',
             }}
           >
-            <Share2 className="w-4 h-4" />
-            Share
+            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+            {copied ? 'Copied!' : 'Share'}
           </button>
-          {/* YouTube — cyan hollow */}
-          <button
+          {/* YouTube subscribe — uncomment and add href when channel is live
+          <a href="https://youtube.com/@monstajam" target="_blank" rel="noopener noreferrer"
             className="px-6 py-2 rounded-full flex items-center gap-2 font-medium text-sm text-white transition-all hover:bg-cyan-500/10"
-            style={{
-              border: '2px solid #00e5ff',
-              boxShadow: '0 0 10px rgba(0,229,255,0.4), inset 0 0 10px rgba(0,229,255,0.15)',
-            }}
-          >
+            style={{ border: '2px solid #00e5ff', boxShadow: '0 0 10px rgba(0,229,255,0.4)' }}>
             <Youtube className="w-4 h-4" />
             Subscribe to YouTube
-          </button>
+          </a>
+          */}
         </div>
       </section>
 
