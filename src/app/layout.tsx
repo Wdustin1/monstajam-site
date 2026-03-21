@@ -12,6 +12,10 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "MonstaJam - Unreleased Beats",
   description: "Discover the beats and tracks that never made it to the mainstream. Curated for true fans.",
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
