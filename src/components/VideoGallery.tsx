@@ -81,16 +81,14 @@ export default function VideoGallery() {
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : 'https://monstajam-site.vercel.app/videos';
+    const url = 'https://monstajam-site.vercel.app/videos';
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // fallback: try Web Share API
-      if (navigator.share) {
-        navigator.share({ title: 'MonstaJam Videos', url });
-      }
+      // Fallback: prompt user to copy
+      prompt('Copy this URL:', url);
     }
   };
 
