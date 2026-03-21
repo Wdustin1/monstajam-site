@@ -29,7 +29,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
     : '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)';
 
   return (
-    <main className="flex-grow container mx-auto px-8 pt-28 pb-16 z-10 flex flex-col lg:flex-row gap-16 lg:gap-24 items-start justify-center max-w-7xl">
+    <main className="flex-grow container mx-auto px-8 pt-28 pb-40 z-10 flex flex-col lg:flex-row gap-16 lg:gap-24 items-start justify-center max-w-7xl">
       {/* Back link */}
       <div className="absolute top-24 left-8 z-20 hidden lg:block">
         <Link
