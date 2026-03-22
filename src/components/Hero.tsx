@@ -16,7 +16,7 @@ export default function Hero({
 }) {
   return (
     <section
-      className="max-w-7xl mx-auto px-8 pt-8 pb-16 flex flex-col lg:flex-row items-center justify-between gap-12 relative"
+      className="max-w-7xl mx-auto px-5 md:px-8 pt-6 md:pt-8 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
       style={{ minHeight: 'calc(100vh - 96px)' }}
     >
       {/* Ambient glow blobs behind content */}
@@ -29,7 +29,7 @@ export default function Hero({
       <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10">
 
         <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
-          style={{ fontSize: 'clamp(3rem, 8vw, 5.5rem)' }}>
+          style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)' }}>
           <span style={{
             background: 'linear-gradient(90deg, #00ffff, #0088ff)',
             WebkitBackgroundClip: 'text',
@@ -117,7 +117,7 @@ export default function Hero({
       </div>
 
       {/* ── Right: Vinyl ── */}
-      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-8 lg:mt-0 relative">
+      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-none mx-auto lg:mx-0">
         {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-72 h-72 rounded-full"

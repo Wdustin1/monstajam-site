@@ -32,7 +32,6 @@ export default function PersistentPlayer() {
   useEffect(() => {
     if (!isPlaying) {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-      // Reset bars to static heights
       barsRef.current.forEach((el, i) => {
         if (el) el.style.height = `${BARS[i] * 2.4}px`;
       });
@@ -72,7 +71,7 @@ export default function PersistentPlayer() {
     <footer
       className="fixed bottom-0 left-0 w-full z-50"
       style={{
-        background: 'rgba(5, 0, 10, 0.92)',
+        background: 'rgba(5, 0, 10, 0.96)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         borderTop: '1px solid rgba(255,255,255,0.07)',
@@ -104,10 +103,71 @@ export default function PersistentPlayer() {
         )}
       </div>
 
-      <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+      {/* ── MOBILE LAYOUT (< md) ── */}
+      <div className="md:hidden px-4 pt-3 pb-3">
+        {/* Row 1: Track info + Play button */}
+        <div className="flex items-center gap-3 mb-2">
+          {/* Mini album art */}
+          <div
+            className={`w-10 h-10 rounded-lg flex-shrink-0 ${displayTrack.color} flex items-center justify-center`}
+            style={{ boxShadow: hasTrack ? '0 0 12px rgba(176,38,255,0.4)' : undefined }}
+          >
+            <svg className="w-4 h-4 opacity-40" fill="white" viewBox="0 0 24 24">
+              <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+            </svg>
+          </div>
 
-        {/* ── LEFT: Track info ── */}
-        <div className="flex items-center gap-4 w-1/4 min-w-[180px]">
+          {/* Track title + artist */}
+          <div className="flex-1 min-w-0">
+            <h4 className="text-white font-semibold text-sm truncate leading-tight">
+              {displayTrack.title}
+              {currentTrack?.subtitle ? ` (${currentTrack.subtitle})` : ''}
+            </h4>
+            <p className="text-xs truncate mt-0.5" style={{ color: '#00e5ff', opacity: 0.7 }}>
+              {currentTrack?.artist || '—'}
+            </p>
+          </div>
+
+          {/* Prev / Play / Next */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={prev} disabled={!hasTrack} aria-label="Previous"
+              className="text-gray-400 hover:text-white transition-colors disabled:opacity-30">
+              <SkipBack className="w-5 h-5 fill-current" />
+            </button>
+            <button
+              onClick={handlePlayPause}
+              disabled={!hasTrack}
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 disabled:opacity-30"
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+              style={{
+                background: 'linear-gradient(135deg, #00e5ff, #7c3aed)',
+                boxShadow: hasTrack ? '0 0 14px rgba(124,58,237,0.7)' : undefined,
+              }}
+            >
+              {isPlaying
+                ? <Pause className="w-4 h-4 text-white fill-current" />
+                : <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+              }
+            </button>
+            <button onClick={next} disabled={!hasTrack} aria-label="Next"
+              className="text-gray-400 hover:text-white transition-colors disabled:opacity-30">
+              <SkipForward className="w-5 h-5 fill-current" />
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: Time stamps */}
+        <div className="flex justify-between px-1">
+          <span className="text-[10px] text-gray-600 tabular-nums">{formatTime(currentTime)}</span>
+          <span className="text-[10px] text-gray-600 tabular-nums">{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      {/* ── DESKTOP LAYOUT (≥ md) ── */}
+      <div className="hidden md:flex max-w-screen-2xl mx-auto px-6 py-3 items-center justify-between gap-4">
+
+        {/* LEFT: Track info */}
+        <div className="flex items-center gap-4 w-1/4">
           <div
             className={`w-12 h-12 rounded-lg flex-shrink-0 ${displayTrack.color} flex items-center justify-center`}
             style={{ boxShadow: hasTrack ? '0 0 16px rgba(176,38,255,0.4)' : undefined }}
@@ -133,7 +193,7 @@ export default function PersistentPlayer() {
           </div>
         </div>
 
-        {/* ── CENTER: Waveform (DOM-mutated, no re-renders) ── */}
+        {/* CENTER: Waveform */}
         <div
           className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden cursor-pointer"
           onClick={(e) => {
@@ -171,8 +231,8 @@ export default function PersistentPlayer() {
           </div>
         </div>
 
-        {/* ── RIGHT: Controls + Volume ── */}
-        <div className="flex items-center justify-end gap-4 w-1/4 min-w-[240px]">
+        {/* RIGHT: Controls + Volume */}
+        <div className="flex items-center justify-end gap-4 w-1/4">
           <button onClick={toggleShuffle} aria-label="Shuffle" className="transition-colors"
             style={{ color: shuffleOn ? '#00e5ff' : '#4b5563' }}>
             <Shuffle className="w-4 h-4" />
@@ -182,7 +242,6 @@ export default function PersistentPlayer() {
             <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
-          {/* Play/Pause */}
           <button
             onClick={handlePlayPause}
             disabled={!hasTrack}
@@ -208,7 +267,6 @@ export default function PersistentPlayer() {
             <Repeat className="w-4 h-4" />
           </button>
 
-          {/* Volume — functional slider */}
           <div className="flex items-center gap-2 ml-1">
             <button
               onClick={() => setVolume(volume > 0 ? 0 : 0.75)}
@@ -235,7 +293,6 @@ export default function PersistentPlayer() {
             </div>
           </div>
         </div>
-
       </div>
     </footer>
   );

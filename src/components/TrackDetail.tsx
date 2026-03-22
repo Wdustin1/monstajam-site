@@ -30,7 +30,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
     : '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)';
 
   return (
-    <main className="flex-grow container mx-auto px-8 pt-28 pb-40 z-10 flex flex-col lg:flex-row gap-16 lg:gap-24 items-start justify-center max-w-7xl">
+    <main className="flex-grow container mx-auto px-5 md:px-8 pt-24 md:pt-28 pb-36 md:pb-40 z-10 flex flex-col lg:flex-row gap-8 lg:gap-24 items-start justify-center max-w-7xl">
       {/* Back link */}
       <div className="absolute top-24 left-8 z-20 hidden lg:block">
         <Link
@@ -90,7 +90,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
 
         {/* Title */}
         <div className="flex flex-col gap-1">
-          <h1 className="text-5xl lg:text-6xl font-black uppercase leading-tight tracking-tight">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-black uppercase leading-tight tracking-tight">
             <span
               className={`block ${titleColor}`}
               style={{ textShadow: titleShadow }}
@@ -106,7 +106,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
               </span>
             )}
           </h1>
-          <h2 className="text-xl font-semibold text-gray-400 uppercase tracking-widest mt-2">
+          <h2 className="text-base md:text-xl font-semibold text-gray-400 uppercase tracking-widest mt-2">
             {track.artist.toUpperCase()}
           </h2>
         </div>
