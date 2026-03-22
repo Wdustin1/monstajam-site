@@ -25,14 +25,6 @@ export default function Hero({
       {/* ── Left: Text ── */}
       <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10">
 
-        {/* Eyebrow tag */}
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-[2px]" style={{ background: '#ff00ff', boxShadow: '0 0 8px #ff00ff' }} />
-          <span className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: '#ff00ff' }}>
-            Official Fan Site
-          </span>
-        </div>
-
         <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
           style={{ fontSize: 'clamp(3rem, 8vw, 5.5rem)' }}>
           <span style={{
