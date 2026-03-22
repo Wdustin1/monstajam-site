@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
+import { TrackUpdateSchema } from '@/lib/schemas';
 
 // GET /api/tracks/[slug]
 export async function GET(
@@ -30,22 +31,35 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { slug } = await params;
+  let body: unknown;
   try {
-    const body = await req.json();
-    const { credits, ...trackData } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
+  const parsed = TrackUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+      { status: 422 }
+    );
+  }
+
+  const { slug } = await params;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { credits, ...trackData } = parsed.data as any;
+
+  try {
     const track = await prisma.track.update({
       where: { slug },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         ...trackData,
-        ...(credits && {
-          credits: {
-            deleteMany: {},
-            create: credits,
-          },
+        ...(Array.isArray(credits) && {
+          credits: { deleteMany: {}, create: credits },
         }),
-      },
+      } as any,
       include: { credits: true },
     });
     return NextResponse.json(track);

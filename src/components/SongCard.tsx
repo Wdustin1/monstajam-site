@@ -45,7 +45,7 @@ export default function SongCard({ track }: SongCardProps) {
 
   return (
     <article
-      className={`rounded-2xl p-4 flex flex-col group cursor-pointer relative min-h-[200px] border transition-all duration-300 ${
+      className={`rounded-2xl p-4 flex flex-col group relative min-h-[200px] border transition-all duration-300 ${
         isActive
           ? 'border-[#ff00ff] neon-pulse-active'
           : 'border-white/8 hover:border-[rgba(255,0,255,0.6)] hover:shadow-[0_0_24px_rgba(255,0,255,0.35)]'

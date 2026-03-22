@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
+import { TrackCreateSchema } from '@/lib/schemas';
 
 // GET /api/tracks — list tracks (published only; admin cookie required for drafts)
 export async function GET(req: NextRequest) {
@@ -33,15 +34,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  let body: unknown;
   try {
-    const body = await req.json();
-    const { credits, ...trackData } = body;
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
+  const parsed = TrackCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
+      { status: 422 }
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { credits, ...trackData } = parsed.data as any;
+
+  try {
     const track = await prisma.track.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         ...trackData,
-        credits: credits?.length ? { create: credits } : undefined,
-      },
+        credits: Array.isArray(credits) && credits.length
+          ? { create: credits }
+          : undefined,
+      } as any,
       include: { credits: true },
     });
     return NextResponse.json(track, { status: 201 });

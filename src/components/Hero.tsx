@@ -2,7 +2,15 @@
 
 import VinylRecord from './VinylRecord';
 
-export default function Hero({ trackCount = 12 }: { trackCount?: number }) {
+export default function Hero({
+  trackCount = 0,
+  artistCount = 1,
+  videoCount = 0,
+}: {
+  trackCount?: number;
+  artistCount?: number;
+  videoCount?: number;
+}) {
   return (
     <section
       className="max-w-7xl mx-auto px-8 pt-8 pb-16 flex flex-col lg:flex-row items-center justify-between gap-12 relative"
@@ -102,13 +110,13 @@ export default function Hero({ trackCount = 12 }: { trackCount?: number }) {
           </div>
           <div className="w-px h-8 bg-white/10" />
           <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">8</span>
+            <span className="text-white font-black text-lg leading-none">{videoCount}</span>
             <span className="text-gray-500 text-xs mt-0.5">Music Videos</span>
           </div>
           <div className="w-px h-8 bg-white/10" />
           <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">1</span>
-            <span className="text-gray-500 text-xs mt-0.5">Artist</span>
+            <span className="text-white font-black text-lg leading-none">{artistCount}</span>
+            <span className="text-gray-500 text-xs mt-0.5">{artistCount === 1 ? 'Artist' : 'Artists'}</span>
           </div>
         </div>
       </div>

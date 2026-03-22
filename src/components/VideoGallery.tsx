@@ -6,11 +6,12 @@ import { Play, Share2, Youtube, Check } from 'lucide-react';
 interface VideoCard {
   id: number;
   title: string;
-  artist?: string;         // shown above title on bottom row
+  artist?: string;
   views: string;
   duration: string;
-  color: string;           // gradient bg placeholder
-  showYTBadge?: boolean;   // card 1 gets the "Watch on YouTube" overlay
+  color: string;
+  youtubeUrl?: string;     // when set, card becomes a real link
+  showYTBadge?: boolean;
 }
 
 const VIDEOS: VideoCard[] = [
@@ -154,7 +155,13 @@ export default function VideoGallery() {
       {/* ── Video grid ── */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {VIDEOS.map((video) => (
-          <article key={video.id} className="group cursor-pointer">
+          <article key={video.id} className={`group ${video.youtubeUrl ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={video.youtubeUrl ? () => window.open(video.youtubeUrl, '_blank', 'noopener') : undefined}
+            role={video.youtubeUrl ? 'link' : undefined}
+            tabIndex={video.youtubeUrl ? 0 : undefined}
+            onKeyDown={video.youtubeUrl ? (e) => e.key === 'Enter' && window.open(video.youtubeUrl, '_blank', 'noopener') : undefined}
+            aria-label={video.youtubeUrl ? `Watch ${video.title} on YouTube` : undefined}
+          >
 
             {/* Thumbnail */}
             <div className="relative rounded-xl overflow-hidden mb-3 border border-gray-700/50"
@@ -164,15 +171,20 @@ export default function VideoGallery() {
               <div className={`w-full h-full bg-gradient-to-br ${video.color} transition-transform duration-300 group-hover:scale-[1.02]`} />
 
               {/* Play button overlay */}
-              <div className="absolute inset-0 flex items-center justify-center transition-colors duration-300"
-                style={{ background: 'rgba(0,0,0,0)' }}>
+              <div className="absolute inset-0 flex items-center justify-center transition-colors duration-300">
                 <div
-                  className="w-12 h-10 rounded flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                  className={`w-12 h-10 rounded flex items-center justify-center transition-all duration-300 ${video.youtubeUrl ? 'group-hover:scale-110' : 'opacity-40'}`}
                   style={{ background: 'rgba(0,0,0,0.55)' }}
                 >
                   <Play className="w-5 h-5 text-white fill-current ml-0.5" />
                 </div>
               </div>
+              {/* Coming soon label when no URL */}
+              {!video.youtubeUrl && (
+                <div className="absolute top-2 left-2 bg-black/70 px-2 py-0.5 rounded text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Coming Soon
+                </div>
+              )}
 
               {/* YouTube badge on card 1 */}
               {video.showYTBadge && (
@@ -197,14 +209,16 @@ export default function VideoGallery() {
               )}
               <div className="flex justify-between items-start gap-2">
                 <h3
-                  className="font-bold leading-tight text-white group-hover:text-cyan-400 transition-colors"
+                  className={`font-bold leading-tight transition-colors ${video.youtubeUrl ? 'text-white group-hover:text-cyan-400' : 'text-gray-400'}`}
                   style={{ fontSize: 16 }}
                 >
                   {video.title}
                 </h3>
-                <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
-                  {video.views}
-                </span>
+                {video.views && video.views !== 'Coming Soon' && (
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
+                    {video.views}
+                  </span>
+                )}
               </div>
             </div>
           </article>
