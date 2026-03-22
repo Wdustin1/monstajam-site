@@ -34,22 +34,11 @@ export default async function Home() {
     number: latest.number ?? null,
   } : null;
 
-  // Vinyl zones: 5 most recent tracks
-  const vinylTracks = [...tracks]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
-    .map(t => ({
-      slug: t.slug, title: t.title, artist: t.artist,
-      color: t.color ?? '#00e5ff',
-      audioUrl: t.audioUrl ?? null, coverUrl: t.coverUrl ?? null,
-      genre: t.genre ?? null, bpm: t.bpm ?? null, number: t.number ?? null,
-    }));
-
   return (
     <>
       <Navbar activeLink="home" />
       <main id="main-content" className="flex-grow pt-24 hero-bg-gradient">
-        <Hero trackCount={tracks.length} artistCount={artistCount} videoCount={videoCount} featuredTrack={featuredTrack} vinylTracks={vinylTracks} />
+        <Hero trackCount={tracks.length} artistCount={artistCount} videoCount={videoCount} featuredTrack={featuredTrack} />
         <ScrollIndicator />
         <MusicLibrary tracks={tracks} />
       </main>

@@ -8,13 +8,11 @@ export default function Hero({
   artistCount = 1,
   videoCount = 0,
   featuredTrack = null,
-  vinylTracks = [],
 }: {
   trackCount?: number;
   artistCount?: number;
   videoCount?: number;
   featuredTrack?: PlayerTrack | null;
-  vinylTracks?: PlayerTrack[];
 }) {
   return (
     <section
@@ -125,7 +123,7 @@ export default function Hero({
           <div className="w-72 h-72 rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)', filter: 'blur(30px)' }} />
         </div>
-        <VinylRecord featuredTrack={featuredTrack} tracks={vinylTracks} />
+        <VinylRecord featuredTrack={featuredTrack} />
       </div>
     </section>
   );
