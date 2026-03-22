@@ -1,15 +1,18 @@
 'use client';
 
 import VinylRecord from './VinylRecord';
+import { PlayerTrack } from '@/context/PlayerContext';
 
 export default function Hero({
   trackCount = 0,
   artistCount = 1,
   videoCount = 0,
+  featuredTrack = null,
 }: {
   trackCount?: number;
   artistCount?: number;
   videoCount?: number;
+  featuredTrack?: PlayerTrack | null;
 }) {
   return (
     <section
@@ -120,7 +123,7 @@ export default function Hero({
           <div className="w-72 h-72 rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)', filter: 'blur(30px)' }} />
         </div>
-        <VinylRecord />
+        <VinylRecord featuredTrack={featuredTrack} />
       </div>
     </section>
   );

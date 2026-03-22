@@ -4,8 +4,17 @@ import { motion, useAnimation } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { usePlayer } from '@/context/PlayerContext';
 
-export default function VinylRecord() {
-  const { currentTrack, isPlaying, toggle } = usePlayer();
+import { PlayerTrack } from '@/context/PlayerContext';
+
+interface VinylRecordProps {
+  featuredTrack?: PlayerTrack | null;
+}
+
+export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
+  const { currentTrack, isPlaying, toggle, play } = usePlayer();
+
+  // Use the active player track if one is loaded, otherwise show the featured track on the label
+  const displayTrack = currentTrack ?? featuredTrack ?? null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [anisotropyShift, setAnisotropyShift] = useState({ x: 0, y: 0 });
@@ -43,8 +52,8 @@ export default function VinylRecord() {
   }, []);
 
   const tonearmAngle = isPlaying ? 24 : 8;
-  const trackTitle = currentTrack?.title ?? 'LOST TAPES';
-  const trackArtist = currentTrack?.artist ?? null;
+  const trackTitle = displayTrack?.title ?? 'MONSTA JAM';
+  const trackArtist = displayTrack?.artist ?? null;
 
   return (
     <div ref={containerRef} className="relative select-none" style={{ width: 520, height: 520 }}>
@@ -182,7 +191,13 @@ export default function VinylRecord() {
               zIndex: 20,
               cursor: 'pointer',
             }}
-            onClick={() => currentTrack && toggle(currentTrack)}
+            onClick={() => {
+              if (currentTrack) {
+                toggle(currentTrack);
+              } else if (featuredTrack) {
+                play(featuredTrack);
+              }
+            }}
           >
             {/* Play/Pause icon */}
             <div className="flex items-center justify-center w-8 h-8 rounded-full mb-1"
