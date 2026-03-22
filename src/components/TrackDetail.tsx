@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePlayer } from '@/context/PlayerContext';
 import type { TrackWithCredits } from './MusicLibrary';
 
@@ -52,14 +53,24 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
             boxShadow: '-10px -10px 40px rgba(255,0,255,0.4), 10px 10px 40px rgba(0,255,255,0.4)',
           }}
         >
-          <div className={`w-full aspect-square rounded-[calc(1rem-4px)] ${track.color} flex items-center justify-center`}>
-            {/* Placeholder art — swap with <Image> when real art is available */}
-            <div className="flex flex-col items-center gap-3 opacity-60">
-              <svg className="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-              </svg>
-              <span className="text-white text-sm font-bold tracking-widest uppercase">{track.artist}</span>
-            </div>
+          <div className={`w-full aspect-square rounded-[calc(1rem-4px)] overflow-hidden relative ${!track.coverUrl ? track.color : ''} flex items-center justify-center`}>
+            {track.coverUrl ? (
+              <Image
+                src={track.coverUrl}
+                alt={`${track.title} cover art`}
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                priority
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 opacity-60">
+                <svg className="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+                <span className="text-white text-sm font-bold tracking-widest uppercase">{track.artist}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

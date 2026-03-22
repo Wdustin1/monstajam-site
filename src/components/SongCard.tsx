@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Play, Pause, Music, Music4 } from 'lucide-react';
 import type { TrackWithCredits } from './MusicLibrary';
 import { usePlayer } from '@/context/PlayerContext';
@@ -10,18 +11,30 @@ interface SongCardProps {
 }
 
 // Album art with hover play overlay
-function AlbumArt({ color, onPlay, isActive }: { color: string; onPlay: () => void; isActive: boolean }) {
+function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverUrl?: string | null; onPlay: () => void; isActive: boolean }) {
   return (
-    <div className={`w-full aspect-square rounded-xl overflow-hidden flex-shrink-0 ${color} flex items-center justify-center relative group/art mb-4`}>
-      {/* Grid texture */}
-      <div className="absolute inset-0 opacity-20"
-        style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px), repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px)'
-        }} />
-      {/* Music note */}
-      <svg className="w-12 h-12 opacity-30 transition-transform duration-700 group-hover/art:scale-110" fill="white" viewBox="0 0 24 24">
-        <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
-      </svg>
+    <div className={`w-full aspect-square rounded-xl overflow-hidden flex-shrink-0 relative group/art mb-4 ${!coverUrl ? color : ''}`}>
+      {coverUrl ? (
+        <Image
+          src={coverUrl}
+          alt="Album art"
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+      ) : (
+        <>
+          {/* Grid texture */}
+          <div className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px), repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px)'
+            }} />
+          {/* Music note */}
+          <svg className="absolute inset-0 m-auto w-12 h-12 opacity-30 transition-transform duration-700 group-hover/art:scale-110" fill="white" viewBox="0 0 24 24">
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+          </svg>
+        </>
+      )}
       {/* Hover overlay */}
       <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/art:opacity-100 transition-opacity duration-200">
         <button
@@ -64,7 +77,7 @@ export default function SongCard({ track }: SongCardProps) {
       </div>
 
       {/* Album art with hover play overlay */}
-      <AlbumArt color={track.color} onPlay={() => toggle(track)} isActive={isActive} />
+      <AlbumArt color={track.color} coverUrl={track.coverUrl} onPlay={() => toggle(track)} isActive={isActive} />
 
       <div className="flex flex-col flex-grow">
         <div className="flex items-start justify-between gap-2 mb-0.5">
