@@ -1,89 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Share2, Youtube, Check } from 'lucide-react';
+import Image from 'next/image';
+import { Play, Share2, Check, ExternalLink } from 'lucide-react';
 
-interface VideoCard {
-  id: number;
+interface Video {
+  id: string;
   title: string;
-  artist?: string;
-  views: string;
-  duration: string;
-  color: string;
-  youtubeUrl?: string;     // when set, card becomes a real link
-  showYTBadge?: boolean;
+  artist: string | null;
+  youtubeUrl: string;
+  youtubeId: string;
+  duration: string | null;
+  published: boolean;
+  order: number;
 }
 
-const VIDEOS: VideoCard[] = [
-  {
-    id: 1,
-    title: 'City Lights - Official Visualizer',
-    artist: 'Neon Pulse',
-    views: 'Coming Soon',
-    duration: '3:52',
-    color: 'from-purple-900 via-blue-900 to-black',
-    showYTBadge: true,
-  },
-  {
-    id: 2,
-    title: 'Midnight Drive - Live Session',
-    artist: 'The Night Shifts',
-    views: 'Coming Soon',
-    duration: '4:10',
-    color: 'from-gray-900 via-slate-800 to-gray-950',
-  },
-  {
-    id: 3,
-    title: 'Synthetic Soul - Studio Footage',
-    artist: 'Follow Funk',
-    views: 'Coming Soon',
-    duration: '3:28',
-    color: 'from-orange-900 via-purple-900 to-teal-900',
-  },
-  {
-    id: 4,
-    title: 'Neon Dreams - Visualizer',
-    artist: 'Retrograde',
-    views: 'Coming Soon',
-    duration: '3:45',
-    color: 'from-fuchsia-900 via-indigo-900 to-gray-900',
-  },
-  {
-    id: 5,
-    title: 'Digital Ocean - Official Video',
-    artist: 'Synthwave',
-    views: 'Coming Soon',
-    duration: '4:22',
-    color: 'from-cyan-950 via-blue-900 to-black',
-  },
-  {
-    id: 6,
-    title: 'Space Walk - Visualizer',
-    artist: 'Ambient Space',
-    views: 'Coming Soon',
-    duration: '5:15',
-    color: 'from-slate-800 via-indigo-900 to-zinc-900',
-  },
-  {
-    id: 7,
-    title: 'Midnight Jazz - Live Performance',
-    artist: 'The Night Shifts',
-    views: 'Coming Soon',
-    duration: '6:02',
-    color: 'from-amber-950 via-slate-800 to-gray-900',
-  },
-  {
-    id: 8,
-    title: 'Acoustic Sunrise - Unplugged',
-    artist: 'Groove Theory',
-    views: 'Coming Soon',
-    duration: '3:58',
-    color: 'from-emerald-950 via-teal-900 to-gray-950',
-  },
-];
+interface VideoGalleryProps {
+  videos: Video[];
+}
 
-export default function VideoGallery() {
+export default function VideoGallery({ videos }: VideoGalleryProps) {
   const [copied, setCopied] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
   const handleShare = async () => {
     const url = 'https://monstajam-site.vercel.app/videos';
@@ -92,7 +30,6 @@ export default function VideoGallery() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback: prompt user to copy
       prompt('Copy this URL:', url);
     }
   };
@@ -100,131 +37,113 @@ export default function VideoGallery() {
   return (
     <div className="flex flex-col gap-10">
 
-      {/* ── Hero heading + buttons ── */}
+      {/* ── Header ── */}
       <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <h1
-          className="text-5xl md:text-6xl font-black uppercase leading-tight"
-          style={{ letterSpacing: '2px' }}
-        >
-          <span
-            style={{
-              background: 'linear-gradient(90deg, #ff44ff, #dd88ff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              filter: 'drop-shadow(0 0 14px rgba(255,0,255,0.8))',
-            }}
-          >
-            MUSIC VIDEO{' '}
-          </span>
-          <span
-            style={{
-              background: 'linear-gradient(90deg, #44eeff, #00ffff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              filter: 'drop-shadow(0 0 14px rgba(0,229,255,0.8))',
-            }}
-          >
-            GALLERY
-          </span>
+        <h1 className="text-5xl md:text-6xl font-black uppercase leading-tight" style={{ letterSpacing: '2px' }}>
+          <span style={{
+            background: 'linear-gradient(90deg, #ff44ff, #dd88ff)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 14px rgba(255,0,255,0.8))',
+          }}>MUSIC VIDEO </span>
+          <span style={{
+            background: 'linear-gradient(90deg, #44eeff, #00ffff)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 14px rgba(0,229,255,0.8))',
+          }}>GALLERY</span>
         </h1>
 
         <div className="flex gap-4 flex-shrink-0">
-          {/* Share — magenta hollow */}
           <button
             onClick={handleShare}
             className="px-6 py-2 rounded-full flex items-center gap-2 font-medium text-sm text-white transition-all hover:bg-fuchsia-500/10"
-            style={{
-              border: '2px solid #ff00ff',
-              boxShadow: '0 0 10px rgba(255,0,255,0.4), inset 0 0 10px rgba(255,0,255,0.15)',
-            }}
+            style={{ border: '2px solid #ff00ff', boxShadow: '0 0 10px rgba(255,0,255,0.4), inset 0 0 10px rgba(255,0,255,0.15)' }}
           >
             {copied ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
             {copied ? 'Copied!' : 'Share'}
           </button>
-          {/* YouTube subscribe — uncomment and add href when channel is live
-          <a href="https://youtube.com/@monstajam" target="_blank" rel="noopener noreferrer"
-            className="px-6 py-2 rounded-full flex items-center gap-2 font-medium text-sm text-white transition-all hover:bg-cyan-500/10"
-            style={{ border: '2px solid #00e5ff', boxShadow: '0 0 10px rgba(0,229,255,0.4)' }}>
-            <Youtube className="w-4 h-4" />
-            Subscribe to YouTube
-          </a>
-          */}
         </div>
       </section>
 
-      {/* ── Video grid ── */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {VIDEOS.map((video) => (
-          <article key={video.id} className={`group ${video.youtubeUrl ? 'cursor-pointer' : 'cursor-default'}`}
-            onClick={video.youtubeUrl ? () => window.open(video.youtubeUrl, '_blank', 'noopener') : undefined}
-            role={video.youtubeUrl ? 'link' : undefined}
-            tabIndex={video.youtubeUrl ? 0 : undefined}
-            onKeyDown={video.youtubeUrl ? (e) => e.key === 'Enter' && window.open(video.youtubeUrl, '_blank', 'noopener') : undefined}
-            aria-label={video.youtubeUrl ? `Watch ${video.title} on YouTube` : undefined}
-          >
+      {/* ── Grid or empty state ── */}
+      {videos.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32 text-gray-600">
+          <Play className="w-16 h-16 mb-4 opacity-20" />
+          <p className="text-lg font-semibold text-gray-500">No videos yet</p>
+          <p className="text-sm mt-1">Add videos via the admin dashboard</p>
+        </div>
+      ) : (
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {videos.map((video) => (
+            <article key={video.id} className="group flex flex-col">
 
-            {/* Thumbnail */}
-            <div className="relative rounded-xl overflow-hidden mb-3 border border-gray-700/50"
-              style={{ aspectRatio: '16/9' }}>
-
-              {/* Gradient placeholder (swapped for real art later) */}
-              <div className={`w-full h-full bg-gradient-to-br ${video.color} transition-transform duration-300 group-hover:scale-[1.02]`} />
-
-              {/* Play button overlay */}
-              <div className="absolute inset-0 flex items-center justify-center transition-colors duration-300">
-                <div
-                  className={`w-12 h-10 rounded flex items-center justify-center transition-all duration-300 ${video.youtubeUrl ? 'group-hover:scale-110' : 'opacity-40'}`}
-                  style={{ background: 'rgba(0,0,0,0.55)' }}
-                >
-                  <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                </div>
-              </div>
-              {/* Coming soon label when no URL */}
-              {!video.youtubeUrl && (
-                <div className="absolute top-2 left-2 bg-black/70 px-2 py-0.5 rounded text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Coming Soon
-                </div>
-              )}
-
-              {/* YouTube badge on card 1 */}
-              {video.showYTBadge && (
-                <div className="absolute bottom-8 left-2 flex items-center gap-1.5 bg-black/70 px-2 py-1 rounded text-[11px] text-gray-300">
-                  <Youtube className="w-3.5 h-3.5 text-red-500" />
-                  Watch on YouTube
-                </div>
-              )}
-
-              {/* Duration badge */}
-              <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-xs font-medium text-white">
-                {video.duration}
-              </div>
-            </div>
-
-            {/* Card info */}
-            <div>
-              {video.artist && (
-                <p className="text-xs text-gray-300 uppercase tracking-wider mb-0.5">
-                  {video.artist}
-                </p>
-              )}
-              <div className="flex justify-between items-start gap-2">
-                <h3
-                  className={`font-bold leading-tight transition-colors ${video.youtubeUrl ? 'text-white group-hover:text-cyan-400' : 'text-gray-400'}`}
-                  style={{ fontSize: 16 }}
-                >
-                  {video.title}
-                </h3>
-                {video.views && video.views !== 'Coming Soon' && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
-                    {video.views}
-                  </span>
+              {/* Thumbnail / embed */}
+              <div className="relative rounded-xl overflow-hidden mb-3 border border-gray-700/50" style={{ aspectRatio: '16/9' }}>
+                {activeVideo === video.id ? (
+                  /* Inline YouTube embed */
+                  <iframe
+                    src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0`}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <>
+                    {/* YouTube maxresdefault thumbnail */}
+                    <Image
+                      src={`https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`}
+                      alt={video.title}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      unoptimized // YouTube CDN
+                    />
+                    {/* Play overlay */}
+                    <button
+                      onClick={() => setActiveVideo(video.id)}
+                      className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors"
+                      aria-label={`Play ${video.title}`}
+                    >
+                      <div className="w-14 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110"
+                        style={{ background: '#ff0000', boxShadow: '0 0 20px rgba(255,0,0,0.6)' }}>
+                        <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                      </div>
+                    </button>
+                    {/* Duration */}
+                    {video.duration && (
+                      <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-xs font-medium text-white">
+                        {video.duration}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            </div>
-          </article>
-        ))}
-      </section>
 
+              {/* Info */}
+              <div className="flex flex-col gap-1 flex-1">
+                {video.artist && (
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">{video.artist}</p>
+                )}
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-white group-hover:text-cyan-400 transition-colors leading-tight text-sm flex-1">
+                    {video.title}
+                  </h3>
+                  <a
+                    href={video.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                    aria-label="Open on YouTube"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

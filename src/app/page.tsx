@@ -12,11 +12,8 @@ export default async function Home() {
     orderBy: { number: 'asc' },
   });
 
-  // Derive stats from DB
+  const videoCount = await prisma.video.count({ where: { published: true } });
   const artistCount = new Set(tracks.map((t: { artist: string }) => t.artist)).size;
-  // Video count: tracks that have a YouTube/video URL could be counted here.
-  // For now use the static VideoGallery count until a videos table exists.
-  const videoCount = 8;
 
   return (
     <>

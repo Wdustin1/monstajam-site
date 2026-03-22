@@ -32,6 +32,21 @@ model Track {
   @@map("tracks")
 }
 
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  artist      String?
+  youtubeUrl  String
+  youtubeId   String   // extracted video ID for embed/thumbnail
+  duration    String?  // e.g. "3:52"
+  published   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("videos")
+}
+
 model Credit {
   id      String @id @default(cuid())
   role    String

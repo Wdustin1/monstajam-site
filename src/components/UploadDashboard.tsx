@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { CloudUpload, Upload, CheckCircle, XCircle, Loader2, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
+import { CloudUpload, Upload, CheckCircle, XCircle, Loader2, Pencil, Trash2, Eye, EyeOff, Youtube, Music } from 'lucide-react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,6 +21,31 @@ interface PublishedTrack {
   coverUrl: string | null;
   published: boolean;
   createdAt: string;
+}
+
+interface VideoRecord {
+  id: string;
+  title: string;
+  artist: string | null;
+  youtubeUrl: string;
+  youtubeId: string;
+  duration: string | null;
+  published: boolean;
+  order: number;
+}
+
+function extractYouTubeId(url: string): string | null {
+  const patterns = [
+    /youtube\.com\/watch\?v=([^&]+)/,
+    /youtu\.be\/([^?&]+)/,
+    /youtube\.com\/embed\/([^?&]+)/,
+    /youtube\.com\/shorts\/([^?&]+)/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -127,7 +152,124 @@ function ConfirmDialog({ track, onConfirm, onCancel }: { track: PublishedTrack; 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function UploadDashboard() {
-  // Edit mode
+  const [activeTab, setActiveTab] = useState<'tracks' | 'videos'>('tracks');
+
+  // ── Video state ──────────────────────────────────────────────────────────────
+  const [videos, setVideos] = useState<VideoRecord[]>([]);
+  const [videosLoading, setVideosLoading] = useState(true);
+  const [videoTitle, setVideoTitle] = useState('');
+  const [videoArtist, setVideoArtist] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoDuration, setVideoDuration] = useState('');
+  const [videoPublish, setVideoPublish] = useState(true);
+  const [videoUrlError, setVideoUrlError] = useState(false);
+  const [videoSubmitting, setVideoSubmitting] = useState(false);
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [confirmDeleteVideo, setConfirmDeleteVideo] = useState<VideoRecord | null>(null);
+
+  const loadVideos = useCallback(async () => {
+    try {
+      setVideosLoading(true);
+      const res = await fetch('/api/videos?all=true', { credentials: 'include' });
+      if (res.ok) setVideos(await res.json());
+    } catch { /* silent */ } finally {
+      setVideosLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadVideos(); }, [loadVideos]);
+
+  const resetVideoForm = () => {
+    setEditingVideoId(null);
+    setVideoTitle(''); setVideoArtist(''); setVideoUrl('');
+    setVideoDuration(''); setVideoPublish(true); setVideoUrlError(false);
+  };
+
+  const startEditVideo = (v: VideoRecord) => {
+    setEditingVideoId(v.id);
+    setVideoTitle(v.title);
+    setVideoArtist(v.artist || '');
+    setVideoUrl(v.youtubeUrl);
+    setVideoDuration(v.duration || '');
+    setVideoPublish(v.published);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleVideoSubmit = async () => {
+    const ytId = extractYouTubeId(videoUrl);
+    if (!videoTitle.trim() || !ytId) {
+      setVideoUrlError(!ytId);
+      if (!videoTitle.trim()) showToast('error', 'Title and a valid YouTube URL are required.');
+      return;
+    }
+    setVideoUrlError(false);
+    setVideoSubmitting(true);
+    try {
+      const payload = {
+        title: videoTitle.trim(),
+        artist: videoArtist.trim() || undefined,
+        youtubeUrl: videoUrl.trim(),
+        youtubeId: ytId,
+        duration: videoDuration.trim() || undefined,
+        published: videoPublish,
+        order: editingVideoId ? undefined : videos.length,
+      };
+      if (editingVideoId) {
+        const res = await fetch(`/api/videos/${editingVideoId}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('Update failed');
+        showToast('success', `"${videoTitle}" updated ✓`);
+      } else {
+        const res = await fetch('/api/videos', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('Create failed');
+        showToast('success', `"${videoTitle}" added 🎬`);
+      }
+      resetVideoForm();
+      await loadVideos();
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setVideoSubmitting(false);
+    }
+  };
+
+  const handleDeleteVideo = async (v: VideoRecord) => {
+    try {
+      const res = await fetch(`/api/videos/${v.id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Delete failed');
+      showToast('success', `"${v.title}" deleted.`);
+      if (editingVideoId === v.id) resetVideoForm();
+      await loadVideos();
+    } catch {
+      showToast('error', 'Failed to delete video.');
+    } finally {
+      setConfirmDeleteVideo(null);
+    }
+  };
+
+  const toggleVideoPublish = async (v: VideoRecord) => {
+    try {
+      const res = await fetch(`/api/videos/${v.id}`, {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: !v.published }),
+      });
+      if (!res.ok) throw new Error('Update failed');
+      showToast('success', `"${v.title}" ${!v.published ? 'published 🎬' : 'set to draft'}.`);
+      await loadVideos();
+    } catch {
+      showToast('error', 'Failed to toggle publish status.');
+    }
+  };
+
+  // Edit mode (tracks)
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
 
   // Form state
@@ -348,8 +490,27 @@ export default function UploadDashboard() {
         </div>
       </header>
 
+      {/* ── Tab switcher ── */}
+      <div className="flex gap-2 mb-6">
+        {([['tracks', 'Tracks', Music], ['videos', 'Videos', Youtube]] as const).map(([tab, label, Icon]) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all"
+            style={{
+              background: activeTab === tab ? (tab === 'tracks' ? '#FF007F' : '#ff0000') : 'rgba(255,255,255,0.05)',
+              color: activeTab === tab ? 'white' : '#64748b',
+              boxShadow: activeTab === tab ? `0 0 15px ${tab === 'tracks' ? 'rgba(255,0,127,0.5)' : 'rgba(255,0,0,0.5)'}` : 'none',
+            }}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Two-panel layout ── */}
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1" style={{ minHeight: 'calc(100vh - 140px)' }}>
+      <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1" style={{ minHeight: 'calc(100vh - 140px)', display: activeTab === 'tracks' ? 'grid' : 'none' }}>
 
         {/* LEFT: Form */}
         <section
@@ -596,13 +757,241 @@ export default function UploadDashboard() {
         </section>
       </main>
 
-      {/* Confirm delete dialog */}
+      {/* Confirm delete dialog — tracks */}
       {confirmDelete && (
         <ConfirmDialog
           track={confirmDelete}
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
         />
+      )}
+
+      {/* ── Videos panel ── */}
+      {activeTab === 'videos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" style={{ minHeight: 'calc(100vh - 200px)' }}>
+
+          {/* LEFT: Video form */}
+          <section
+            className="lg:col-span-2 rounded-xl p-6 flex flex-col"
+            style={{
+              backgroundColor: '#12123A',
+              border: `1px solid ${editingVideoId ? '#ff0000' : '#FF007F'}`,
+              boxShadow: editingVideoId
+                ? '0 0 10px rgba(255,0,0,0.5), 0 0 20px rgba(255,0,0,0.3)'
+                : '0 0 10px rgba(255,0,127,0.5), 0 0 20px rgba(255,0,127,0.3)',
+              transition: 'border-color 0.3s, box-shadow 0.3s',
+            }}
+          >
+            <h2 className="text-2xl font-bold mb-6"
+              style={{ color: editingVideoId ? '#ff4444' : '#FF007F', textShadow: editingVideoId ? '0 0 10px #ff4444' : '0 0 10px #FF007F' }}>
+              {editingVideoId ? '✏️ Edit Video' : '🎬 Add Video'}
+            </h2>
+
+            <div className="flex flex-col gap-5">
+
+              {/* Title + Artist */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <NeonInput label="Video Title *">
+                  <input value={videoTitle} onChange={e => setVideoTitle(e.target.value)}
+                    type="text" placeholder="e.g. City Lights - Official Visualizer" style={inputStyle} />
+                </NeonInput>
+                <NeonInput label="Artist Name">
+                  <input value={videoArtist} onChange={e => setVideoArtist(e.target.value)}
+                    type="text" placeholder="e.g. Monsta Jam" style={inputStyle} />
+                </NeonInput>
+              </div>
+
+              {/* YouTube URL */}
+              <NeonInput label="YouTube URL *">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                    <Youtube className="w-5 h-5 text-red-500" />
+                  </div>
+                  <input
+                    value={videoUrl}
+                    onChange={e => { setVideoUrl(e.target.value); setVideoUrlError(false); }}
+                    type="text"
+                    placeholder="https://youtube.com/watch?v=..."
+                    style={{
+                      ...inputStyle,
+                      paddingLeft: 44,
+                      borderColor: videoUrlError ? '#FF007F' : '#00FFFF',
+                      boxShadow: videoUrlError ? 'inset 0 0 5px rgba(255,0,127,0.5)' : inputStyle.boxShadow,
+                    }}
+                  />
+                </div>
+                {videoUrl && !extractYouTubeId(videoUrl) && (
+                  <p className="text-xs text-pink-500 mt-1">⚠ Couldn&apos;t extract YouTube ID — check the URL format</p>
+                )}
+                {videoUrl && extractYouTubeId(videoUrl) && (
+                  <p className="text-xs text-emerald-400 mt-1">✓ Video ID: {extractYouTubeId(videoUrl)}</p>
+                )}
+              </NeonInput>
+
+              {/* Duration */}
+              <NeonInput label="Duration (optional)">
+                <input value={videoDuration} onChange={e => setVideoDuration(e.target.value)}
+                  type="text" placeholder="e.g. 3:52" style={{ ...inputStyle, maxWidth: 160 }} />
+              </NeonInput>
+
+              {/* YouTube preview */}
+              {videoUrl && extractYouTubeId(videoUrl) && (
+                <div className="rounded-xl overflow-hidden" style={{ aspectRatio: '16/9', maxWidth: 400 }}>
+                  <img
+                    src={`https://img.youtube.com/vi/${extractYouTubeId(videoUrl)}/maxresdefault.jpg`}
+                    alt="Thumbnail preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Publish toggle */}
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  onClick={() => setVideoPublish(!videoPublish)}
+                  className="relative w-12 h-6 rounded-full transition-colors"
+                  style={{ backgroundColor: videoPublish ? '#ff0000' : '#1e293b', boxShadow: videoPublish ? '0 0 10px rgba(255,0,0,0.6)' : 'none' }}
+                >
+                  <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform"
+                    style={{ transform: videoPublish ? 'translateX(28px)' : 'translateX(4px)' }} />
+                </div>
+                <span className="text-sm font-medium" style={{ color: videoPublish ? '#ff4444' : '#94a3b8' }}>
+                  {videoPublish ? 'Published 🎬' : 'Save as draft'}
+                </span>
+              </label>
+
+              {/* Submit */}
+              <div className="flex gap-3">
+                {editingVideoId && (
+                  <button onClick={resetVideoForm}
+                    className="px-6 py-3 rounded-lg font-semibold text-sm text-gray-300 hover:text-white transition-colors"
+                    style={{ border: '1px solid #334155' }}>
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleVideoSubmit}
+                  disabled={videoSubmitting}
+                  className="flex-1 rounded-lg py-3 font-bold tracking-widest uppercase text-sm text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: '#ff0000', boxShadow: '0 0 15px rgba(255,0,0,0.5)' }}
+                >
+                  {videoSubmitting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                    : editingVideoId ? '💾 Save Changes' : '🎬 Add Video'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT: Video list */}
+          <section
+            className="rounded-xl p-6 flex flex-col"
+            style={{
+              backgroundColor: '#12123A',
+              border: '1px solid #ff0000',
+              boxShadow: '0 0 10px rgba(255,0,0,0.4), 0 0 20px rgba(255,0,0,0.2)',
+              maxHeight: 'calc(100vh - 160px)',
+            }}
+          >
+            <div className="flex items-center justify-between mb-6 flex-shrink-0">
+              <h2 className="text-2xl font-bold" style={{ color: '#ff4444', textShadow: '0 0 10px #ff4444' }}>Videos</h2>
+              {!videosLoading && (
+                <span className="text-xs text-gray-500 font-mono">{videos.length} total</span>
+              )}
+            </div>
+
+            <div className="flex-grow overflow-y-auto space-y-3 pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ff4444 transparent' }}>
+              {videosLoading ? (
+                <div className="flex items-center justify-center h-32 text-gray-500">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
+                </div>
+              ) : videos.length === 0 ? (
+                <div className="text-gray-500 text-sm text-center mt-8">No videos yet. Add the first one 🎬</div>
+              ) : (
+                videos.map((v) => (
+                  <div key={v.id} className="rounded-lg p-3 transition-all"
+                    style={{
+                      border: `1px solid ${editingVideoId === v.id ? '#ff0000' : v.published ? '#1e2a1e' : '#1e293b'}`,
+                      backgroundColor: editingVideoId === v.id ? 'rgba(255,0,0,0.08)' : 'rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    {/* Thumbnail */}
+                    <div className="w-full rounded overflow-hidden mb-2" style={{ aspectRatio: '16/9' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`}
+                        alt={v.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-xs leading-tight truncate" style={{ color: '#00FFFF' }}>{v.title}</h3>
+                        {v.artist && <p className="text-[10px] text-gray-500 mt-0.5">{v.artist}</p>}
+                      </div>
+                      <span className="text-[10px] font-bold flex-shrink-0 px-2 py-0.5 rounded"
+                        style={{
+                          background: v.published ? 'rgba(0,255,100,0.1)' : 'rgba(255,255,255,0.05)',
+                          color: v.published ? '#4ade80' : '#64748b',
+                          border: `1px solid ${v.published ? 'rgba(0,255,100,0.2)' : '#1e293b'}`,
+                        }}>
+                        {v.published ? 'LIVE' : 'DRAFT'}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => startEditVideo(v)} title="Edit"
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
+                        style={{ background: 'rgba(0,255,255,0.1)', border: '1px solid rgba(0,255,255,0.2)', color: '#00FFFF' }}>
+                        <Pencil className="w-3 h-3" /> Edit
+                      </button>
+                      <button onClick={() => toggleVideoPublish(v)} title={v.published ? 'Unpublish' : 'Publish'}
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
+                        style={{
+                          background: v.published ? 'rgba(255,200,0,0.1)' : 'rgba(255,0,0,0.1)',
+                          border: `1px solid ${v.published ? 'rgba(255,200,0,0.2)' : 'rgba(255,0,0,0.2)'}`,
+                          color: v.published ? '#fbbf24' : '#ff4444',
+                        }}>
+                        {v.published ? <><EyeOff className="w-3 h-3" /> Hide</> : <><Eye className="w-3 h-3" /> Publish</>}
+                      </button>
+                      <button onClick={() => setConfirmDeleteVideo(v)} title="Delete"
+                        className="p-1.5 rounded transition-all hover:scale-105"
+                        style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.2)', color: '#f87171' }}>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Confirm delete — videos */}
+      {confirmDeleteVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="rounded-xl p-8 max-w-sm w-full mx-4 text-center"
+            style={{ background: '#12123A', border: '1px solid #ff0000', boxShadow: '0 0 30px rgba(255,0,0,0.4)' }}>
+            <Trash2 className="w-10 h-10 mx-auto mb-4 text-red-500" />
+            <h3 className="text-xl font-bold mb-2 text-white">Delete Video?</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              <span style={{ color: '#00FFFF' }}>&quot;{confirmDeleteVideo.title}&quot;</span> will be permanently removed.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteVideo(null)}
+                className="flex-1 py-2 rounded-lg font-semibold text-sm text-gray-300 hover:text-white transition-colors"
+                style={{ border: '1px solid #334155', background: 'transparent' }}>
+                Cancel
+              </button>
+              <button onClick={() => handleDeleteVideo(confirmDeleteVideo)}
+                className="flex-1 py-2 rounded-lg font-bold text-sm text-white transition-all hover:scale-105"
+                style={{ background: '#ff0000', boxShadow: '0 0 12px rgba(255,0,0,0.5)' }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}
