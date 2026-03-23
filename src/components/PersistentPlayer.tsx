@@ -61,6 +61,8 @@ export default function PersistentPlayer() {
 
   const hasTrack = !!currentTrack;
 
+  if (!hasTrack) return null;
+
   const displayTrack = currentTrack ?? {
     title: 'No track selected', artist: '', genre: '', slug: '',
     color: 'bg-gradient-to-br from-purple-700 to-blue-600',
