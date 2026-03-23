@@ -117,13 +117,40 @@ export default function Hero({
       </div>
 
       {/* ── Right: Vinyl ── */}
-      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative max-w-xs sm:max-w-sm md:max-w-md lg:max-w-none mx-auto lg:mx-0">
+      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative">
         {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-72 h-72 rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)', filter: 'blur(30px)' }} />
         </div>
-        <VinylRecord featuredTrack={featuredTrack} />
+        {/* Scale wrapper: shrink vinyl on mobile uniformly (keeps it circular) */}
+        <div className="vinyl-scale-wrapper">
+          <style>{`
+            .vinyl-scale-wrapper {
+              width: 300px; height: 300px;
+              display: flex; align-items: center; justify-content: center;
+              overflow: visible;
+            }
+            .vinyl-scale-wrapper > * {
+              transform: scale(0.577);
+              transform-origin: center center;
+              flex-shrink: 0;
+            }
+            @media (min-width: 480px) {
+              .vinyl-scale-wrapper { width: 374px; height: 374px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.72); }
+            }
+            @media (min-width: 640px) {
+              .vinyl-scale-wrapper { width: 442px; height: 442px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.85); }
+            }
+            @media (min-width: 1024px) {
+              .vinyl-scale-wrapper { width: 520px; height: 520px; }
+              .vinyl-scale-wrapper > * { transform: scale(1); }
+            }
+          `}</style>
+          <VinylRecord featuredTrack={featuredTrack} />
+        </div>
       </div>
     </section>
   );
