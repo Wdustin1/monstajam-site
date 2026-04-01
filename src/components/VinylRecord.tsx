@@ -302,7 +302,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           height: ARM_LEN,
           transformOrigin: '50% 0%',
           zIndex: 40,
-          transform: `rotate(${isPlaying ? ANGLE_PLAY : ANGLE_REST}deg)`,
+          transform: `rotate(${isPlaying ? ANGLE_REST : ANGLE_PLAY}deg)`,
           transition: 'transform 1.3s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
