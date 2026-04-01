@@ -285,8 +285,8 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', zIndex: 30,
           backdropFilter: 'blur(6px)',
-          opacity: (hovered || isPlaying) ? 1 : 0,
-          pointerEvents: (hovered || isPlaying) ? 'auto' : 'none',
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? 'auto' : 'none',
           transition: 'opacity 0.25s ease, box-shadow 0.3s ease, background 0.3s ease',
         }}
       >
