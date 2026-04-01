@@ -9,26 +9,29 @@ interface VinylRecordProps {
   featuredTrack?: PlayerTrack | null;
 }
 
-const DISC  = 520;
-const R     = DISC / 2;  // 260
-const LABEL = 160;
+const DISC  = 520;        // disc diameter px
+const R     = DISC / 2;   // 260
+const LABEL = 160;        // center label diameter
 
-// Tonearm pivot: right side at (535, 90)
-// ARM_LEN=185. At ANGLE_PLAY=-27°: needle lands ~191px from disc center = outer groove ✓
-// At ANGLE_REST=+20°: arm parked right, clear of disc
-const PIVOT_X    = 535;
-const PIVOT_Y    = 90;
-const ARM_LEN    = 185;
-const ANGLE_REST = 20;
-const ANGLE_PLAY = -27;
+// Tonearm pivot: right side of disc, like a real turntable (not top)
+// Pivot at x=535 (right of disc edge at 520), y=90
+// ARM_LEN=185. Playing: arm swings -27° (left), needle lands on outer right groove (~194px from center)
+// Rest: arm swings +20° (right), parked away from disc
+// Disc center = (260, 260). Disc right edge ≈ 520. Outer groove r ≈ 205.
+// At -27°: nx=535+185*sin(-27°)=535-84=451, ny=90+185*cos(-27°)=90+165=255 → 191px from center ✓
+const PIVOT_X   = 535;
+const PIVOT_Y   = 90;
+const ARM_LEN   = 185;
+const ANGLE_REST = 20;   // arm swings right, parked away from disc
+const ANGLE_PLAY = -27;  // arm over outer groove on right side of disc
 
 export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
   const { currentTrack, isPlaying, toggle, play } = usePlayer();
   const displayTrack = currentTrack ?? featuredTrack ?? null;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const discControls   = useAnimation();
+  const [tilt, setTilt]     = useState({ x: 0, y: 0 });
+  const discControls        = useAnimation();
 
   // ── Spin ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -52,21 +55,16 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
     return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
-  // Needle tip world coords (for sparks)
   const toneAngle = isPlaying ? ANGLE_PLAY : ANGLE_REST;
-  const rad = (toneAngle * Math.PI) / 180;
+
+  // Needle tip world coords (for sparks)
+  const rad  = (toneAngle * Math.PI) / 180;
   const needleX = PIVOT_X + ARM_LEN * Math.sin(rad);
   const needleY = PIVOT_Y + ARM_LEN * Math.cos(rad);
 
-  const handleToggle = () => {
-    if (currentTrack) toggle(currentTrack);
-    else if (featuredTrack) play(featuredTrack);
-  };
-
   return (
-    // Container: disc (520) + space for tonearm pivot (120)
     <div ref={containerRef} className="relative select-none"
-      style={{ width: DISC + 120, height: DISC }}
+      style={{ width: DISC + 200, height: DISC }}
     >
       {/* ── Outer glow halo ──────────────────────────────────────── */}
       <motion.div className="absolute pointer-events-none" style={{
@@ -96,7 +94,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         />
       ))}
 
-      {/* ── 3D tilt wrapper (disc only — NOT button, to avoid pointer-event issues) */}
+      {/* ── 3D tilt wrapper ──────────────────────────────────────── */}
       <div className="absolute" style={{
         left: 0, top: 0, width: DISC, height: DISC,
         zIndex: 10,
@@ -104,10 +102,11 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
         transition: 'transform 0.12s ease-out',
       }}>
+
         {/* ── Spinning vinyl disc ──────────────────────────────── */}
         <motion.div
           animate={discControls}
-          onClick={handleToggle}
+          onClick={() => { if (currentTrack) toggle(currentTrack); else if (featuredTrack) play(featuredTrack); }}
           style={{
             position: 'absolute', inset: 0,
             borderRadius: '50%',
@@ -116,7 +115,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             background: '#080808',
           }}
         >
-          {/* Groove base */}
+          {/* Deep groove base — tight repeating rings */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `repeating-radial-gradient(
@@ -129,7 +128,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             )`,
           }} />
 
-          {/* Iridescent diffraction band */}
+          {/* Iridescent diffraction band — sweeps the surface like real vinyl */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `conic-gradient(
@@ -149,7 +148,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             mixBlendMode: 'screen',
           }} />
 
-          {/* Second iridescent sweep */}
+          {/* Second iridescent sweep — shifted for asymmetry */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `conic-gradient(
@@ -164,7 +163,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             mixBlendMode: 'screen',
           }} />
 
-          {/* Specular highlight top-left */}
+          {/* Specular highlight — bright crescent top-left */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `radial-gradient(
@@ -175,7 +174,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             )`,
           }} />
 
-          {/* Specular bottom-right */}
+          {/* Second specular — subtle bottom-right bounce */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `radial-gradient(
@@ -185,7 +184,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             )`,
           }} />
 
-          {/* Edge vignette */}
+          {/* Edge vignette — darkens rim for depth */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             background: `radial-gradient(
@@ -196,7 +195,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             )`,
           }} />
 
-          {/* Chrome rim */}
+          {/* Chrome rim highlight ring */}
           <div className="absolute inset-0 pointer-events-none" style={{
             borderRadius: '50%',
             boxShadow: `
@@ -206,7 +205,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
             `,
           }} />
 
-          {/* Lead-in zone near label */}
+          {/* Center lead-in zone (smoother area near label edge) */}
           <div className="absolute pointer-events-none" style={{
             width: LABEL + 48, height: LABEL + 48,
             borderRadius: '50%',
@@ -247,6 +246,30 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           }} />
         </motion.div>
 
+        {/* ── Play / Pause — fixed (non-spinning) ─────────────── */}
+        <button
+          onClick={() => { if (currentTrack) toggle(currentTrack); else if (featuredTrack) play(featuredTrack); }}
+          style={{
+            position: 'absolute',
+            top: R - 26, left: R - 26,
+            width: 52, height: 52, borderRadius: '50%',
+            background: isPlaying ? 'rgba(255,0,170,0.20)' : 'rgba(0,220,255,0.16)',
+            border: `2px solid ${isPlaying ? 'rgba(255,0,170,0.75)' : 'rgba(0,220,255,0.65)'}`,
+            boxShadow: isPlaying
+              ? '0 0 24px rgba(255,0,170,0.65), inset 0 0 12px rgba(255,0,170,0.18)'
+              : '0 0 24px rgba(0,220,255,0.50), inset 0 0 12px rgba(0,220,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 20,
+            backdropFilter: 'blur(6px)',
+            transition: 'all 0.3s ease',
+          }}
+        >
+          {isPlaying
+            ? <svg width="13" height="15" viewBox="0 0 14 16" fill="white"><rect x="1" y="0" width="4" height="16" rx="1.5"/><rect x="9" y="0" width="4" height="16" rx="1.5"/></svg>
+            : <svg width="13" height="15" viewBox="0 0 14 16" fill="white" style={{ marginLeft: 2 }}><path d="M1 0l13 8-13 8z"/></svg>
+          }
+        </button>
+
         {/* Track badge */}
         {isPlaying && displayTrack && (
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
@@ -267,44 +290,25 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         )}
       </div>
 
-      {/* ── Play / Pause ── OUTSIDE preserve-3d wrapper so pointer events work */}
-      <button
-        onClick={(e) => { e.stopPropagation(); handleToggle(); }}
-        style={{
-          position: 'absolute',
-          top: R - 26, left: R - 26,
-          width: 52, height: 52, borderRadius: '50%',
-          background: isPlaying ? 'rgba(255,0,170,0.20)' : 'rgba(0,220,255,0.16)',
-          border: `2px solid ${isPlaying ? 'rgba(255,0,170,0.75)' : 'rgba(0,220,255,0.65)'}`,
-          boxShadow: isPlaying
-            ? '0 0 24px rgba(255,0,170,0.65), inset 0 0 12px rgba(255,0,170,0.18)'
-            : '0 0 24px rgba(0,220,255,0.50), inset 0 0 12px rgba(0,220,255,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', zIndex: 30,
-          backdropFilter: 'blur(6px)',
-          transition: 'all 0.3s ease',
-        }}
-      >
-        {isPlaying
-          ? <svg width="13" height="15" viewBox="0 0 14 16" fill="white"><rect x="1" y="0" width="4" height="16" rx="1.5"/><rect x="9" y="0" width="4" height="16" rx="1.5"/></svg>
-          : <svg width="13" height="15" viewBox="0 0 14 16" fill="white" style={{ marginLeft: 2 }}><path d="M1 0l13 8-13 8z"/></svg>
-        }
-      </button>
-
       {/* ── Tonearm ──────────────────────────────────────────────── */}
-      {/* Tonearm — pure CSS transition, no FM arc-direction bug */}
-      <div
+      {/*
+        Pivot at (PIVOT_X, PIVOT_Y) in container space.
+        Div top-center = pivot. transformOrigin = '50% 0' (top-center).
+        Rotation negative = swings left toward disc.
+        ARM_LEN = shaft + headshell + needle visible length.
+      */}
+      <motion.div
         className="absolute pointer-events-none"
         style={{
           top:  PIVOT_Y,
-          left: PIVOT_X - 5,
+          left: PIVOT_X - 5,   // center the 10px wide shaft on pivot X
           width: 10,
           height: ARM_LEN,
           transformOrigin: '50% 0%',
           zIndex: 40,
-          transform: `rotate(${isPlaying ? ANGLE_PLAY : ANGLE_REST}deg)`,
-          transition: 'transform 1.3s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
+        animate={{ rotate: toneAngle }}
+        transition={{ duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* Shaft */}
         <div style={{
@@ -315,7 +319,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           borderRadius: 5,
           boxShadow: '3px 0 12px rgba(0,0,0,0.7), -1px 0 4px rgba(255,255,255,0.04)',
         }} />
-        {/* Headshell */}
+        {/* Headshell — angled slightly outward */}
         <div style={{
           position: 'absolute',
           top: ARM_LEN - 50,
@@ -336,7 +340,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           boxShadow: isPlaying ? '0 0 8px #00F0FF, 0 0 20px rgba(0,240,255,0.7)' : 'none',
           transition: 'background 0.4s, box-shadow 0.4s',
         }} />
-        {/* Stylus */}
+        {/* Stylus needle */}
         <div style={{
           position: 'absolute',
           top: ARM_LEN - 6,
@@ -345,9 +349,9 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           background: 'linear-gradient(to bottom, #606060, #222)',
           borderRadius: 1,
         }} />
-      </div>
+      </motion.div>
 
-      {/* Pivot base cap */}
+      {/* Pivot base cap — sits on top, doesn't rotate */}
       <div className="absolute pointer-events-none" style={{
         top:  PIVOT_Y - 28,
         left: PIVOT_X - 28,
@@ -358,6 +362,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         zIndex: 45,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
+        {/* Counterweight visible above center */}
         <div style={{
           position: 'absolute',
           bottom: '100%', left: '50%', transform: 'translateX(-50%)',

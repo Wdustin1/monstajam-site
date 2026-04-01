@@ -117,7 +117,7 @@ export default function Hero({
       </div>
 
       {/* ── Right: Vinyl ── */}
-      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative">
+      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative lg:pl-8">
         {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-72 h-72 rounded-full"
@@ -127,7 +127,7 @@ export default function Hero({
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {
-              width: 300px; height: 300px;
+              width: 393px; height: 300px;
               display: flex; align-items: center; justify-content: center;
               overflow: visible;
             }
@@ -137,15 +137,15 @@ export default function Hero({
               flex-shrink: 0;
             }
             @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 374px; height: 374px; }
+              .vinyl-scale-wrapper { width: 490px; height: 374px; }
               .vinyl-scale-wrapper > * { transform: scale(0.72); }
             }
             @media (min-width: 640px) {
-              .vinyl-scale-wrapper { width: 442px; height: 442px; }
+              .vinyl-scale-wrapper { width: 578px; height: 442px; }
               .vinyl-scale-wrapper > * { transform: scale(0.85); }
             }
             @media (min-width: 1024px) {
-              .vinyl-scale-wrapper { width: 520px; height: 520px; }
+              .vinyl-scale-wrapper { width: 720px; height: 520px; }
               .vinyl-scale-wrapper > * { transform: scale(1); }
             }
           `}</style>

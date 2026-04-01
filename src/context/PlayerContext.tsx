@@ -80,8 +80,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.volume = volume;
     audio.preload = 'metadata';
 
+    const PREVIEW_CAP = 45; // seconds
+
     audio.addEventListener('timeupdate', () => {
       if (audio.duration && isFinite(audio.duration)) {
+        // Cap playback at PREVIEW_CAP seconds
+        if (audio.currentTime >= PREVIEW_CAP) {
+          audio.pause();
+          audio.dispatchEvent(new Event('ended'));
+          return;
+        }
         setCurrentTime(audio.currentTime);
         setProgress(audio.currentTime / audio.duration);
       }
