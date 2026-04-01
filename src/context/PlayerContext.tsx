@@ -156,8 +156,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(track);
       if (track.audioUrl) {
         audio.src = track.audioUrl;
-        audio.load();
-        audio.play().catch(() => {});
+        audio.play().catch((e) => { console.warn('play() failed:', e); });
         setIsPlaying(true);
       } else {
         // No audio URL — still update UI but can't play
