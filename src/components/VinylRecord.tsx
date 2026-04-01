@@ -28,6 +28,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState(false);
   const discControls   = useAnimation();
 
   // ── Spin ──────────────────────────────────────────────────────
@@ -67,6 +68,8 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
     // Container: disc (520) + space for tonearm pivot (120)
     <div ref={containerRef} className="relative select-none"
       style={{ width: DISC + 120, height: DISC }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
 
       {/* ── Outer glow halo ──────────────────────────────────────── */}
@@ -282,7 +285,9 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', zIndex: 30,
           backdropFilter: 'blur(6px)',
-          transition: 'all 0.3s ease',
+          opacity: (hovered || isPlaying) ? 1 : 0,
+          pointerEvents: (hovered || isPlaying) ? 'auto' : 'none',
+          transition: 'opacity 0.25s ease, box-shadow 0.3s ease, background 0.3s ease',
         }}
       >
         {isPlaying
