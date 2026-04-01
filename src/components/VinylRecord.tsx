@@ -107,11 +107,10 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         {/* ── Spinning vinyl disc ──────────────────────────────── */}
         <motion.div
           animate={discControls}
-          onClick={handleToggle}
           style={{
             position: 'absolute', inset: 0,
             borderRadius: '50%',
-            cursor: 'pointer',
+            cursor: 'default',
             overflow: 'hidden',
             background: '#080808',
           }}
@@ -269,7 +268,7 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
 
       {/* ── Play / Pause ── OUTSIDE preserve-3d wrapper so pointer events work */}
       <button
-        onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+        onClick={handleToggle}
         style={{
           position: 'absolute',
           top: R - 26, left: R - 26,
