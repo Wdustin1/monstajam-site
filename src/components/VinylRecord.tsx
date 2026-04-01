@@ -69,15 +69,6 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
       style={{ width: DISC + 120, height: DISC }}
     >
 
-      {/* DEBUG — remove before final */}
-      <div style={{
-        position: 'absolute', top: 8, left: 8,
-        background: 'rgba(0,0,0,0.85)', color: isPlaying ? '#0f0' : '#f00',
-        padding: '4px 8px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-        zIndex: 999, fontFamily: 'monospace', pointerEvents: 'none',
-      }}>
-        isPlaying: {String(isPlaying)} | track: {currentTrack?.slug ?? featuredTrack?.slug ?? 'none'}
-      </div>
       {/* ── Outer glow halo ──────────────────────────────────────── */}
       <motion.div className="absolute pointer-events-none" style={{
         left: 0, top: 0, width: DISC, height: DISC,
