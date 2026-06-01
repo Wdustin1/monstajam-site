@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const track = await prisma.track.findUnique({ where: { slug } }).catch(() => null);
+  const track = await prisma.track.findUnique({ where: { slug } });
   if (!track) return {};
   return {
     title: `${track.title}${track.subtitle ? ` (${track.subtitle})` : ''} — MonstaJam`,
@@ -21,9 +21,6 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
   const track = await prisma.track.findUnique({
     where: { slug },
     include: { credits: true },
-  }).catch((err) => {
-    console.warn('Failed to load track detail:', err instanceof Error ? err.message : err);
-    return null;
   });
   if (!track) notFound();
 
@@ -43,9 +40,6 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
       number: true,
     },
     orderBy: { number: 'asc' },
-  }).catch((err) => {
-    console.warn('Failed to load track queue:', err instanceof Error ? err.message : err);
-    return [];
   });
 
   return (

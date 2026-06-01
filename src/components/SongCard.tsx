@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { Play, Pause, Music, Music4 } from 'lucide-react';
+import { proxyCoverUrl } from '@/lib/proxy-cover';
 import type { TrackWithCredits } from './MusicLibrary';
 import { usePlayer } from '@/context/PlayerContext';
 
@@ -15,12 +15,10 @@ function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverU
   return (
     <div className={`w-full aspect-square rounded-xl overflow-hidden flex-shrink-0 relative group/art mb-4 ${!coverUrl ? color : ''}`}>
       {coverUrl ? (
-        <Image
-          src={coverUrl}
+        <img
+          src={proxyCoverUrl(coverUrl)}
           alt="Album art"
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 50vw, 25vw"
+          className="w-full h-full object-cover"
         />
       ) : (
         <>

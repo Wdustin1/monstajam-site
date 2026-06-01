@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePlayer } from '@/context/PlayerContext';
+import { proxyCoverUrl } from '@/lib/proxy-cover';
 import type { TrackWithCredits } from './MusicLibrary';
 
 interface TrackDetailProps {
@@ -55,13 +55,10 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
         >
           <div className={`w-full aspect-square rounded-[calc(1rem-4px)] overflow-hidden relative ${!track.coverUrl ? track.color : ''} flex items-center justify-center`}>
             {track.coverUrl ? (
-              <Image
-                src={track.coverUrl}
+              <img
+                src={proxyCoverUrl(track.coverUrl)}
                 alt={`${track.title} cover art`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                priority
+                className="w-full h-full object-cover"
               />
             ) : (
               <div className="flex flex-col items-center gap-3 opacity-60">

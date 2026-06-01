@@ -15,9 +15,6 @@ export default async function GenresPage() {
     where: { published: true },
     include: { credits: true },
     orderBy: { number: 'asc' },
-  }).catch((err) => {
-    console.warn('Failed to load genre tracks:', err instanceof Error ? err.message : err);
-    return [];
   });
 
   return (

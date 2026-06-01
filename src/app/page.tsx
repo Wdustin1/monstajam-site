@@ -14,14 +14,8 @@ export default async function Home() {
       where: { published: true },
       include: { credits: true },
       orderBy: { number: 'asc' },
-    }).catch((err) => {
-      console.warn('Failed to load homepage tracks:', err instanceof Error ? err.message : err);
-      return [];
     }),
-    prisma.video.count({ where: { published: true } }).catch((err) => {
-      console.warn('Failed to load homepage video count:', err instanceof Error ? err.message : err);
-      return 0;
-    }),
+    prisma.video.count({ where: { published: true } }),
   ]);
   const artistCount = new Set(tracks.map((t: { artist: string }) => t.artist)).size;
 

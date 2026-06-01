@@ -34,6 +34,7 @@ export const TrackCreateSchema = z.object({
   coverUrl:      urlOrEmpty,
   spotifyUrl:    urlOrEmpty,
   appleMusicUrl: urlOrEmpty,
+  previewOnly:   z.boolean().optional(),  // true = 30-sec preview (default), false = full song
   published:     z.boolean().optional(),
   accentCyan:    z.boolean().optional().nullable(),
 });

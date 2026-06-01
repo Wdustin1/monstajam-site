@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model Track {
-  id            String   @id @default(cuid())
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
   slug          String   @unique
   number        Int
   title         String
@@ -18,7 +19,7 @@ model Track {
   mood          String?
   color         String
   accentCyan    Boolean  @default(false)
-  story         String?  @db.Text
+  story         String?
   spotifyUrl    String?
   appleMusicUrl String?
   audioUrl      String?
@@ -33,7 +34,7 @@ model Track {
 }
 
 model Video {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   artist      String?
   youtubeUrl  String
@@ -48,11 +49,11 @@ model Video {
 }
 
 model Credit {
-  id      String @id @default(cuid())
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
   role    String
   name    String
   track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  trackId String
+  trackId String @db.ObjectId
 
   @@map("credits")
 }
