@@ -71,11 +71,12 @@ const inputStyle: React.CSSProperties = {
   transition: 'box-shadow 0.3s',
 };
 
-const GENRES = ['Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi', 'Pop', 'Trap', 'Afrobeat', 'Other'];
+const GENRES = ['Full Songs', 'Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi', 'Pop', 'Trap', 'Afrobeat', 'Other'];
 
 // Map genres to gradient classes matching what SongCard/TrackDetail expect
 const GENRE_COLORS: Record<string, string> = {
   'Hip-Hop':  'bg-gradient-to-br from-purple-600 to-blue-500',
+  'Full Songs': 'bg-gradient-to-br from-emerald-500 to-cyan-700',
   'R&B':      'bg-gradient-to-br from-pink-600 to-purple-700',
   'Electronic':'bg-gradient-to-br from-cyan-500 to-blue-700',
   'Lo-Fi':    'bg-gradient-to-br from-indigo-500 to-purple-600',

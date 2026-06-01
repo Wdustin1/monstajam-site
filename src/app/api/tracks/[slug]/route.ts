@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
@@ -47,19 +48,16 @@ export async function PUT(
   }
 
   const { slug } = await params;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { credits, ...trackData } = parsed.data as any;
+  const { accentCyan, ...trackInput } = parsed.data;
+  const trackData: Prisma.TrackUpdateInput = {
+    ...trackInput,
+    ...(accentCyan != null && { accentCyan }),
+  };
 
   try {
     const track = await prisma.track.update({
       where: { slug },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: {
-        ...trackData,
-        ...(Array.isArray(credits) && {
-          credits: { deleteMany: {}, create: credits },
-        }),
-      } as any,
+      data: trackData,
       include: { credits: true },
     });
     return NextResponse.json(track);

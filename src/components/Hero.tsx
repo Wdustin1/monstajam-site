@@ -16,8 +16,8 @@ export default function Hero({
 }) {
   return (
     <section
-      className="max-w-7xl mx-auto px-5 md:px-8 pt-6 md:pt-8 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
-      style={{ minHeight: 'calc(100vh - 96px)' }}
+      className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
+      style={{ minHeight: 'calc(100vh - 260px)' }}
     >
       {/* Ambient glow blobs behind content */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
@@ -127,25 +127,25 @@ export default function Hero({
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {
-              width: 393px; height: 300px;
+              width: 315px; height: 260px;
               display: flex; align-items: center; justify-content: center;
               overflow: visible;
             }
             .vinyl-scale-wrapper > * {
-              transform: scale(0.577);
+              transform: scale(0.72);
               transform-origin: center center;
               flex-shrink: 0;
             }
             @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 490px; height: 374px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.72); }
+              .vinyl-scale-wrapper { width: 360px; height: 294px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.82); }
             }
             @media (min-width: 640px) {
-              .vinyl-scale-wrapper { width: 578px; height: 442px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.85); }
+              .vinyl-scale-wrapper { width: 395px; height: 324px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.9); }
             }
             @media (min-width: 1024px) {
-              .vinyl-scale-wrapper { width: 720px; height: 520px; }
+              .vinyl-scale-wrapper { width: 440px; height: 360px; }
               .vinyl-scale-wrapper > * { transform: scale(1); }
             }
           `}</style>

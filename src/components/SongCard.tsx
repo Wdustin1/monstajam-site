@@ -55,6 +55,7 @@ function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverU
 export default function SongCard({ track }: SongCardProps) {
   const { currentTrack, isPlaying, toggle } = usePlayer();
   const isActive = currentTrack?.slug === track.slug && isPlaying;
+  const isFullSong = track.genre === 'Full Songs';
 
   return (
     <article
@@ -107,14 +108,14 @@ export default function SongCard({ track }: SongCardProps) {
         <div className="mt-auto flex items-center justify-between">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide"
             style={{
-              border: '1px solid rgba(0,229,255,0.3)',
-              background: 'rgba(0,229,255,0.07)',
-              color: '#00e5ff',
+              border: isFullSong ? '1px solid rgba(52,211,153,0.35)' : '1px solid rgba(0,229,255,0.3)',
+              background: isFullSong ? 'rgba(52,211,153,0.10)' : 'rgba(0,229,255,0.07)',
+              color: isFullSong ? '#86efac' : '#00e5ff',
             }}>
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
             </svg>
-            EXCLUSIVE
+            {isFullSong ? 'FULL SONG' : 'EXCLUSIVE'}
           </span>
           <div className="flex gap-2">
             {track.spotifyUrl && track.spotifyUrl !== '#' && (

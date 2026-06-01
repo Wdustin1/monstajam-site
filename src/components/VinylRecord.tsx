@@ -9,16 +9,16 @@ interface VinylRecordProps {
   featuredTrack?: PlayerTrack | null;
 }
 
-const DISC  = 520;
-const R     = DISC / 2;  // 260
-const LABEL = 160;
+const DISC  = 360;
+const R     = DISC / 2;
+const LABEL = 104;
 
 // Tonearm pivot: right side at (535, 90)
 // ARM_LEN=185. At ANGLE_PLAY=-27°: needle lands ~191px from disc center = outer groove ✓
 // At ANGLE_REST=+20°: arm parked right, clear of disc
-const PIVOT_X    = 535;
-const PIVOT_Y    = 90;
-const ARM_LEN    = 185;
+const PIVOT_X    = 374;
+const PIVOT_Y    = 62;
+const ARM_LEN    = 128;
 const ANGLE_REST = 20;
 const ANGLE_PLAY = -27;
 
@@ -65,9 +65,9 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
   };
 
   return (
-    // Container: disc (520) + space for tonearm pivot (120)
+    // Container: disc + space for tonearm pivot.
     <div ref={containerRef} className="relative select-none"
-      style={{ width: DISC + 120, height: DISC }}
+      style={{ width: DISC + 80, height: DISC }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -275,8 +275,8 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
         onClick={handleToggle}
         style={{
           position: 'absolute',
-          top: R - 26, left: R - 26,
-          width: 52, height: 52, borderRadius: '50%',
+          top: R - 22, left: R - 22,
+          width: 44, height: 44, borderRadius: '50%',
           background: isPlaying ? 'rgba(255,0,170,0.20)' : 'rgba(0,220,255,0.16)',
           border: `2px solid ${isPlaying ? 'rgba(255,0,170,0.75)' : 'rgba(0,220,255,0.65)'}`,
           boxShadow: isPlaying

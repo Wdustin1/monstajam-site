@@ -8,11 +8,16 @@ export const metadata = {
   description: 'Browse exclusive tracks by genre on MonstaJam.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function GenresPage() {
   const tracks = await prisma.track.findMany({
     where: { published: true },
     include: { credits: true },
     orderBy: { number: 'asc' },
+  }).catch((err) => {
+    console.warn('Failed to load genre tracks:', err instanceof Error ? err.message : err);
+    return [];
   });
 
   return (

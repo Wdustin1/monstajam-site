@@ -84,8 +84,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener('timeupdate', () => {
       if (audio.duration && isFinite(audio.duration)) {
-        // Cap playback at PREVIEW_CAP seconds
-        if (audio.currentTime >= PREVIEW_CAP) {
+        const allowFullPlayback = currentTrackRef.current?.genre === 'Full Songs';
+        if (!allowFullPlayback && audio.currentTime >= PREVIEW_CAP) {
           audio.pause();
           audio.dispatchEvent(new Event('ended'));
           return;

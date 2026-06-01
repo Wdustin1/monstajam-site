@@ -8,10 +8,15 @@ export const metadata = {
   description: 'Watch exclusive music videos and live sessions.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function VideosPage() {
   const videos = await prisma.video.findMany({
     where: { published: true },
     orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+  }).catch((err) => {
+    console.warn('Failed to load videos:', err instanceof Error ? err.message : err);
+    return [];
   });
 
   return (

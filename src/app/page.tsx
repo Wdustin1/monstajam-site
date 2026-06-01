@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Navbar from '@/components/Navbar';
+import AlbumReleaseBanner from '@/components/AlbumReleaseBanner';
 import Hero from '@/components/Hero';
 import ScrollIndicator from '@/components/ScrollIndicator';
 import MusicLibrary from '@/components/MusicLibrary';
@@ -8,13 +9,20 @@ import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
 
 export default async function Home() {
-  const tracks = await prisma.track.findMany({
-    where: { published: true },
-    include: { credits: true },
-    orderBy: { number: 'asc' },
-  });
-
-  const videoCount = await prisma.video.count({ where: { published: true } });
+  const [tracks, videoCount] = await Promise.all([
+    prisma.track.findMany({
+      where: { published: true },
+      include: { credits: true },
+      orderBy: { number: 'asc' },
+    }).catch((err) => {
+      console.warn('Failed to load homepage tracks:', err instanceof Error ? err.message : err);
+      return [];
+    }),
+    prisma.video.count({ where: { published: true } }).catch((err) => {
+      console.warn('Failed to load homepage video count:', err instanceof Error ? err.message : err);
+      return 0;
+    }),
+  ]);
   const artistCount = new Set(tracks.map((t: { artist: string }) => t.artist)).size;
 
   // Featured track = most recently added (highest createdAt)
@@ -38,6 +46,7 @@ export default async function Home() {
     <>
       <Navbar activeLink="home" />
       <main id="main-content" className="flex-grow pt-24 hero-bg-gradient">
+        <AlbumReleaseBanner />
         <Hero trackCount={tracks.length} artistCount={artistCount} videoCount={videoCount} featuredTrack={featuredTrack} />
         <ScrollIndicator />
         <MusicLibrary tracks={tracks} />

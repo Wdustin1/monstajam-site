@@ -26,7 +26,7 @@ export type TrackWithCredits = PlayerTrack & {
   credits?: Credit[];
 };
 
-const GENRES = ['All', 'Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi'];
+const GENRES = ['All', 'Full Songs', 'Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi'];
 const BPMS = ['All', '< 80', '80–100', '100–120', '120+'];
 const MOODS = ['All', 'Chill', 'Energetic', 'Dark'];
 
@@ -101,6 +101,14 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
     });
   }, [search, genre, bpm, mood, tracks]);
 
+  const fullSongs = useMemo(() => (
+    tracks.filter((track) => track.genre === 'Full Songs')
+  ), [tracks]);
+  const showingFullSongsLane = fullSongs.length > 0 && genre === 'All' && !search && bpm === 'All' && mood === 'All';
+  const libraryTracks = showingFullSongsLane
+    ? filtered.filter((track) => track.genre !== 'Full Songs')
+    : filtered;
+
   // Keep player queue in sync with visible filtered tracks
   useEffect(() => {
     setQueue(filtered);
@@ -153,9 +161,26 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
         </div>
       </div>
 
-      {filtered.length > 0 ? (
+      {showingFullSongsLane && (
+        <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/[0.045] p-4 md:p-5">
+          <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-200/80">Full tracks</p>
+              <h3 className="text-xl font-black tracking-tight text-white">Listen all the way through</h3>
+            </div>
+            <span className="text-sm text-emerald-100/60">{fullSongs.length} full song{fullSongs.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {fullSongs.map((track) => (
+              <SongCard key={`full-${track.slug}`} track={track} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {libraryTracks.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filtered.map((track) => (
+          {libraryTracks.map((track) => (
             <SongCard key={track.slug} track={track} />
           ))}
         </div>
