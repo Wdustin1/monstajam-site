@@ -56,7 +56,7 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between px-4 py-3 rounded-full bg-[#111118] border border-white/10 hover:border-white/20 transition-colors text-sm gap-3 min-w-[110px]"
+        className="flex items-center justify-between px-4 py-3 rounded-full bg-[#111118] border border-white/10 hover:border-white/20 transition-colors text-sm gap-3 min-w-[104px]"
         style={{ backdropFilter: 'blur(8px)' }}
       >
         <span className={value === 'All' ? 'text-gray-400' : 'text-[#00e5ff]'}>{display}</span>
@@ -136,8 +136,8 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-center w-full">
-        <div className="relative w-full md:flex-grow">
+      <div className="flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap gap-4 items-center w-full">
+        <div className="relative w-full md:min-w-[320px] md:flex-1">
           <div className="absolute inset-[-1px] rounded-full z-[-1] opacity-60 blur-[5px]"
             style={{ background: 'linear-gradient(90deg, #00e5ff, #ff00ff)' }} />
           <div className="bg-[#0e0e14] border border-white/10 flex items-center px-4 py-3 rounded-full w-full"
@@ -154,7 +154,7 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
             )}
           </div>
         </div>
-        <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <div className="flex flex-wrap gap-3 w-full md:w-auto md:justify-end overflow-visible pb-1 md:pb-0">
           <Dropdown label="Genre" options={GENRES} value={genre} onChange={setGenre} />
           <Dropdown label="BPM" options={BPMS} value={bpm} onChange={setBpm} />
           <Dropdown label="Mood" options={MOODS} value={mood} onChange={setMood} />
