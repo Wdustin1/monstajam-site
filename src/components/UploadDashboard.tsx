@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { CloudUpload, Upload, CheckCircle, XCircle, Loader2, Pencil, Trash2, Eye, EyeOff, Youtube, Music } from 'lucide-react';
+import { upload } from '@vercel/blob/client';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -345,13 +346,17 @@ export default function UploadDashboard() {
     if (f && (f.name.endsWith('.wav') || f.name.endsWith('.mp3'))) setAudioFile(f);
   }, []);
 
-  // Upload file to Supabase
+  // Upload directly to Vercel Blob so song-sized files do not hit function body limits.
   async function uploadFile(file: File, bucket: string): Promise<string> {
-    const fd = new FormData();
-    fd.append('file', file); fd.append('bucket', bucket);
-    const res = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: fd });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Upload failed'); }
-    return (await res.json()).url;
+    const ext = file.name.split('.').pop() || 'bin';
+    const path = `monstajam/${bucket}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const blob = await upload(path, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload',
+      contentType: file.type || 'application/octet-stream',
+      multipart: bucket === 'audio',
+    });
+    return blob.url;
   }
 
   // Submit (create or update)
