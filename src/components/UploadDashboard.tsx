@@ -1,10 +1,29 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { CloudUpload, Upload, CheckCircle, XCircle, Loader2, Pencil, Trash2, Eye, EyeOff, Youtube, Music } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { upload } from '@vercel/blob/client';
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Disc3,
+  Eye,
+  EyeOff,
+  FileAudio,
+  Image as ImageIcon,
+  LayoutDashboard,
+  Loader2,
+  Music,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash2,
+  Upload,
+  Video,
+  XCircle,
+  Youtube,
+} from 'lucide-react';
 
 interface PublishedTrack {
   id: string;
@@ -22,6 +41,7 @@ interface PublishedTrack {
   coverUrl: string | null;
   published: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface VideoRecord {
@@ -33,6 +53,93 @@ interface VideoRecord {
   duration: string | null;
   published: boolean;
   order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+type AdminTab = 'tracks' | 'videos' | 'ops';
+type ToastState = { type: 'success' | 'error'; message: string } | null;
+type ConfirmState =
+  | { kind: 'track'; item: PublishedTrack }
+  | { kind: 'video'; item: VideoRecord }
+  | null;
+
+type TrackFormState = {
+  title: string;
+  artist: string;
+  genre: string;
+  bpm: string;
+  mood: string;
+  story: string;
+  spotifyUrl: string;
+  appleMusicUrl: string;
+  published: boolean;
+  audioFile: File | null;
+  coverFile: File | null;
+};
+
+type VideoFormState = {
+  title: string;
+  artist: string;
+  youtubeUrl: string;
+  duration: string;
+  published: boolean;
+};
+
+const GENRES = [
+  'Full Songs',
+  'Hip-Hop',
+  'R&B',
+  'Soul',
+  'Pop',
+  'Reggae',
+  'Country',
+  'Electronic',
+  'Lo-Fi',
+  'Trap',
+  'Afrobeat',
+  'Other',
+];
+
+const GENRE_COLORS: Record<string, string> = {
+  'Hip-Hop': 'bg-gradient-to-br from-purple-600 to-blue-500',
+  'Full Songs': 'bg-gradient-to-br from-emerald-500 to-cyan-700',
+  'R&B': 'bg-gradient-to-br from-pink-600 to-purple-700',
+  Soul: 'bg-gradient-to-br from-amber-600 to-rose-700',
+  Pop: 'bg-gradient-to-br from-rose-500 to-pink-600',
+  Reggae: 'bg-gradient-to-br from-emerald-600 to-yellow-600',
+  Country: 'bg-gradient-to-br from-orange-600 to-stone-700',
+  Electronic: 'bg-gradient-to-br from-cyan-500 to-blue-700',
+  'Lo-Fi': 'bg-gradient-to-br from-indigo-500 to-purple-600',
+  Trap: 'bg-gradient-to-br from-gray-700 to-gray-900',
+  Afrobeat: 'bg-gradient-to-br from-orange-500 to-yellow-600',
+  Other: 'bg-gradient-to-br from-slate-600 to-slate-800',
+};
+
+const emptyTrackForm = (): TrackFormState => ({
+  title: '',
+  artist: 'Monsta Jam',
+  genre: 'Hip-Hop',
+  bpm: '',
+  mood: '',
+  story: '',
+  spotifyUrl: '',
+  appleMusicUrl: '',
+  published: false,
+  audioFile: null,
+  coverFile: null,
+});
+
+const emptyVideoForm = (): VideoFormState => ({
+  title: '',
+  artist: '',
+  youtubeUrl: '',
+  duration: '',
+  published: true,
+});
+
+function slugify(text: string) {
+  return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -42,106 +149,231 @@ function extractYouTubeId(url: string): string | null {
     /youtube\.com\/embed\/([^?&]+)/,
     /youtube\.com\/shorts\/([^?&]+)/,
   ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
   }
   return null;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+function formatDate(value?: string) {
+  if (!value) return 'Not recorded';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
 
-function NeonInput({ label, children }: { label: string; children: React.ReactNode }) {
+function fileLabel(file: File | null, fallback: string) {
+  return file ? `${file.name} (${Math.round(file.size / 1024)} KB)` : fallback;
+}
+
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+}) {
   return (
-    <div>
-      <label className="block text-sm text-gray-300 mb-2 font-medium">{label}</label>
+    <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</div>
+      <div className="mt-3 font-mono text-3xl font-semibold text-white">{value}</div>
+      <div className="mt-1 text-sm text-slate-400">{detail}</div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-300">
+        {label}
+        {required && <span className="text-rose-400"> *</span>}
+      </span>
       {children}
-    </div>
+      {error && <span className="mt-2 block text-sm text-rose-300">{error}</span>}
+    </label>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  backgroundColor: '#0F172A',
-  border: '1px solid #00FFFF',
-  boxShadow: 'inset 0 0 5px rgba(0,255,255,0.5)',
-  color: 'white',
-  borderRadius: 8,
-  width: '100%',
-  padding: '12px 16px',
-  outline: 'none',
-  transition: 'box-shadow 0.3s',
-};
-
-const GENRES = ['Full Songs', 'Hip-Hop', 'R&B', 'Electronic', 'Lo-Fi', 'Pop', 'Trap', 'Afrobeat', 'Other'];
-
-// Map genres to gradient classes matching what SongCard/TrackDetail expect
-const GENRE_COLORS: Record<string, string> = {
-  'Hip-Hop':  'bg-gradient-to-br from-purple-600 to-blue-500',
-  'Full Songs': 'bg-gradient-to-br from-emerald-500 to-cyan-700',
-  'R&B':      'bg-gradient-to-br from-pink-600 to-purple-700',
-  'Electronic':'bg-gradient-to-br from-cyan-500 to-blue-700',
-  'Lo-Fi':    'bg-gradient-to-br from-indigo-500 to-purple-600',
-  'Pop':      'bg-gradient-to-br from-rose-500 to-pink-600',
-  'Trap':     'bg-gradient-to-br from-gray-700 to-gray-900',
-  'Afrobeat': 'bg-gradient-to-br from-orange-500 to-yellow-600',
-  'Other':    'bg-gradient-to-br from-slate-600 to-slate-800',
-};
-
-function slugify(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={[
+        'w-full rounded-md border border-white/10 bg-slate-950/80 px-3.5 py-3 text-sm text-white outline-none transition',
+        'placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20',
+        props.className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    />
+  );
 }
 
-// ─── Toast ─────────────────────────────────────────────────────────────────────
-
-function Toast({ type, message, onDismiss }: { type: 'success' | 'error'; message: string; onDismiss: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(t);
-  }, [onDismiss]);
-
+function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <div
-      className="fixed top-6 right-6 z-[200] flex items-center gap-3 px-5 py-4 rounded-xl text-white text-sm font-medium shadow-2xl"
-      style={{
-        background: type === 'success' ? 'rgba(0,30,15,0.95)' : 'rgba(30,0,15,0.95)',
-        border: `1px solid ${type === 'success' ? '#00FFCF' : '#FF007F'}`,
-        boxShadow: `0 0 20px ${type === 'success' ? 'rgba(0,255,207,0.4)' : 'rgba(255,0,127,0.4)'}`,
-      }}
+    <textarea
+      {...props}
+      className={[
+        'min-h-28 w-full resize-y rounded-md border border-white/10 bg-slate-950/80 px-3.5 py-3 text-sm text-white outline-none transition',
+        'placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20',
+        props.className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    />
+  );
+}
+
+function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={[
+        'w-full rounded-md border border-white/10 bg-slate-950/80 px-3.5 py-3 text-sm text-white outline-none transition',
+        'focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20',
+        props.className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    />
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+  help,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+  help: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-white/20"
     >
-      {type === 'success'
-        ? <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-        : <XCircle className="w-5 h-5 text-pink-500 flex-shrink-0" />}
-      {message}
+      <span>
+        <span className="block text-sm font-semibold text-white">{label}</span>
+        <span className="mt-0.5 block text-xs text-slate-500">{help}</span>
+      </span>
+      <span
+        className={[
+          'relative h-6 w-11 rounded-full transition',
+          checked ? 'bg-cyan-400' : 'bg-slate-700',
+        ].join(' ')}
+      >
+        <span
+          className={[
+            'absolute top-1 h-4 w-4 rounded-full bg-white transition',
+            checked ? 'left-6' : 'left-1',
+          ].join(' ')}
+        />
+      </span>
+    </button>
+  );
+}
+
+function StatusPill({
+  tone,
+  children,
+}: {
+  tone: 'live' | 'draft' | 'warn' | 'neutral';
+  children: React.ReactNode;
+}) {
+  const className = {
+    live: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
+    draft: 'border-slate-500/30 bg-slate-500/10 text-slate-300',
+    warn: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
+    neutral: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200',
+  }[tone];
+
+  return (
+    <span className={`inline-flex items-center rounded border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void }) {
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(onDismiss, 4800);
+    return () => window.clearTimeout(timer);
+  }, [toast, onDismiss]);
+
+  if (!toast) return null;
+
+  return (
+    <div className="fixed right-5 top-5 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-white/10 bg-slate-950/95 p-4 text-sm shadow-2xl shadow-black/40">
+      {toast.type === 'success' ? (
+        <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-300" />
+      ) : (
+        <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-300" />
+      )}
+      <div className="text-slate-100">{toast.message}</div>
     </div>
   );
 }
 
-// ─── Confirm Dialog ────────────────────────────────────────────────────────────
+function ConfirmDialog({
+  confirm,
+  onCancel,
+  onConfirm,
+}: {
+  confirm: ConfirmState;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!confirm) return null;
 
-function ConfirmDialog({ track, onConfirm, onCancel }: { track: PublishedTrack; onConfirm: () => void; onCancel: () => void }) {
+  const title = confirm.kind === 'track' ? confirm.item.title : confirm.item.title;
+  const noun = confirm.kind === 'track' ? 'track' : 'video';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}>
-      <div
-        className="rounded-xl p-8 max-w-sm w-full mx-4 text-center"
-        style={{ background: '#12123A', border: '1px solid #FF007F', boxShadow: '0 0 30px rgba(255,0,127,0.4)' }}
-      >
-        <Trash2 className="w-10 h-10 mx-auto mb-4 text-pink-500" />
-        <h3 className="text-xl font-bold mb-2 text-white">Delete Track?</h3>
-        <p className="text-gray-400 text-sm mb-6">
-          <span style={{ color: '#00FFFF' }}>&quot;{track.title}&quot;</span> will be permanently removed from the database.
-        </p>
-        <div className="flex gap-3">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4">
+      <div className="w-full max-w-md rounded-lg border border-rose-400/30 bg-slate-950 p-6 shadow-2xl shadow-black/60">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-md bg-rose-400/10 text-rose-300">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Delete {noun}</h3>
+            <p className="mt-1 text-sm text-slate-400">This removes &quot;{title}&quot; from the database.</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
-            className="flex-1 py-2 rounded-lg font-semibold text-sm text-gray-300 transition-colors hover:text-white"
-            style={{ border: '1px solid #334155', background: 'transparent' }}
+            className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className="flex-1 py-2 rounded-lg font-bold text-sm text-white transition-all hover:scale-105"
-            style={{ background: '#FF007F', boxShadow: '0 0 12px rgba(255,0,127,0.5)' }}
+            className="rounded-md bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400"
           >
             Delete
           </button>
@@ -151,205 +383,140 @@ function ConfirmDialog({ track, onConfirm, onCancel }: { track: PublishedTrack; 
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
-
 export default function UploadDashboard() {
-  const [activeTab, setActiveTab] = useState<'tracks' | 'videos'>('tracks');
-
-  // ── Video state ──────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<AdminTab>('tracks');
+  const [tracks, setTracks] = useState<PublishedTrack[]>([]);
   const [videos, setVideos] = useState<VideoRecord[]>([]);
+  const [tracksLoading, setTracksLoading] = useState(true);
   const [videosLoading, setVideosLoading] = useState(true);
-  const [videoTitle, setVideoTitle] = useState('');
-  const [videoArtist, setVideoArtist] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [videoDuration, setVideoDuration] = useState('');
-  const [videoPublish, setVideoPublish] = useState(true);
-  const [videoUrlError, setVideoUrlError] = useState(false);
-  const [videoSubmitting, setVideoSubmitting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [trackForm, setTrackForm] = useState<TrackFormState>(() => emptyTrackForm());
+  const [videoForm, setVideoForm] = useState<VideoFormState>(() => emptyVideoForm());
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
-  const [confirmDeleteVideo, setConfirmDeleteVideo] = useState<VideoRecord | null>(null);
+  const [submittingTrack, setSubmittingTrack] = useState(false);
+  const [submittingVideo, setSubmittingVideo] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState('');
+  const [toast, setToast] = useState<ToastState>(null);
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
+  const [trackErrors, setTrackErrors] = useState<Record<string, string>>({});
+  const [videoErrors, setVideoErrors] = useState<Record<string, string>>({});
 
-  const loadVideos = useCallback(async () => {
-    try {
-      setVideosLoading(true);
-      const res = await fetch('/api/videos?all=true', { credentials: 'include' });
-      if (res.ok) setVideos(await res.json());
-    } catch { /* silent */ } finally {
-      setVideosLoading(false);
-    }
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
   }, []);
 
-  useEffect(() => { loadVideos(); }, [loadVideos]);
+  const loadTracks = useCallback(async () => {
+    setTracksLoading(true);
+    try {
+      const res = await fetch('/api/tracks?all=true', { credentials: 'include' });
+      if (!res.ok) throw new Error('Track library failed to load.');
+      setTracks(await res.json());
+      setLastLoadedAt(new Date());
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Track library failed to load.');
+    } finally {
+      setTracksLoading(false);
+    }
+  }, [showToast]);
+
+  const loadVideos = useCallback(async () => {
+    setVideosLoading(true);
+    try {
+      const res = await fetch('/api/videos?all=true', { credentials: 'include' });
+      if (!res.ok) throw new Error('Video library failed to load.');
+      setVideos(await res.json());
+      setLastLoadedAt(new Date());
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Video library failed to load.');
+    } finally {
+      setVideosLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    loadTracks();
+    loadVideos();
+  }, [loadTracks, loadVideos]);
+
+  const metrics = useMemo(() => {
+    const liveTracks = tracks.filter((track) => track.published).length;
+    const draftTracks = tracks.length - liveTracks;
+    const missingAudio = tracks.filter((track) => !track.audioUrl).length;
+    const missingCovers = tracks.filter((track) => !track.coverUrl).length;
+    const liveVideos = videos.filter((video) => video.published).length;
+
+    return {
+      liveTracks,
+      draftTracks,
+      missingAudio,
+      missingCovers,
+      liveVideos,
+      draftVideos: videos.length - liveVideos,
+    };
+  }, [tracks, videos]);
+
+  const filteredTracks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return tracks;
+    return tracks.filter((track) =>
+      [track.title, track.artist, track.genre, track.mood, track.slug].some((value) =>
+        value?.toLowerCase().includes(needle)
+      )
+    );
+  }, [query, tracks]);
+
+  const resetTrackForm = () => {
+    setEditingSlug(null);
+    setTrackForm(emptyTrackForm());
+    setTrackErrors({});
+    setUploadPhase('');
+  };
 
   const resetVideoForm = () => {
     setEditingVideoId(null);
-    setVideoTitle(''); setVideoArtist(''); setVideoUrl('');
-    setVideoDuration(''); setVideoPublish(true); setVideoUrlError(false);
+    setVideoForm(emptyVideoForm());
+    setVideoErrors({});
   };
 
-  const startEditVideo = (v: VideoRecord) => {
-    setEditingVideoId(v.id);
-    setVideoTitle(v.title);
-    setVideoArtist(v.artist || '');
-    setVideoUrl(v.youtubeUrl);
-    setVideoDuration(v.duration || '');
-    setVideoPublish(v.published);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleVideoSubmit = async () => {
-    const ytId = extractYouTubeId(videoUrl);
-    if (!videoTitle.trim() || !ytId) {
-      setVideoUrlError(!ytId);
-      if (!videoTitle.trim()) showToast('error', 'Title and a valid YouTube URL are required.');
-      return;
-    }
-    setVideoUrlError(false);
-    setVideoSubmitting(true);
-    try {
-      const payload = {
-        title: videoTitle.trim(),
-        artist: videoArtist.trim() || undefined,
-        youtubeUrl: videoUrl.trim(),
-        youtubeId: ytId,
-        duration: videoDuration.trim() || undefined,
-        published: videoPublish,
-        order: editingVideoId ? undefined : videos.length,
-      };
-      if (editingVideoId) {
-        const res = await fetch(`/api/videos/${editingVideoId}`, {
-          method: 'PUT', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('Update failed');
-        showToast('success', `"${videoTitle}" updated ✓`);
-      } else {
-        const res = await fetch('/api/videos', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('Create failed');
-        showToast('success', `"${videoTitle}" added 🎬`);
-      }
-      resetVideoForm();
-      await loadVideos();
-    } catch (err) {
-      showToast('error', err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setVideoSubmitting(false);
-    }
-  };
-
-  const handleDeleteVideo = async (v: VideoRecord) => {
-    try {
-      const res = await fetch(`/api/videos/${v.id}`, { method: 'DELETE', credentials: 'include' });
-      if (!res.ok) throw new Error('Delete failed');
-      showToast('success', `"${v.title}" deleted.`);
-      if (editingVideoId === v.id) resetVideoForm();
-      await loadVideos();
-    } catch {
-      showToast('error', 'Failed to delete video.');
-    } finally {
-      setConfirmDeleteVideo(null);
-    }
-  };
-
-  const toggleVideoPublish = async (v: VideoRecord) => {
-    try {
-      const res = await fetch(`/api/videos/${v.id}`, {
-        method: 'PUT', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ published: !v.published }),
-      });
-      if (!res.ok) throw new Error('Update failed');
-      showToast('success', `"${v.title}" ${!v.published ? 'published 🎬' : 'set to draft'}.`);
-      await loadVideos();
-    } catch {
-      showToast('error', 'Failed to toggle publish status.');
-    }
-  };
-
-  // Edit mode (tracks)
-  const [editingSlug, setEditingSlug] = useState<string | null>(null);
-
-  // Form state
-  const [title, setTitle]         = useState('');
-  const [artist, setArtist]       = useState('Monsta Jam');
-  const [genre, setGenre]         = useState('Hip-Hop');
-  const [bpm, setBpm]             = useState('');
-  const [mood, setMood]           = useState('');
-  const [story, setStory]         = useState('');
-  const [ytLink, setYtLink]       = useState('');
-  const [spotifyLink, setSpotify] = useState('');
-  const [appleLink, setApple]     = useState('');
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [audioDrag, setAudioDrag] = useState(false);
-  const [publishNow, setPublish]  = useState(false);
-
-  // UI state
-  const [submitting, setSubmitting]   = useState(false);
-  const [toast, setToast]             = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [titleError, setTitleError]   = useState(false);
-  const [tracks, setTracks]           = useState<PublishedTrack[]>([]);
-  const [tracksLoading, setTracksLoading] = useState(true);
-  const [confirmDelete, setConfirmDelete] = useState<PublishedTrack | null>(null);
-
-  const showToast = (type: 'success' | 'error', msg: string) => setToast({ type, msg });
-
-  // Load tracks
-  const loadTracks = useCallback(async () => {
-    try {
-      setTracksLoading(true);
-      const res = await fetch('/api/tracks?all=true', { credentials: 'include' });
-      if (res.ok) setTracks(await res.json());
-    } catch { /* silent */ } finally {
-      setTracksLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadTracks(); }, [loadTracks]);
-
-  // Reset form
-  const resetForm = () => {
-    setEditingSlug(null);
-    setTitle(''); setArtist('Monsta Jam'); setGenre('Hip-Hop');
-    setBpm(''); setMood(''); setStory(''); setYtLink('');
-    setSpotify(''); setApple(''); setAudioFile(null); setCoverFile(null);
-    setPublish(false);
-  };
-
-  // Load track into form for editing
-  const startEdit = (track: PublishedTrack) => {
+  const startEditTrack = (track: PublishedTrack) => {
     setEditingSlug(track.slug);
-    setTitle(track.title);
-    setArtist(track.artist);
-    setGenre(track.genre);
-    setBpm(track.bpm ? String(track.bpm) : '');
-    setMood(track.mood || '');
-    setStory(track.story || '');
-    setYtLink('');
-    setSpotify(track.spotifyUrl || '');
-    setApple(track.appleMusicUrl || '');
-    setAudioFile(null); setCoverFile(null);
-    setPublish(track.published);
-    // Scroll form into view
+    setTrackErrors({});
+    setUploadPhase('');
+    setTrackForm({
+      title: track.title,
+      artist: track.artist,
+      genre: GENRES.includes(track.genre) ? track.genre : 'Other',
+      bpm: track.bpm ? String(track.bpm) : '',
+      mood: track.mood ?? '',
+      story: track.story ?? '',
+      spotifyUrl: track.spotifyUrl ?? '',
+      appleMusicUrl: track.appleMusicUrl ?? '',
+      published: track.published,
+      audioFile: null,
+      coverFile: null,
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // File drop
-  const handleAudioDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setAudioDrag(false);
-    const f = e.dataTransfer.files[0];
-    if (f && (f.name.endsWith('.wav') || f.name.endsWith('.mp3'))) setAudioFile(f);
-  }, []);
+  const startEditVideo = (video: VideoRecord) => {
+    setEditingVideoId(video.id);
+    setVideoErrors({});
+    setVideoForm({
+      title: video.title,
+      artist: video.artist ?? '',
+      youtubeUrl: video.youtubeUrl,
+      duration: video.duration ?? '',
+      published: video.published,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  // Upload directly to Vercel Blob so song-sized files do not hit function body limits.
-  async function uploadFile(file: File, bucket: string): Promise<string> {
+  async function uploadFile(file: File, bucket: 'audio' | 'covers') {
     const ext = file.name.split('.').pop() || 'bin';
     const path = `monstajam/${bucket}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    setUploadPhase(bucket === 'audio' ? 'Uploading audio to Blob storage' : 'Uploading cover art to Blob storage');
     const blob = await upload(path, file, {
       access: 'public',
       handleUploadUrl: '/api/upload',
@@ -359,649 +526,664 @@ export default function UploadDashboard() {
     return blob.url;
   }
 
-  // Submit (create or update)
-  const handleSubmit = async () => {
-    if (!title.trim()) {
-      setTitleError(true);
-      showToast('error', 'Track title is required.');
-      return;
-    }
-    setTitleError(false);
+  function validateTrackForm() {
+    const errors: Record<string, string> = {};
+    const editingTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : null;
+    const hasAudio = Boolean(editingTrack?.audioUrl || trackForm.audioFile);
 
-    setSubmitting(true);
+    if (!trackForm.title.trim()) errors.title = 'Track title is required.';
+    if (!trackForm.artist.trim()) errors.artist = 'Artist name is required.';
+    if (trackForm.bpm && Number.isNaN(Number(trackForm.bpm))) errors.bpm = 'BPM must be a number.';
+    if (trackForm.bpm && (Number(trackForm.bpm) < 40 || Number(trackForm.bpm) > 300)) {
+      errors.bpm = 'BPM must be between 40 and 300.';
+    }
+    if (trackForm.published && !hasAudio) {
+      errors.audio = 'Live tracks need an audio file. Save as draft if the audio is not ready.';
+    }
+
+    setTrackErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  async function handleTrackSubmit() {
+    if (!validateTrackForm()) return;
+
+    setSubmittingTrack(true);
+    setUploadPhase(editingSlug ? 'Saving track changes' : 'Preparing new track');
+
     try {
       let audioUrl: string | undefined;
       let coverUrl: string | undefined;
-      if (audioFile) audioUrl = await uploadFile(audioFile, 'audio');
-      if (coverFile) coverUrl = await uploadFile(coverFile, 'covers');
+      if (trackForm.audioFile) audioUrl = await uploadFile(trackForm.audioFile, 'audio');
+      if (trackForm.coverFile) coverUrl = await uploadFile(trackForm.coverFile, 'covers');
 
       const payload: Record<string, unknown> = {
-        title: title.trim(),
-        artist: artist.trim() || 'Monsta Jam',
-        genre,
-        bpm: bpm ? parseInt(bpm) : undefined,
-        mood: mood.trim() || undefined,
-        color: GENRE_COLORS[genre] ?? 'bg-gradient-to-br from-purple-600 to-blue-500',
-        story: story.trim() || undefined,
-        spotifyUrl: spotifyLink.trim() || undefined,
-        appleMusicUrl: appleLink.trim() || undefined,
-        published: publishNow,
+        title: trackForm.title.trim(),
+        artist: trackForm.artist.trim(),
+        genre: trackForm.genre,
+        bpm: trackForm.bpm ? Number(trackForm.bpm) : undefined,
+        mood: trackForm.mood.trim() || undefined,
+        story: trackForm.story.trim() || undefined,
+        spotifyUrl: trackForm.spotifyUrl.trim() || undefined,
+        appleMusicUrl: trackForm.appleMusicUrl.trim() || undefined,
+        color: GENRE_COLORS[trackForm.genre] ?? GENRE_COLORS.Other,
+        published: trackForm.published,
       };
+
       if (audioUrl) payload.audioUrl = audioUrl;
       if (coverUrl) payload.coverUrl = coverUrl;
 
-      if (editingSlug) {
-        // UPDATE
-        const res = await fetch(`/api/tracks/${editingSlug}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Update failed'); }
-        showToast('success', `"${title}" updated ✓`);
-      } else {
-        // CREATE — use MAX track number to avoid gaps from deletions
-        const maxNum = tracks.reduce((max, t) => t.number > max ? t.number : max, 0);
-        const nextNum = maxNum + 1;
-        const res = await fetch('/api/tracks', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, slug: slugify(title), number: nextNum }),
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed to create track'); }
-        showToast('success', `"${title}" is ${publishNow ? 'live 🔥' : 'saved as draft'}.`);
+      const res = editingSlug
+        ? await fetch(`/api/tracks/${editingSlug}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/tracks', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...payload,
+              slug: slugify(trackForm.title),
+              number: tracks.reduce((max, track) => Math.max(max, track.number), 0) + 1,
+            }),
+          });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || (editingSlug ? 'Track update failed.' : 'Track create failed.'));
       }
 
-      resetForm();
+      showToast('success', editingSlug ? 'Track changes saved.' : 'Track added to the library.');
+      resetTrackForm();
       await loadTracks();
-    } catch (err) {
-      showToast('error', err instanceof Error ? err.message : 'Something went wrong.');
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Track save failed.');
     } finally {
-      setSubmitting(false);
+      setSubmittingTrack(false);
+      setUploadPhase('');
     }
-  };
+  }
 
-  // Toggle publish
-  const togglePublish = async (track: PublishedTrack) => {
+  async function toggleTrackPublish(track: PublishedTrack) {
     try {
+      if (!track.published && !track.audioUrl) {
+        showToast('error', 'Add audio before publishing this track.');
+        return;
+      }
       const res = await fetch(`/api/tracks/${track.slug}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published: !track.published }),
       });
-      if (!res.ok) throw new Error('Failed to update');
-      showToast('success', `"${track.title}" ${!track.published ? 'published 🔥' : 'set to draft'}.`);
+      if (!res.ok) throw new Error('Publish status failed to update.');
+      showToast('success', !track.published ? 'Track published.' : 'Track moved to draft.');
       await loadTracks();
-    } catch {
-      showToast('error', 'Failed to toggle publish status.');
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Publish status failed to update.');
+    }
+  }
+
+  async function handleDeleteTrack(track: PublishedTrack) {
+    try {
+      const res = await fetch(`/api/tracks/${track.slug}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Track delete failed.');
+      showToast('success', 'Track deleted.');
+      if (editingSlug === track.slug) resetTrackForm();
+      await loadTracks();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Track delete failed.');
+    } finally {
+      setConfirm(null);
+    }
+  }
+
+  function validateVideoForm() {
+    const errors: Record<string, string> = {};
+    const youtubeId = extractYouTubeId(videoForm.youtubeUrl);
+    if (!videoForm.title.trim()) errors.title = 'Video title is required.';
+    if (!videoForm.youtubeUrl.trim()) errors.youtubeUrl = 'YouTube URL is required.';
+    if (videoForm.youtubeUrl.trim() && !youtubeId) errors.youtubeUrl = 'Use a valid YouTube watch, short, embed, or youtu.be URL.';
+    setVideoErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  async function handleVideoSubmit() {
+    if (!validateVideoForm()) return;
+    const youtubeId = extractYouTubeId(videoForm.youtubeUrl);
+    if (!youtubeId) return;
+
+    setSubmittingVideo(true);
+    try {
+      const payload = {
+        title: videoForm.title.trim(),
+        artist: videoForm.artist.trim() || undefined,
+        youtubeUrl: videoForm.youtubeUrl.trim(),
+        youtubeId,
+        duration: videoForm.duration.trim() || undefined,
+        published: videoForm.published,
+        order: editingVideoId ? undefined : videos.length,
+      };
+
+      const res = editingVideoId
+        ? await fetch(`/api/videos/${editingVideoId}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/videos', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+      if (!res.ok) throw new Error(editingVideoId ? 'Video update failed.' : 'Video create failed.');
+      showToast('success', editingVideoId ? 'Video changes saved.' : 'Video added.');
+      resetVideoForm();
+      await loadVideos();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Video save failed.');
+    } finally {
+      setSubmittingVideo(false);
+    }
+  }
+
+  async function toggleVideoPublish(video: VideoRecord) {
+    try {
+      const res = await fetch(`/api/videos/${video.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: !video.published }),
+      });
+      if (!res.ok) throw new Error('Video publish status failed to update.');
+      showToast('success', !video.published ? 'Video published.' : 'Video moved to draft.');
+      await loadVideos();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Video publish status failed to update.');
+    }
+  }
+
+  async function handleDeleteVideo(video: VideoRecord) {
+    try {
+      const res = await fetch(`/api/videos/${video.id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Video delete failed.');
+      showToast('success', 'Video deleted.');
+      if (editingVideoId === video.id) resetVideoForm();
+      await loadVideos();
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Video delete failed.');
+    } finally {
+      setConfirm(null);
+    }
+  }
+
+  const confirmDelete = () => {
+    if (!confirm) return;
+    if (confirm.kind === 'track') {
+      handleDeleteTrack(confirm.item);
+    } else {
+      handleDeleteVideo(confirm.item);
     }
   };
 
-  // Delete
-  const handleDelete = async (track: PublishedTrack) => {
-    try {
-      const res = await fetch(`/api/tracks/${track.slug}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Delete failed');
-      showToast('success', `"${track.title}" deleted.`);
-      if (editingSlug === track.slug) resetForm();
-      await loadTracks();
-    } catch {
-      showToast('error', 'Failed to delete track.');
-    } finally {
-      setConfirmDelete(null);
-    }
-  };
+  const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
 
   return (
-    <div
-      className="min-h-screen w-full overflow-hidden p-6 font-sans antialiased text-white flex flex-col"
-      style={{ background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' }}
-    >
-      {/* ── Header ── */}
-      <header
-        className="flex justify-between items-center mb-8 pb-4"
-        style={{ borderBottom: '1px solid #FF007F', boxShadow: '0 4px 15px -3px rgba(255,0,127,0.3)' }}
-      >
-        <h1 className="text-2xl md:text-3xl tracking-wider uppercase font-bold">
-          <span style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}>Private Admin </span>
-          <span style={{ color: '#00FFFF', textShadow: '0 0 10px #00FFFF' }}>Backstage </span>
-          <span style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}>v2</span>
-        </h1>
-        <div className="flex items-center gap-3">
-          {editingSlug && (
-            <button
-              onClick={resetForm}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold text-gray-300 hover:text-white transition-colors"
-              style={{ border: '1px solid #334155' }}
-            >
-              + New Track
-            </button>
-          )}
-          <button
-            onClick={async () => {
-              await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-              window.location.href = '/upload/login';
-            }}
-            className="text-xs px-3 py-1.5 rounded-lg font-semibold text-gray-400 hover:text-white transition-colors"
-            style={{ border: '1px solid #334155' }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </header>
-
-      {/* ── Tab switcher ── */}
-      <div className="flex gap-2 mb-6">
-        {([['tracks', 'Tracks', Music], ['videos', 'Videos', Youtube]] as const).map(([tab, label, Icon]) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all"
-            style={{
-              background: activeTab === tab ? (tab === 'tracks' ? '#FF007F' : '#ff0000') : 'rgba(255,255,255,0.05)',
-              color: activeTab === tab ? 'white' : '#64748b',
-              boxShadow: activeTab === tab ? `0 0 15px ${tab === 'tracks' ? 'rgba(255,0,127,0.5)' : 'rgba(255,0,0,0.5)'}` : 'none',
-            }}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Two-panel layout ── */}
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1" style={{ minHeight: 'calc(100vh - 140px)', display: activeTab === 'tracks' ? 'grid' : 'none' }}>
-
-        {/* LEFT: Form */}
-        <section
-          className="lg:col-span-2 rounded-xl p-6 flex flex-col overflow-y-auto"
-          style={{
-            backgroundColor: '#12123A',
-            border: `1px solid ${editingSlug ? '#FF007F' : '#00FFFF'}`,
-            boxShadow: editingSlug
-              ? '0 0 10px rgba(255,0,127,0.5), 0 0 20px rgba(255,0,127,0.3)'
-              : '0 0 10px rgba(0,255,255,0.5), 0 0 20px rgba(0,255,255,0.3)',
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#00FFFF transparent',
-            transition: 'border-color 0.3s, box-shadow 0.3s',
-          }}
-        >
-          <h2
-            className="text-2xl font-bold mb-1"
-            style={{ color: editingSlug ? '#FF007F' : '#00FFFF', textShadow: editingSlug ? '0 0 10px #FF007F' : '0 0 10px #00FFFF' }}
-          >
-            {editingSlug ? '✏️ Edit Track' : 'Drop New Heat'}
-          </h2>
-          {editingSlug && (
-            <p className="text-xs text-gray-500 mb-5">Editing: <span style={{ color: '#00FFFF' }}>{editingSlug}</span></p>
-          )}
-          {!editingSlug && <div className="mb-6" />}
-
-          <div className="flex flex-col gap-5 flex-grow">
-
-            {/* Title + Artist */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <NeonInput label="Track Title *">
-                <input value={title} onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) setTitleError(false); }} type="text" placeholder="e.g. Midnight City"
-                  style={{ ...inputStyle, borderColor: titleError ? '#FF007F' : '#00FFFF', boxShadow: titleError ? 'inset 0 0 5px rgba(255,0,127,0.5)' : inputStyle.boxShadow }} />
-              </NeonInput>
-              <NeonInput label="Artist Name">
-                <input value={artist} onChange={(e) => setArtist(e.target.value)} type="text" placeholder="Monsta Jam" style={inputStyle} />
-              </NeonInput>
+    <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(0,199,190,0.14),transparent_28%),radial-gradient(circle_at_86%_2%,rgba(255,80,130,0.12),transparent_24%)]" />
+      <div className="relative mx-auto max-w-7xl">
+        <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300">
+              <Disc3 className="h-4 w-4" />
+              Creator suite
             </div>
-
-            {/* Genre + BPM + Mood */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <NeonInput label="Genre">
-                <select value={genre} onChange={(e) => setGenre(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                  {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </NeonInput>
-              <NeonInput label="BPM">
-                <input value={bpm} onChange={(e) => setBpm(e.target.value)} type="number" placeholder="e.g. 140" style={inputStyle} />
-              </NeonInput>
-              <NeonInput label="Mood">
-                <input value={mood} onChange={(e) => setMood(e.target.value)} type="text" placeholder="e.g. Dark, Hyped" style={inputStyle} />
-              </NeonInput>
-            </div>
-
-            {/* Audio upload */}
-            <NeonInput label={editingSlug ? 'Replace Audio File (optional)' : 'Audio File (WAV, MP3)'}>
-              <label
-                onDragOver={(e) => { e.preventDefault(); setAudioDrag(true); }}
-                onDragLeave={() => setAudioDrag(false)}
-                onDrop={handleAudioDrop}
-                className="flex justify-center items-center gap-2 cursor-pointer rounded-lg transition-colors hover:bg-slate-800 group"
-                style={{ ...inputStyle, padding: '16px', background: audioDrag ? 'rgba(0,255,255,0.05)' : '#0F172A' }}
-              >
-                <input type="file" accept=".wav,.mp3" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setAudioFile(f); }} />
-                <CloudUpload className="w-5 h-5" style={{ color: '#00FFFF' }} />
-                {audioFile
-                  ? <span className="text-white text-sm">{audioFile.name}</span>
-                  : <span className="text-gray-300 text-sm group-hover:text-white">Drag &amp; Drop or <span style={{ color: '#00FFFF' }}>Browse</span></span>}
-              </label>
-            </NeonInput>
-
-            {/* Cover art */}
-            <NeonInput label={editingSlug ? 'Replace Cover Art (optional)' : 'Cover Art (JPEG, PNG)'}>
-              <label className="flex justify-center items-center gap-2 cursor-pointer rounded-lg transition-colors hover:bg-slate-800" style={{ ...inputStyle, padding: '16px' }}>
-                <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setCoverFile(f); }} />
-                <Upload className="w-5 h-5 text-gray-400" />
-                {coverFile
-                  ? <span className="text-white text-sm">{coverFile.name}</span>
-                  : <span className="text-gray-400 text-sm">Browse image</span>}
-              </label>
-            </NeonInput>
-
-            {/* Story */}
-            <NeonInput label="Track Story / Lyrics">
-              <textarea value={story} onChange={(e) => setStory(e.target.value)} placeholder="Type your story or lyrics here..." rows={4} className="placeholder-gray-500 resize-none" style={{ ...inputStyle, minHeight: 100 }} />
-            </NeonInput>
-
-            {/* YouTube */}
-            <NeonInput label="YouTube Link">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <svg className="w-5 h-5" fill="#00FFFF" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                </div>
-                <input value={ytLink} onChange={(e) => setYtLink(e.target.value)} type="text" placeholder="https://youtube.com/watch?v=..." className="placeholder-gray-600" style={{ ...inputStyle, paddingLeft: 44 }} />
-              </div>
-            </NeonInput>
-
-            {/* Streaming links */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <NeonInput label="Spotify Link">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg className="w-4 h-4" fill="#00FFFF" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.54.659.301 1.02zm1.44-3.3c-.301.42-.84.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.84.241 1.2zm.48-3.48C15.12 7.02 8.76 6.84 5.1 7.92c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.32-1.2 11.28-1.02 15.72 1.62.54.3.72.96.42 1.5-.24.54-.9.72-1.5.42z"/></svg>
-                  </div>
-                  <input value={spotifyLink} onChange={(e) => setSpotify(e.target.value)} type="text" placeholder="https://open.spotify.com/..." className="placeholder-gray-600" style={{ ...inputStyle, paddingLeft: 36 }} />
-                </div>
-              </NeonInput>
-              <NeonInput label="Apple Music Link">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg className="w-4 h-4" fill="#00FFFF" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-                  </div>
-                  <input value={appleLink} onChange={(e) => setApple(e.target.value)} type="text" placeholder="https://music.apple.com/..." className="placeholder-gray-600" style={{ ...inputStyle, paddingLeft: 36 }} />
-                </div>
-              </NeonInput>
-            </div>
-
-            {/* Publish toggle */}
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <div
-                onClick={() => setPublish(!publishNow)}
-                className="relative w-12 h-6 rounded-full transition-colors"
-                style={{ backgroundColor: publishNow ? '#FF007F' : '#1e293b', boxShadow: publishNow ? '0 0 10px rgba(255,0,127,0.6)' : 'none' }}
-              >
-                <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform" style={{ transform: publishNow ? 'translateX(28px)' : 'translateX(4px)' }} />
-              </div>
-              <span className="text-sm font-medium" style={{ color: publishNow ? '#FF007F' : '#94a3b8' }}>
-                {publishNow ? 'Publish immediately 🔥' : 'Save as draft'}
-              </span>
-            </label>
-
-            {/* Submit button */}
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              MonstaJam backstage
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              Upload songs, prep releases, manage videos, and catch missing media before anything goes live.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full rounded-lg py-4 font-bold tracking-widest uppercase text-lg mt-2 text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-              style={{ backgroundColor: '#FF007F', boxShadow: '0 0 15px rgba(255,0,127,0.6)' }}
-              onMouseEnter={(e) => !submitting && (e.currentTarget.style.boxShadow = '0 0 25px rgba(255,0,127,0.8)')}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 0 15px rgba(255,0,127,0.6)')}
+              onClick={() => {
+                loadTracks();
+                loadVideos();
+              }}
+              className="inline-flex items-center gap-2 rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/40 hover:text-white"
             >
-              {submitting
-                ? <><Loader2 className="w-5 h-5 animate-spin" /> {editingSlug ? 'Saving...' : 'Uploading...'}</>
-                : editingSlug
-                  ? '💾 Save Changes'
-                  : publishNow ? '🔥 Go Live' : 'Save Draft'}
+              <RefreshCw className="h-4 w-4" />
+              Reload
             </button>
-
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                window.location.href = '/upload/login';
+              }}
+              className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100"
+            >
+              Sign out
+            </button>
           </div>
-        </section>
+        </header>
 
-        {/* RIGHT: Track Manager */}
-        <section
-          className="rounded-xl p-6 flex flex-col"
-          style={{
-            backgroundColor: '#12123A',
-            border: '1px solid #FF007F',
-            boxShadow: '0 0 10px rgba(255,0,127,0.5), 0 0 20px rgba(255,0,127,0.3)',
-            maxHeight: 'calc(100vh - 160px)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-6 flex-shrink-0">
-            <h2 className="text-2xl font-bold" style={{ color: '#FF007F', textShadow: '0 0 10px #FF007F' }}>
-              Tracks
-            </h2>
-            {!tracksLoading && (
-              <span className="text-xs text-gray-500 font-mono">{tracks.length} total</span>
-            )}
-          </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Tracks" value={tracks.length} detail={`${metrics.liveTracks} live, ${metrics.draftTracks} draft`} />
+          <StatCard label="Videos" value={videos.length} detail={`${metrics.liveVideos} live, ${metrics.draftVideos} draft`} />
+          <StatCard label="Media flags" value={metrics.missingAudio + metrics.missingCovers} detail={`${metrics.missingAudio} audio, ${metrics.missingCovers} covers missing`} />
+          <StatCard label="Last check" value={lastLoadedAt ? formatDate(lastLoadedAt.toISOString()) : '--'} detail="Admin library refresh" />
+        </div>
 
-          <div className="flex-grow overflow-y-auto space-y-3 pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#00FFFF transparent' }}>
-            {tracksLoading ? (
-              <div className="flex items-center justify-center h-32 text-gray-500">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
-              </div>
-            ) : tracks.length === 0 ? (
-              <div className="text-gray-500 text-sm text-center mt-8">No tracks yet. Drop the first heat 🔥</div>
-            ) : (
-              tracks.map((track) => (
-                <div
-                  key={track.id}
-                  className="rounded-lg p-3 transition-all"
-                  style={{
-                    border: `1px solid ${editingSlug === track.slug ? '#FF007F' : track.published ? '#1e3a2e' : '#1e293b'}`,
-                    backgroundColor: editingSlug === track.slug ? 'rgba(255,0,127,0.08)' : 'rgba(0,0,0,0.2)',
-                    boxShadow: editingSlug === track.slug ? '0 0 12px rgba(255,0,127,0.2)' : 'none',
-                  }}
-                >
-                  {/* Track info */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-sm leading-tight truncate" style={{ color: '#00FFFF' }}>
-                        {track.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{track.genre}{track.bpm ? ` · ${track.bpm} BPM` : ''}</p>
-                    </div>
-                    <span
-                      className="text-xs font-bold flex-shrink-0 px-2 py-0.5 rounded"
-                      style={{
-                        background: track.published ? 'rgba(0,255,100,0.1)' : 'rgba(255,255,255,0.05)',
-                        color: track.published ? '#4ade80' : '#64748b',
-                        border: `1px solid ${track.published ? 'rgba(0,255,100,0.2)' : '#1e293b'}`,
-                      }}
-                    >
-                      {track.published ? 'LIVE' : 'DRAFT'}
-                    </span>
-                  </div>
+        <nav className="mt-6 flex flex-wrap gap-2">
+          {[
+            { id: 'tracks' as const, label: 'Tracks', icon: Music },
+            { id: 'videos' as const, label: 'Videos', icon: Video },
+            { id: 'ops' as const, label: 'Ops', icon: LayoutDashboard },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={[
+                'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition',
+                activeTab === id
+                  ? 'bg-cyan-300 text-slate-950'
+                  : 'border border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:text-white',
+              ].join(' ')}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </nav>
 
-                  {/* Action buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEdit(track)}
-                      title="Edit"
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
-                      style={{ background: 'rgba(0,255,255,0.1)', border: '1px solid rgba(0,255,255,0.2)', color: '#00FFFF' }}
-                    >
-                      <Pencil className="w-3 h-3" /> Edit
-                    </button>
-                    <button
-                      onClick={() => togglePublish(track)}
-                      title={track.published ? 'Unpublish' : 'Publish'}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
-                      style={{
-                        background: track.published ? 'rgba(255,200,0,0.1)' : 'rgba(255,0,127,0.1)',
-                        border: `1px solid ${track.published ? 'rgba(255,200,0,0.2)' : 'rgba(255,0,127,0.2)'}`,
-                        color: track.published ? '#fbbf24' : '#FF007F',
-                      }}
-                    >
-                      {track.published ? <><EyeOff className="w-3 h-3" /> Unpublish</> : <><Eye className="w-3 h-3" /> Publish</>}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(track)}
-                      title="Delete"
-                      className="p-1.5 rounded transition-all hover:scale-105"
-                      style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.2)', color: '#f87171' }}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
+        {activeTab === 'tracks' && (
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">{editingSlug ? 'Edit track' : 'New track'}</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {editingSlug ? `Editing ${editingSlug}. Media only changes when you select replacement files.` : 'Create a draft first, then publish after media is checked.'}
+                  </p>
                 </div>
-              ))
-            )}
-          </div>
-        </section>
-      </main>
-
-      {/* Confirm delete dialog — tracks */}
-      {confirmDelete && (
-        <ConfirmDialog
-          track={confirmDelete}
-          onConfirm={() => handleDelete(confirmDelete)}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
-
-      {/* ── Videos panel ── */}
-      {activeTab === 'videos' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8" style={{ minHeight: 'calc(100vh - 200px)' }}>
-
-          {/* LEFT: Video form */}
-          <section
-            className="lg:col-span-2 rounded-xl p-6 flex flex-col"
-            style={{
-              backgroundColor: '#12123A',
-              border: `1px solid ${editingVideoId ? '#ff0000' : '#FF007F'}`,
-              boxShadow: editingVideoId
-                ? '0 0 10px rgba(255,0,0,0.5), 0 0 20px rgba(255,0,0,0.3)'
-                : '0 0 10px rgba(255,0,127,0.5), 0 0 20px rgba(255,0,127,0.3)',
-              transition: 'border-color 0.3s, box-shadow 0.3s',
-            }}
-          >
-            <h2 className="text-2xl font-bold mb-6"
-              style={{ color: editingVideoId ? '#ff4444' : '#FF007F', textShadow: editingVideoId ? '0 0 10px #ff4444' : '0 0 10px #FF007F' }}>
-              {editingVideoId ? '✏️ Edit Video' : '🎬 Add Video'}
-            </h2>
-
-            <div className="flex flex-col gap-5">
-
-              {/* Title + Artist */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <NeonInput label="Video Title *">
-                  <input value={videoTitle} onChange={e => setVideoTitle(e.target.value)}
-                    type="text" placeholder="e.g. City Lights - Official Visualizer" style={inputStyle} />
-                </NeonInput>
-                <NeonInput label="Artist Name">
-                  <input value={videoArtist} onChange={e => setVideoArtist(e.target.value)}
-                    type="text" placeholder="e.g. Monsta Jam" style={inputStyle} />
-                </NeonInput>
-              </div>
-
-              {/* YouTube URL */}
-              <NeonInput label="YouTube URL *">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <Youtube className="w-5 h-5 text-red-500" />
-                  </div>
-                  <input
-                    value={videoUrl}
-                    onChange={e => { setVideoUrl(e.target.value); setVideoUrlError(false); }}
-                    type="text"
-                    placeholder="https://youtube.com/watch?v=..."
-                    style={{
-                      ...inputStyle,
-                      paddingLeft: 44,
-                      borderColor: videoUrlError ? '#FF007F' : '#00FFFF',
-                      boxShadow: videoUrlError ? 'inset 0 0 5px rgba(255,0,127,0.5)' : inputStyle.boxShadow,
-                    }}
-                  />
-                </div>
-                {videoUrl && !extractYouTubeId(videoUrl) && (
-                  <p className="text-xs text-pink-500 mt-1">⚠ Couldn&apos;t extract YouTube ID — check the URL format</p>
-                )}
-                {videoUrl && extractYouTubeId(videoUrl) && (
-                  <p className="text-xs text-emerald-400 mt-1">✓ Video ID: {extractYouTubeId(videoUrl)}</p>
-                )}
-              </NeonInput>
-
-              {/* Duration */}
-              <NeonInput label="Duration (optional)">
-                <input value={videoDuration} onChange={e => setVideoDuration(e.target.value)}
-                  type="text" placeholder="e.g. 3:52" style={{ ...inputStyle, maxWidth: 160 }} />
-              </NeonInput>
-
-              {/* YouTube preview */}
-              {videoUrl && extractYouTubeId(videoUrl) && (
-                <div className="rounded-xl overflow-hidden" style={{ aspectRatio: '16/9', maxWidth: 400 }}>
-                  <img
-                    src={`https://img.youtube.com/vi/${extractYouTubeId(videoUrl)}/maxresdefault.jpg`}
-                    alt="Thumbnail preview"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              {/* Publish toggle */}
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <div
-                  onClick={() => setVideoPublish(!videoPublish)}
-                  className="relative w-12 h-6 rounded-full transition-colors"
-                  style={{ backgroundColor: videoPublish ? '#ff0000' : '#1e293b', boxShadow: videoPublish ? '0 0 10px rgba(255,0,0,0.6)' : 'none' }}
-                >
-                  <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform"
-                    style={{ transform: videoPublish ? 'translateX(28px)' : 'translateX(4px)' }} />
-                </div>
-                <span className="text-sm font-medium" style={{ color: videoPublish ? '#ff4444' : '#94a3b8' }}>
-                  {videoPublish ? 'Published 🎬' : 'Save as draft'}
-                </span>
-              </label>
-
-              {/* Submit */}
-              <div className="flex gap-3">
-                {editingVideoId && (
-                  <button onClick={resetVideoForm}
-                    className="px-6 py-3 rounded-lg font-semibold text-sm text-gray-300 hover:text-white transition-colors"
-                    style={{ border: '1px solid #334155' }}>
-                    Cancel
+                {editingSlug && (
+                  <button
+                    type="button"
+                    onClick={resetTrackForm}
+                    className="rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white"
+                  >
+                    New track
                   </button>
                 )}
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <Field label="Track title" required error={trackErrors.title}>
+                  <TextInput
+                    value={trackForm.title}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, title: event.target.value }))}
+                    placeholder="Cold World"
+                  />
+                </Field>
+                <Field label="Artist" required error={trackErrors.artist}>
+                  <TextInput
+                    value={trackForm.artist}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, artist: event.target.value }))}
+                    placeholder="Jason Miller"
+                  />
+                </Field>
+                <Field label="Genre">
+                  <Select value={trackForm.genre} onChange={(event) => setTrackForm((form) => ({ ...form, genre: event.target.value }))}>
+                    {GENRES.map((genre) => (
+                      <option key={genre} value={genre}>
+                        {genre}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="BPM" error={trackErrors.bpm}>
+                  <TextInput
+                    type="number"
+                    inputMode="numeric"
+                    value={trackForm.bpm}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, bpm: event.target.value }))}
+                    placeholder="88"
+                  />
+                </Field>
+                <Field label="Mood">
+                  <TextInput
+                    value={trackForm.mood}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, mood: event.target.value }))}
+                    placeholder="Moody"
+                  />
+                </Field>
+                <Field label="Spotify URL">
+                  <TextInput
+                    value={trackForm.spotifyUrl}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, spotifyUrl: event.target.value }))}
+                    placeholder="https://open.spotify.com/..."
+                  />
+                </Field>
+                <Field label="Apple Music URL">
+                  <TextInput
+                    value={trackForm.appleMusicUrl}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, appleMusicUrl: event.target.value }))}
+                    placeholder="https://music.apple.com/..."
+                  />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Track story / lyrics">
+                    <TextArea
+                      value={trackForm.story}
+                      onChange={(event) => setTrackForm((form) => ({ ...form, story: event.target.value }))}
+                      placeholder="Notes, lyrics, release story, or context."
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <Field label={editingSlug ? 'Replace audio file' : 'Audio file'} error={trackErrors.audio}>
+                  <div className="rounded-md border border-dashed border-cyan-300/30 bg-cyan-300/[0.03] p-4">
+                    <div className="flex items-center gap-3 text-sm text-slate-300">
+                      <FileAudio className="h-5 w-5 text-cyan-300" />
+                      <span>{fileLabel(trackForm.audioFile, editingSlug ? 'Keep current audio unless replaced' : 'MP3 or WAV')}</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".wav,.mp3,audio/*"
+                      className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                      onChange={(event) => setTrackForm((form) => ({ ...form, audioFile: event.target.files?.[0] ?? null }))}
+                    />
+                  </div>
+                </Field>
+                <Field label={editingSlug ? 'Replace cover art' : 'Cover art'}>
+                  <div className="rounded-md border border-dashed border-white/15 bg-white/[0.03] p-4">
+                    <div className="flex items-center gap-3 text-sm text-slate-300">
+                      <ImageIcon className="h-5 w-5 text-slate-300" />
+                      <span>{fileLabel(trackForm.coverFile, editingSlug ? 'Keep current cover unless replaced' : 'PNG or JPG')}</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                      onChange={(event) => setTrackForm((form) => ({ ...form, coverFile: event.target.files?.[0] ?? null }))}
+                    />
+                  </div>
+                </Field>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                <Toggle
+                  checked={trackForm.published}
+                  onChange={(published) => setTrackForm((form) => ({ ...form, published }))}
+                  label={trackForm.published ? 'Publish live' : 'Save as draft'}
+                  help={trackForm.published ? 'Requires audio and appears publicly.' : 'Hidden from the public library.'}
+                />
+                <button
+                  type="button"
+                  onClick={handleTrackSubmit}
+                  disabled={submittingTrack}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submittingTrack ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {editingSlug ? 'Save changes' : 'Add track'}
+                </button>
+              </div>
+              {uploadPhase && <p className="mt-3 text-sm text-cyan-200">{uploadPhase}</p>}
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex flex-col gap-4 border-b border-white/10 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">Track library</h2>
+                    <p className="mt-1 text-sm text-slate-400">{filteredTracks.length} visible of {tracks.length}</p>
+                  </div>
+                  {tracksLoading && <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />}
+                </div>
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <TextInput
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search title, artist, genre"
+                    className="pl-9"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
+                {!tracksLoading && filteredTracks.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
+                    No tracks match that search.
+                  </div>
+                )}
+                {filteredTracks.map((track) => (
+                  <article
+                    key={track.id}
+                    className={[
+                      'rounded-lg border p-4 transition',
+                      editingSlug === track.slug ? 'border-cyan-300/50 bg-cyan-300/[0.06]' : 'border-white/10 bg-slate-950/50 hover:border-white/20',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-white">{track.title}</h3>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {track.artist} · {track.genre}{track.bpm ? ` · ${track.bpm} BPM` : ''}
+                        </p>
+                      </div>
+                      <StatusPill tone={track.published ? 'live' : 'draft'}>{track.published ? 'Live' : 'Draft'}</StatusPill>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <StatusPill tone={track.audioUrl ? 'neutral' : 'warn'}>{track.audioUrl ? 'Audio' : 'No audio'}</StatusPill>
+                      <StatusPill tone={track.coverUrl ? 'neutral' : 'warn'}>{track.coverUrl ? 'Cover' : 'No cover'}</StatusPill>
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                        <Clock className="h-3.5 w-3.5" />
+                        {formatDate(track.updatedAt ?? track.createdAt)}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEditTrack(track)}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-cyan-300/20 px-2 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/50"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleTrackPublish(track)}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25"
+                      >
+                        {track.published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        {track.published ? 'Draft' : 'Live'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirm({ kind: 'track', item: track })}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === 'videos' && (
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">{editingVideoId ? 'Edit video' : 'New video'}</h2>
+                  <p className="mt-1 text-sm text-slate-400">Paste any standard YouTube URL and the dashboard will extract the video ID.</p>
+                </div>
+                {editingVideoId && (
+                  <button type="button" onClick={resetVideoForm} className="rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white">
+                    New video
+                  </button>
+                )}
+              </div>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <Field label="Video title" required error={videoErrors.title}>
+                  <TextInput value={videoForm.title} onChange={(event) => setVideoForm((form) => ({ ...form, title: event.target.value }))} />
+                </Field>
+                <Field label="Artist">
+                  <TextInput value={videoForm.artist} onChange={(event) => setVideoForm((form) => ({ ...form, artist: event.target.value }))} />
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="YouTube URL" required error={videoErrors.youtubeUrl}>
+                    <TextInput
+                      value={videoForm.youtubeUrl}
+                      onChange={(event) => setVideoForm((form) => ({ ...form, youtubeUrl: event.target.value }))}
+                      placeholder="https://youtube.com/watch?v=..."
+                    />
+                    {youtubePreviewId && <p className="mt-2 text-sm text-emerald-300">Video ID: {youtubePreviewId}</p>}
+                  </Field>
+                </div>
+                <Field label="Duration">
+                  <TextInput value={videoForm.duration} onChange={(event) => setVideoForm((form) => ({ ...form, duration: event.target.value }))} placeholder="3:52" />
+                </Field>
+              </div>
+              {youtubePreviewId && (
+                <div className="mt-5 max-w-lg overflow-hidden rounded-lg border border-white/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`https://img.youtube.com/vi/${youtubePreviewId}/maxresdefault.jpg`} alt="YouTube thumbnail preview" className="aspect-video w-full object-cover" />
+                </div>
+              )}
+              <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                <Toggle
+                  checked={videoForm.published}
+                  onChange={(published) => setVideoForm((form) => ({ ...form, published }))}
+                  label={videoForm.published ? 'Publish video' : 'Save video as draft'}
+                  help={videoForm.published ? 'Appears on the public video page.' : 'Hidden until approved.'}
+                />
                 <button
                   type="button"
                   onClick={handleVideoSubmit}
-                  disabled={videoSubmitting}
-                  className="flex-1 rounded-lg py-3 font-bold tracking-widest uppercase text-sm text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: '#ff0000', boxShadow: '0 0 15px rgba(255,0,0,0.5)' }}
+                  disabled={submittingVideo}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {videoSubmitting
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                    : editingVideoId ? '💾 Save Changes' : '🎬 Add Video'}
+                  {submittingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Youtube className="h-4 w-4" />}
+                  {editingVideoId ? 'Save changes' : 'Add video'}
                 </button>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* RIGHT: Video list */}
-          <section
-            className="rounded-xl p-6 flex flex-col"
-            style={{
-              backgroundColor: '#12123A',
-              border: '1px solid #ff0000',
-              boxShadow: '0 0 10px rgba(255,0,0,0.4), 0 0 20px rgba(255,0,0,0.2)',
-              maxHeight: 'calc(100vh - 160px)',
-            }}
-          >
-            <div className="flex items-center justify-between mb-6 flex-shrink-0">
-              <h2 className="text-2xl font-bold" style={{ color: '#ff4444', textShadow: '0 0 10px #ff4444' }}>Videos</h2>
-              {!videosLoading && (
-                <span className="text-xs text-gray-500 font-mono">{videos.length} total</span>
-              )}
-            </div>
-
-            <div className="flex-grow overflow-y-auto space-y-3 pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#ff4444 transparent' }}>
-              {videosLoading ? (
-                <div className="flex items-center justify-center h-32 text-gray-500">
-                  <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Video library</h2>
+                  <p className="mt-1 text-sm text-slate-400">{videos.length} videos</p>
                 </div>
-              ) : videos.length === 0 ? (
-                <div className="text-gray-500 text-sm text-center mt-8">No videos yet. Add the first one 🎬</div>
-              ) : (
-                videos.map((v) => (
-                  <div key={v.id} className="rounded-lg p-3 transition-all"
-                    style={{
-                      border: `1px solid ${editingVideoId === v.id ? '#ff0000' : v.published ? '#1e2a1e' : '#1e293b'}`,
-                      backgroundColor: editingVideoId === v.id ? 'rgba(255,0,0,0.08)' : 'rgba(0,0,0,0.2)',
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div className="w-full rounded overflow-hidden mb-2" style={{ aspectRatio: '16/9' }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`}
-                        alt={v.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-xs leading-tight truncate" style={{ color: '#00FFFF' }}>{v.title}</h3>
-                        {v.artist && <p className="text-[10px] text-gray-500 mt-0.5">{v.artist}</p>}
-                      </div>
-                      <span className="text-[10px] font-bold flex-shrink-0 px-2 py-0.5 rounded"
-                        style={{
-                          background: v.published ? 'rgba(0,255,100,0.1)' : 'rgba(255,255,255,0.05)',
-                          color: v.published ? '#4ade80' : '#64748b',
-                          border: `1px solid ${v.published ? 'rgba(0,255,100,0.2)' : '#1e293b'}`,
-                        }}>
-                        {v.published ? 'LIVE' : 'DRAFT'}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => startEditVideo(v)} title="Edit"
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
-                        style={{ background: 'rgba(0,255,255,0.1)', border: '1px solid rgba(0,255,255,0.2)', color: '#00FFFF' }}>
-                        <Pencil className="w-3 h-3" /> Edit
-                      </button>
-                      <button onClick={() => toggleVideoPublish(v)} title={v.published ? 'Unpublish' : 'Publish'}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-xs font-semibold transition-all hover:scale-105"
-                        style={{
-                          background: v.published ? 'rgba(255,200,0,0.1)' : 'rgba(255,0,0,0.1)',
-                          border: `1px solid ${v.published ? 'rgba(255,200,0,0.2)' : 'rgba(255,0,0,0.2)'}`,
-                          color: v.published ? '#fbbf24' : '#ff4444',
-                        }}>
-                        {v.published ? <><EyeOff className="w-3 h-3" /> Hide</> : <><Eye className="w-3 h-3" /> Publish</>}
-                      </button>
-                      <button onClick={() => setConfirmDeleteVideo(v)} title="Delete"
-                        className="p-1.5 rounded transition-all hover:scale-105"
-                        style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.2)', color: '#f87171' }}>
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
+                {videosLoading && <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />}
+              </div>
+              <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
+                {!videosLoading && videos.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
+                    No videos yet.
                   </div>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Confirm delete — videos */}
-      {confirmDeleteVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className="rounded-xl p-8 max-w-sm w-full mx-4 text-center"
-            style={{ background: '#12123A', border: '1px solid #ff0000', boxShadow: '0 0 30px rgba(255,0,0,0.4)' }}>
-            <Trash2 className="w-10 h-10 mx-auto mb-4 text-red-500" />
-            <h3 className="text-xl font-bold mb-2 text-white">Delete Video?</h3>
-            <p className="text-gray-400 text-sm mb-6">
-              <span style={{ color: '#00FFFF' }}>&quot;{confirmDeleteVideo.title}&quot;</span> will be permanently removed.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirmDeleteVideo(null)}
-                className="flex-1 py-2 rounded-lg font-semibold text-sm text-gray-300 hover:text-white transition-colors"
-                style={{ border: '1px solid #334155', background: 'transparent' }}>
-                Cancel
-              </button>
-              <button onClick={() => handleDeleteVideo(confirmDeleteVideo)}
-                className="flex-1 py-2 rounded-lg font-bold text-sm text-white transition-all hover:scale-105"
-                style={{ background: '#ff0000', boxShadow: '0 0 12px rgba(255,0,0,0.5)' }}>
-                Delete
-              </button>
-            </div>
+                )}
+                {videos.map((video) => (
+                  <article key={video.id} className="rounded-lg border border-white/10 bg-slate-950/50 p-4">
+                    <div className="overflow-hidden rounded-md border border-white/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`} alt={video.title} className="aspect-video w-full object-cover" />
+                    </div>
+                    <div className="mt-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-white">{video.title}</h3>
+                        {video.artist && <p className="mt-1 text-xs text-slate-500">{video.artist}</p>}
+                      </div>
+                      <StatusPill tone={video.published ? 'live' : 'draft'}>{video.published ? 'Live' : 'Draft'}</StatusPill>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <button type="button" onClick={() => startEditVideo(video)} className="rounded-md border border-cyan-300/20 px-2 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/50">Edit</button>
+                      <button type="button" onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25">
+                        {video.published ? 'Draft' : 'Live'}
+                      </button>
+                      <button type="button" onClick={() => setConfirm({ kind: 'video', item: video })} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50">Delete</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Toast */}
-      {toast && <Toast type={toast.type} message={toast.msg} onDismiss={() => setToast(null)} />}
-    </div>
+        {activeTab === 'ops' && (
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <h2 className="text-xl font-semibold text-white">Release readiness</h2>
+              <div className="mt-5 space-y-3">
+                {[
+                  { label: 'All live tracks have audio', ok: tracks.filter((track) => track.published && !track.audioUrl).length === 0 },
+                  { label: 'All live tracks have cover art', ok: tracks.filter((track) => track.published && !track.coverUrl).length === 0 },
+                  { label: 'Admin library is reachable', ok: !tracksLoading && !videosLoading },
+                  { label: 'Drafts are separated from public output', ok: metrics.draftTracks + metrics.draftVideos >= 0 },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center justify-between rounded-md border border-white/10 bg-slate-950/50 p-3">
+                    <span className="text-sm text-slate-300">{item.label}</span>
+                    {item.ok ? <CheckCircle className="h-5 w-5 text-emerald-300" /> : <AlertTriangle className="h-5 w-5 text-amber-300" />}
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
+              <h2 className="text-xl font-semibold text-white">Needs attention</h2>
+              <div className="mt-5 space-y-3">
+                {tracks.filter((track) => !track.audioUrl || !track.coverUrl).length === 0 ? (
+                  <div className="rounded-md border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-200">
+                    No missing track media found.
+                  </div>
+                ) : (
+                  tracks
+                    .filter((track) => !track.audioUrl || !track.coverUrl)
+                    .map((track) => (
+                      <button
+                        key={track.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('tracks');
+                          startEditTrack(track);
+                        }}
+                        className="flex w-full items-center justify-between rounded-md border border-amber-300/20 bg-amber-300/10 p-3 text-left text-sm text-amber-100 transition hover:border-amber-300/40"
+                      >
+                        <span>
+                          <span className="block font-semibold">{track.title}</span>
+                          <span className="mt-1 block text-xs text-amber-200/70">
+                            {!track.audioUrl ? 'Missing audio' : 'Audio ok'} · {!track.coverUrl ? 'Missing cover' : 'Cover ok'}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    ))
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
+      <ConfirmDialog confirm={confirm} onCancel={() => setConfirm(null)} onConfirm={confirmDelete} />
+    </section>
   );
 }
