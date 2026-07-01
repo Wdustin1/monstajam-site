@@ -42,7 +42,6 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
   const display = value === 'All' ? label : value;
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -56,18 +55,19 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between px-4 py-3 rounded-full bg-[#111118] border border-white/10 hover:border-white/20 transition-colors text-sm gap-3 min-w-[104px]"
-        style={{ backdropFilter: 'blur(8px)' }}
+        className="flex min-w-[104px] items-center justify-between gap-3 rounded-full border border-white/10 bg-[#151515] px-4 py-3 text-sm transition-colors hover:border-white/25"
       >
-        <span className={value === 'All' ? 'text-gray-400' : 'text-[#00e5ff]'}>{display}</span>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className={value === 'All' ? 'text-zinc-400' : 'text-cyan-200'}>{display}</span>
+        <ChevronDown className={`h-4 w-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl min-w-full"
-          style={{ backdropFilter: 'blur(12px)' }}>
+        <div className="absolute left-0 top-full z-50 mt-2 min-w-full overflow-hidden rounded-xl border border-white/10 bg-[#111] shadow-2xl">
           {options.map((opt) => (
-            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${value === opt ? 'text-[#00e5ff]' : 'text-gray-300'}`}>
+            <button
+              key={opt}
+              onClick={() => { onChange(opt); setOpen(false); }}
+              className={`w-full px-4 py-2.5 text-left text-sm transition-colors hover:bg-white/5 ${value === opt ? 'text-cyan-200' : 'text-zinc-300'}`}
+            >
               {opt}
             </button>
           ))}
@@ -101,60 +101,59 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
     });
   }, [search, genre, bpm, mood, tracks]);
 
-  const fullSongs = useMemo(() => (
-    tracks.filter((track) => track.genre === 'Full Songs')
-  ), [tracks]);
+  const fullSongs = useMemo(() => tracks.filter((track) => track.genre === 'Full Songs'), [tracks]);
   const showingFullSongsLane = fullSongs.length > 0 && genre === 'All' && !search && bpm === 'All' && mood === 'All';
   const libraryTracks = showingFullSongsLane
     ? filtered.filter((track) => track.genre !== 'Full Songs')
     : filtered;
 
-  // Keep player queue in sync with visible filtered tracks
   useEffect(() => {
     setQueue(filtered);
   }, [filtered, setQueue]);
 
   return (
-    <section id="library" className="max-w-7xl mx-auto px-4 md:px-6 pt-8 pb-44 md:pb-40 flex flex-col gap-8 md:gap-10 z-10 relative">
-      <div className="flex flex-col gap-2">
+    <section id="library" className="relative z-10 mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-44 pt-8 md:gap-10 md:px-6 md:pb-40">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <span className="w-8 h-[2px]" style={{ background: '#00e5ff', boxShadow: '0 0 8px #00e5ff' }} />
-          <span className="text-xs font-bold tracking-[0.2em] uppercase text-gray-500">The Collection</span>
+          <span className="h-px w-10 bg-white/20" />
+          <span className="text-xs font-bold uppercase tracking-[0.24em] text-zinc-500">Producer vault</span>
         </div>
-        <div className="flex items-end justify-between">
-          <h2 className="font-black tracking-tight uppercase"
-            style={{
-              fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
-              background: 'linear-gradient(90deg, #00e5ff, #0088ff)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              filter: 'drop-shadow(0 0 10px rgba(0,229,255,0.4))',
-            }}>
-            Exclusive Library
-          </h2>
-          <span className="text-sm text-gray-500 mb-1">{filtered.length} track{filtered.length !== 1 ? 's' : ''}</span>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2
+              className="font-black uppercase leading-none tracking-[-0.04em] text-white"
+              style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}
+            >
+              Label archive
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+              Every track file carries the cover, catalog number, artist, stream links, and a short note pulled from the record.
+            </p>
+          </div>
+          <span className="text-sm uppercase tracking-[0.18em] text-zinc-500">{filtered.length} track{filtered.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap gap-4 items-center w-full">
+      <div className="flex w-full flex-col items-center gap-4 md:flex-row md:flex-wrap xl:flex-nowrap">
         <div className="relative w-full md:min-w-[320px] md:flex-1">
-          <div className="absolute inset-[-1px] rounded-full z-[-1] opacity-60 blur-[5px]"
-            style={{ background: 'linear-gradient(90deg, #00e5ff, #ff00ff)' }} />
-          <div className="bg-[#0e0e14] border border-white/10 flex items-center px-4 py-3 rounded-full w-full"
-            style={{ backdropFilter: 'blur(8px)' }}>
-            <Search className="w-5 h-5 text-gray-500 flex-shrink-0" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+          <div className="flex w-full items-center rounded-full border border-white/10 bg-[#111] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <Search className="h-5 w-5 flex-shrink-0 text-zinc-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Escape' && setSearch('')}
-              placeholder="Search tracks..."
-              className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-600 w-full ml-3 text-sm" />
+              placeholder="Search the vault..."
+              className="ml-3 w-full border-none bg-transparent text-sm text-white outline-none placeholder-zinc-600 focus:ring-0"
+            />
             {search && (
-              <button onClick={() => setSearch('')} className="ml-2 text-gray-500 hover:text-white transition-colors flex-shrink-0" aria-label="Clear search">
-                <X className="w-4 h-4" />
+              <button onClick={() => setSearch('')} className="ml-2 flex-shrink-0 text-zinc-500 transition-colors hover:text-white" aria-label="Clear search">
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3 w-full md:w-auto md:justify-end overflow-visible pb-1 md:pb-0">
+        <div className="flex w-full flex-wrap gap-3 overflow-visible pb-1 md:w-auto md:justify-end md:pb-0">
           <Dropdown label="Genre" options={GENRES} value={genre} onChange={setGenre} />
           <Dropdown label="BPM" options={BPMS} value={bpm} onChange={setBpm} />
           <Dropdown label="Mood" options={MOODS} value={mood} onChange={setMood} />
@@ -165,8 +164,8 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
         <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/[0.045] p-4 md:p-5">
           <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-200/80">Full tracks</p>
-              <h3 className="text-xl font-black tracking-tight text-white">Listen all the way through</h3>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-200/80">Full song files</p>
+              <h3 className="text-xl font-black tracking-tight text-white">Play these past the preview cap</h3>
             </div>
             <span className="text-sm text-emerald-100/60">{fullSongs.length} full song{fullSongs.length !== 1 ? 's' : ''}</span>
           </div>
@@ -179,16 +178,16 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
       )}
 
       {libraryTracks.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {libraryTracks.map((track) => (
             <SongCard key={track.slug} track={track} />
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-gray-600">
-          <Search className="w-12 h-12 mb-4 opacity-20" />
-          <p className="text-lg font-semibold text-gray-500">No tracks found</p>
-          <p className="text-sm mt-1">Try adjusting your filters</p>
+        <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+          <Search className="mb-4 h-12 w-12 opacity-20" />
+          <p className="text-lg font-semibold text-zinc-500">No tracks found</p>
+          <p className="mt-1 text-sm">Try another title, mood, or BPM range.</p>
         </div>
       )}
     </section>

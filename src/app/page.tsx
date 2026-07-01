@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar';
 import AlbumReleaseBanner from '@/components/AlbumReleaseBanner';
 import Hero from '@/components/Hero';
 import ScrollIndicator from '@/components/ScrollIndicator';
+import LabelStory from '@/components/LabelStory';
 import MusicLibrary from '@/components/MusicLibrary';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
@@ -43,6 +44,7 @@ export default async function Home() {
         <AlbumReleaseBanner />
         <Hero trackCount={tracks.length} artistCount={artistCount} videoCount={videoCount} featuredTrack={featuredTrack} />
         <ScrollIndicator />
+        <LabelStory />
         <MusicLibrary tracks={tracks} />
       </main>
       <Footer />
