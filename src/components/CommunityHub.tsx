@@ -1,6 +1,7 @@
 const HUB_CARDS = [
   {
     eyebrow: '01',
+    id: 'vote-on-music',
     title: 'Vote on Music',
     status: 'MVP path',
     body:
@@ -9,6 +10,7 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '02',
+    id: 'community-chat',
     title: 'Community Chat',
     status: 'WhatsApp first',
     body:
@@ -17,6 +19,7 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '03',
+    id: 'artist-hub',
     title: 'Artist Hub',
     status: 'Apply + submit',
     body:
@@ -25,6 +28,7 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '04',
+    id: 'rewards-credits',
     title: 'Rewards / Credits',
     status: 'Engagement loop',
     body:
@@ -33,11 +37,50 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '05',
+    id: 'premium-token-access',
     title: 'Premium / Token Access',
     status: 'Coming Soon',
     body:
       'Coming Soon: private artist chats, listening rooms, early demos, Q&A sessions, badges, VIP areas, subscriptions, and ETH / Monsta token access.',
     bullets: ['VIP rooms', 'early demos', 'Monsta tokens'],
+  },
+];
+
+const HUB_ACTIONS = [
+  {
+    id: 'vote-track',
+    label: 'Vote on a track',
+    eyebrow: 'Fan action',
+    href: '#library',
+    body: 'Start by listening through the library and picking what deserves the next push.',
+  },
+  {
+    id: 'join-community',
+    label: 'Join the community',
+    eyebrow: 'Chat action',
+    href: process.env.NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL || '#community-chat',
+    body: 'Use the configured WhatsApp or community invite when it is ready; until then this jumps to the chat plan.',
+  },
+  {
+    id: 'apply-artist',
+    label: 'Apply as an artist',
+    eyebrow: 'Artist action',
+    href: process.env.NEXT_PUBLIC_MONSTAJAM_ARTIST_APPLY_URL || '#artist-hub',
+    body: 'Point artists toward the submission lane now, then wire this to the real application form next.',
+  },
+  {
+    id: 'earn-credits',
+    label: 'See credit rules',
+    eyebrow: 'Rewards action',
+    href: '#rewards-credits',
+    body: 'Show how fans will earn credits by voting, commenting, sharing, and supporting drops.',
+  },
+  {
+    id: 'premium-access',
+    label: 'Watch premium access',
+    eyebrow: 'Future action',
+    href: '#premium-token-access',
+    body: 'Preview the premium, subscription, VIP, and Monsta token access layer without overbuilding it yet.',
   },
 ];
 
@@ -73,16 +116,28 @@ export default function CommunityHub() {
                 </p>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-3">
-                <a
-                  href="#library"
-                  className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-5 py-3 text-center text-sm font-bold text-cyan-100 hover:bg-cyan-300/15 transition-colors"
-                >
-                  Start with the music
-                </a>
-                <div className="rounded-full border border-fuchsia-300/25 bg-fuchsia-300/10 px-5 py-3 text-center text-sm font-bold text-fuchsia-100">
-                  WhatsApp invite coming soon
-                </div>
+              <div data-section-id="community-actions" className="grid gap-3">
+                {HUB_ACTIONS.map((action) => (
+                  <a
+                    key={action.id}
+                    data-cta-id={action.id}
+                    href={action.href}
+                    className="group rounded-2xl border border-white/10 bg-white/[0.04] p-4 no-underline transition-colors hover:border-cyan-300/35 hover:bg-cyan-300/[0.07]"
+                  >
+                    <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200/80">
+                      {action.eyebrow}
+                    </span>
+                    <span className="mt-1 flex items-center justify-between gap-3 text-sm font-black uppercase tracking-tight text-white">
+                      {action.label}
+                      <span aria-hidden="true" className="text-cyan-200 transition-transform group-hover:translate-x-1">
+                        →
+                      </span>
+                    </span>
+                    <span className="mt-2 block text-xs leading-relaxed text-gray-500">
+                      {action.body}
+                    </span>
+                  </a>
+                ))}
               </div>
 
               <p className="text-xs text-gray-500 leading-relaxed">
@@ -94,7 +149,8 @@ export default function CommunityHub() {
               {HUB_CARDS.map((card) => (
                 <article
                   key={card.title}
-                  className="group rounded-3xl border border-white/10 bg-black/30 p-5 md:p-6 hover:border-cyan-300/30 transition-colors"
+                  id={card.id}
+                  className="scroll-mt-28 group rounded-3xl border border-white/10 bg-black/30 p-5 md:p-6 hover:border-cyan-300/30 transition-colors"
                 >
                   <div className="flex flex-col md:flex-row md:items-start gap-4">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-xs font-black text-cyan-200">

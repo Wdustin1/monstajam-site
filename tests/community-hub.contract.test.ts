@@ -28,6 +28,37 @@ test('Community Hub component exists with the required public sections', () => {
   }
 });
 
+test('Community Hub exposes real CTA action cards instead of loose placeholders', () => {
+  const source = readFileSync(componentPath, 'utf8');
+  const requiredCtas = [
+    'data-section-id="community-actions"',
+    'data-cta-id={action.id}',
+    "id: 'vote-track'",
+    "href: '#library'",
+    'Vote on a track',
+    "id: 'join-community'",
+    'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
+    'Join the community',
+    "id: 'apply-artist'",
+    'NEXT_PUBLIC_MONSTAJAM_ARTIST_APPLY_URL',
+    'Apply as an artist',
+    "id: 'earn-credits'",
+    'See credit rules',
+    "id: 'premium-access'",
+    'Watch premium access',
+  ];
+
+  for (const anchor of requiredCtas) {
+    assert.ok(source.includes(anchor), `CommunityHub CTA contract should include ${anchor}`);
+  }
+
+  assert.equal(
+    source.includes('WhatsApp invite coming soon'),
+    false,
+    'CommunityHub should not rely on the old loose WhatsApp placeholder CTA'
+  );
+});
+
 test('homepage imports and renders the Community Hub before the music library', () => {
   const source = readFileSync(pagePath, 'utf8');
 
