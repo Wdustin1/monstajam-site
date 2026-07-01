@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
+    "test:community-hub": "tsx --test tests/community-hub.contract.test.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts"
   },
   "prisma": {
