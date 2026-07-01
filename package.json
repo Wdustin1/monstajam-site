@@ -10,9 +10,6 @@
     "seed": "tsx prisma/seed.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.99.3",

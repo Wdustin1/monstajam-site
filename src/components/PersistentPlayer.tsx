@@ -20,7 +20,7 @@ function formatTime(seconds: number) {
 export default function PersistentPlayer() {
   const {
     currentTrack, isPlaying, progress, currentTime, duration,
-    volume, pause, play, toggle, seek, setVolume,
+    volume, pause, play, seek, setVolume,
     next, prev, shuffleOn, repeatOn, toggleShuffle, toggleRepeat,
   } = usePlayer();
 
@@ -56,7 +56,11 @@ export default function PersistentPlayer() {
 
   const handlePlayPause = () => {
     if (!currentTrack) return;
-    isPlaying ? pause() : play(currentTrack);
+    if (isPlaying) {
+      pause();
+    } else {
+      play(currentTrack);
+    }
   };
 
   const hasTrack = !!currentTrack;

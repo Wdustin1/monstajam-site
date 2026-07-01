@@ -14,97 +14,116 @@ export default function Hero({
   videoCount?: number;
   featuredTrack?: PlayerTrack | null;
 }) {
-  const stats = [
-    { value: `${trackCount}+`, label: 'Vault cuts' },
-    ...(videoCount > 0 ? [{ value: String(videoCount), label: videoCount === 1 ? 'Video' : 'Videos' }] : []),
-    { value: String(artistCount), label: artistCount === 1 ? 'Roster artist live' : 'Roster artists live' },
-  ];
-
   return (
     <section
-      className="relative mx-auto flex max-w-7xl flex-col items-center justify-between gap-8 px-5 pb-10 pt-8 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:flex-row"
+      className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
       style={{ minHeight: 'calc(100vh - 260px)' }}
     >
-      <div className="absolute left-4 top-10 hidden h-28 w-px bg-white/10 md:block" />
-      <div className="absolute bottom-8 right-6 hidden h-px w-44 bg-white/10 lg:block" />
+      {/* Ambient glow blobs behind content */}
+      <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(255,0,255,0.12) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+      <div className="absolute top-1/4 right-0 w-96 h-96 rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.10) 0%, transparent 70%)', filter: 'blur(40px)' }} />
 
-      <div className="z-10 flex w-full flex-col gap-6 lg:w-1/2">
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-zinc-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#00e5ff] shadow-[0_0_10px_rgba(0,229,255,0.65)]" />
-          Monsta Jam Productions
-        </div>
+      {/* ── Left: Text ── */}
+      <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10">
 
-        <div className="flex flex-col gap-4">
-          <h1
-            className="max-w-3xl font-black uppercase leading-[0.9] tracking-[-0.07em] text-white"
-            style={{ fontSize: 'clamp(3rem, 10vw, 6.25rem)' }}
-          >
-            The Monsta Jam roster lives here.
-          </h1>
-          <p className="max-w-xl text-base leading-7 text-zinc-300 md:text-lg">
-            Producer vault, label roster, official drops, and track notes from the Monsta Jam world.
-            Start with the Cold World run, then dig through the archive.
-          </p>
-        </div>
+        <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
+          style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)' }}>
+          <span style={{
+            background: 'linear-gradient(90deg, #00ffff, #0088ff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 14px rgba(0,255,255,0.55))',
+          }}>
+            UNRELEASED.
+          </span>
+          <span style={{
+            background: 'linear-gradient(90deg, #ff44ff, #aa00ff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 14px rgba(255,0,255,0.55))',
+          }}>
+            EXCLUSIVE.
+          </span>
+          <span style={{
+            background: 'linear-gradient(90deg, #ffffff, #aaddff)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 0 12px rgba(100,200,255,0.5))',
+          }}>
+            YOURS.
+          </span>
+        </h1>
 
-        <div className="grid max-w-2xl gap-3 sm:grid-cols-3">
-          <div className="border border-white/10 bg-black/25 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">Current drop</p>
-            <p className="mt-1 text-sm font-semibold text-white">Cold World Vol. 2</p>
-          </div>
-          <div className="border border-white/10 bg-black/25 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">Produced by</p>
-            <p className="mt-1 text-sm font-semibold text-white">Monsta Jam Productions</p>
-          </div>
-          <div className="border border-white/10 bg-black/25 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-zinc-500">Archive lane</p>
-            <p className="mt-1 text-sm font-semibold text-white">Vault cuts + full songs</p>
-          </div>
-        </div>
+        <p className="text-base text-gray-400 max-w-md mt-2 leading-relaxed">
+          Discover the beats and tracks that never made it to the mainstream.
+          Curated for true fans — no algorithms, no gatekeepers.
+        </p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-4 mt-4 flex-wrap">
+          {/* Explore Library — cyan glow */}
           <button
             onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-black uppercase tracking-[0.16em] text-black transition hover:-translate-y-0.5 hover:bg-[#00e5ff]"
+            className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105"
+            style={{
+              border: '2px solid #00e5ff',
+              background: 'rgba(0,229,255,0.07)',
+              boxShadow: '0 0 16px rgba(0,229,255,0.35), inset 0 0 12px rgba(0,229,255,0.08)',
+            }}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="#00e5ff" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="9" strokeWidth="2" />
-              <path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none" />
+              <path d="M10 8l6 4-6 4V8z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="#00e5ff" stroke="none"/>
             </svg>
-            Open the vault
+            Explore Library
           </button>
 
-          {videoCount > 0 && (
-            <a
-              href="/videos"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-7 py-3.5 text-sm font-bold uppercase tracking-[0.16em] text-white no-underline transition hover:border-white/35 hover:bg-white/5"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <rect x="2" y="4" width="20" height="16" rx="3" strokeWidth="2" />
-                <path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none" />
-              </svg>
-              Watch videos
-            </a>
-          )}
+          {/* Watch Videos — magenta hollow */}
+          <a
+            href="/videos"
+            className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105 no-underline"
+            style={{
+              border: '1px solid rgba(255,0,255,0.4)',
+              background: 'rgba(255,0,255,0.05)',
+              boxShadow: '0 0 12px rgba(255,0,255,0.2)',
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24">
+              <rect x="2" y="4" width="20" height="16" rx="3" strokeWidth="2"/>
+              <path d="M10 9l5 3-5 3V9z" fill="#ff44ff" stroke="none"/>
+            </svg>
+            <span style={{ color: '#ff99ff' }}>Watch Videos</span>
+          </a>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-5 border-t border-white/10 pt-6">
-          {stats.map((stat, index) => (
-            <div key={stat.label} className="flex items-center gap-5">
-              {index > 0 && <div className="h-8 w-px bg-white/10" />}
-              <div className="flex flex-col">
-                <span className="text-lg font-black leading-none text-white tabular-nums">{stat.value}</span>
-                <span className="mt-1 text-xs uppercase tracking-[0.16em] text-zinc-500">{stat.label}</span>
-              </div>
-            </div>
-          ))}
+        {/* Social proof strip */}
+        <div className="flex items-center gap-5 mt-2 pt-6 border-t border-white/5">
+          <div className="flex flex-col">
+            <span className="text-white font-black text-lg leading-none">{trackCount}+</span>
+            <span className="text-gray-500 text-xs mt-0.5">Exclusive Tracks</span>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-white font-black text-lg leading-none">{videoCount}</span>
+            <span className="text-gray-500 text-xs mt-0.5">Music Videos</span>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-white font-black text-lg leading-none">{artistCount}</span>
+            <span className="text-gray-500 text-xs mt-0.5">{artistCount === 1 ? 'Artist' : 'Artists'}</span>
+          </div>
         </div>
       </div>
 
-      <div className="relative mt-2 flex w-full justify-center lg:mt-0 lg:w-1/2 lg:justify-end lg:pl-8">
+      {/* ── Right: Vinyl ── */}
+      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative lg:pl-8">
+        {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(0,229,255,0.10),transparent_68%)] blur-3xl" />
+          <div className="w-72 h-72 rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)', filter: 'blur(30px)' }} />
         </div>
+        {/* Scale wrapper: shrink vinyl on mobile uniformly (keeps it circular) */}
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {

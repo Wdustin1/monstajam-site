@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element -- cover art is already routed through /api/cover to normalize Vercel Blob responses. */
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePlayer } from '@/context/PlayerContext';
@@ -13,7 +15,7 @@ interface TrackDetailProps {
 
 export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps) {
   const [showLyrics, setShowLyrics] = useState(false);
-  const { toggle, currentTrack, isPlaying, setQueue, play } = usePlayer();
+  const { toggle, currentTrack, isPlaying, setQueue } = usePlayer();
 
   const handlePlay = () => {
     // Set queue with all tracks so Next/Prev work

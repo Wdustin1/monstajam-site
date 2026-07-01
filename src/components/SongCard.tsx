@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element -- cover art is already routed through /api/cover to normalize Vercel Blob responses. */
+
 import Link from 'next/link';
 import { Play, Pause, Music, Music4 } from 'lucide-react';
 import { proxyCoverUrl } from '@/lib/proxy-cover';
@@ -10,166 +12,124 @@ interface SongCardProps {
   track: TrackWithCredits;
 }
 
-function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverUrl?: string | null; onPlay: () => void; isActive: boolean }) {
+// Album art with hover play overlay
+function AlbumArt({ color, coverUrl, onPlay }: { color: string; coverUrl?: string | null; onPlay: () => void }) {
   return (
-    <div className={`group/art relative mb-4 aspect-square w-full flex-shrink-0 overflow-hidden rounded-lg border border-white/10 ${!coverUrl ? color : ''}`}>
+    <div className={`w-full aspect-square rounded-xl overflow-hidden flex-shrink-0 relative group/art mb-4 ${!coverUrl ? color : ''}`}>
       {coverUrl ? (
         <img
           src={proxyCoverUrl(coverUrl)}
           alt="Album art"
-          className={`h-full w-full object-cover transition duration-500 group-hover/art:scale-[1.035] ${isActive ? 'scale-[1.025]' : ''}`}
+          className="w-full h-full object-cover"
         />
       ) : (
         <>
-          <div
-            className="absolute inset-0 opacity-20"
+          {/* Grid texture */}
+          <div className="absolute inset-0 opacity-20"
             style={{
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px), repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px)',
-            }}
-          />
-          <svg className="absolute inset-0 m-auto h-12 w-12 opacity-30 transition-transform duration-700 group-hover/art:scale-110" fill="white" viewBox="0 0 24 24">
-            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px), repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.05) 6px, rgba(255,255,255,0.05) 7px)'
+            }} />
+          {/* Music note */}
+          <svg className="absolute inset-0 m-auto w-12 h-12 opacity-30 transition-transform duration-700 group-hover/art:scale-110" fill="white" viewBox="0 0 24 24">
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
           </svg>
         </>
       )}
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
-      <div className="absolute bottom-3 left-3 rounded bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/80">
-        Vault file
-      </div>
-
-      <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-200 group-hover/art:opacity-100">
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/art:opacity-100 transition-opacity duration-200">
         <button
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-white text-black shadow-[0_12px_28px_rgba(0,0,0,0.45)] transition hover:scale-105"
-          aria-label={isActive ? 'Pause track' : 'Play track'}
+          className="w-14 h-14 rounded-full flex items-center justify-center border border-white/20 hover:bg-white hover:text-black transition-all"
+          style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
+          aria-label="Play"
         >
-          {isActive ? <Pause className="h-6 w-6 fill-current" /> : <Play className="ml-0.5 h-6 w-6 fill-current" />}
+          <svg className="w-6 h-6 ml-0.5" fill="white" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
         </button>
       </div>
     </div>
   );
 }
 
-function getProducer(track: TrackWithCredits) {
-  return track.credits?.find((credit) => credit.role.toLowerCase().includes('produc'))?.name;
-}
-
-function getStoryTeaser(story?: string | null) {
-  if (!story) return null;
-  const clean = story.replace(/\s+/g, ' ').trim();
-  if (!clean) return null;
-  return clean.length > 96 ? `${clean.slice(0, 93).trim()}...` : clean;
-}
-
 export default function SongCard({ track }: SongCardProps) {
   const { currentTrack, isPlaying, toggle } = usePlayer();
-  const isCurrent = currentTrack?.slug === track.slug;
-  const isActive = isCurrent && isPlaying;
+  const isActive = currentTrack?.slug === track.slug && isPlaying;
   const isFullSong = track.genre === 'Full Songs';
-  const producer = getProducer(track);
-  const storyTeaser = getStoryTeaser(track.story);
-  const trackNumber = track.number != null ? String(track.number).padStart(2, '0') : '--';
 
   return (
     <article
-      className={`group relative flex min-h-[200px] flex-col rounded-xl border p-4 transition-all duration-300 ${
-        isCurrent
-          ? 'border-cyan-200/55 neon-pulse-active'
-          : 'border-white/10 hover:-translate-y-1 hover:border-white/25'
+      className={`rounded-2xl p-4 flex flex-col group relative min-h-[200px] border transition-all duration-300 ${
+        isActive
+          ? 'border-[#ff00ff] neon-pulse-active'
+          : 'border-white/8 hover:border-[rgba(255,0,255,0.6)] hover:shadow-[0_0_24px_rgba(255,0,255,0.35)]'
       }`}
       style={{
-        backgroundColor: '#101010',
-        boxShadow: isCurrent ? '0 0 24px rgba(0,229,255,0.26)' : '0 12px 28px rgba(0,0,0,0.42)',
+        backgroundColor: '#0A0710',
+        boxShadow: isActive
+          ? '0 0 28px rgba(255,0,170,0.55)'
+          : '0 4px 24px rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(4px)',
       }}
     >
-      <div className="absolute right-3 top-3 z-10 rounded bg-black/70 px-2 py-1 text-[10px] font-black text-zinc-300 tabular-nums">
-        {trackNumber}
+      {/* Track number badge */}
+      <div className="absolute top-3 right-3 text-[10px] font-bold text-gray-600 tabular-nums">
+        {String(track.number).padStart(2, '0')}
       </div>
 
-      <AlbumArt color={track.color} coverUrl={track.coverUrl} onPlay={() => toggle(track)} isActive={isActive} />
+      {/* Album art with hover play overlay */}
+      <AlbumArt color={track.color} coverUrl={track.coverUrl} onPlay={() => toggle(track)} />
 
-      <div className="flex flex-grow flex-col">
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <Link href={`/tracks/${track.slug}`} onClick={(e) => e.stopPropagation()} className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-base font-bold leading-snug text-white transition-colors hover:text-cyan-200">
+      <div className="flex flex-col flex-grow">
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <Link href={`/tracks/${track.slug}`} onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+            <h3 className="font-bold text-base leading-snug text-white hover:text-[#00e5ff] transition-colors line-clamp-2">
               {track.title}{track.subtitle ? ` (${track.subtitle})` : ''}
             </h3>
           </Link>
+          {/* Small inline play/pause */}
           <button
             onClick={() => toggle(track)}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-all hover:scale-110"
+            className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
             aria-label={isActive ? 'Pause' : 'Play'}
             style={isActive
-              ? { background: '#00e5ff', color: '#020202', boxShadow: '0 0 12px rgba(0,229,255,0.45)' }
-              : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }
+              ? { background: '#ff00ff', boxShadow: '0 0 12px rgba(255,0,255,0.6)' }
+              : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }
             }
           >
             {isActive
-              ? <Pause className="h-3 w-3 fill-current" />
-              : <Play className="ml-0.5 h-3 w-3 fill-current text-white" />
+              ? <Pause className="w-3 h-3 text-white fill-current" />
+              : <Play className="w-3 h-3 text-white fill-current ml-0.5" />
             }
           </button>
         </div>
+        <p className="text-xs text-gray-500 mb-3">{track.artist}</p>
 
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-zinc-500">{track.artist}</p>
-
-        <div className="mb-3 grid grid-cols-2 gap-2 text-[11px] text-zinc-400">
-          {track.bpm != null && (
-            <div className="border border-white/10 bg-black/25 px-2 py-1.5">
-              <span className="text-zinc-600">BPM</span> <span className="text-zinc-200">{track.bpm}</span>
-            </div>
-          )}
-          {track.mood && (
-            <div className="border border-white/10 bg-black/25 px-2 py-1.5">
-              <span className="text-zinc-600">Mood</span> <span className="text-zinc-200">{track.mood}</span>
-            </div>
-          )}
-          {producer && (
-            <div className="col-span-2 border border-white/10 bg-black/25 px-2 py-1.5">
-              <span className="text-zinc-600">Producer</span> <span className="text-zinc-200">{producer}</span>
-            </div>
-          )}
-        </div>
-
-        {storyTeaser && (
-          <p className="mb-4 line-clamp-2 text-xs leading-5 text-zinc-500">{storyTeaser}</p>
-        )}
-
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <span
-            className="inline-flex items-center gap-1 border px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
+        <div className="mt-auto flex items-center justify-between">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide"
             style={{
-              borderColor: isFullSong ? 'rgba(52,211,153,0.35)' : 'rgba(0,229,255,0.25)',
-              background: isFullSong ? 'rgba(52,211,153,0.10)' : 'rgba(0,229,255,0.055)',
-              color: isFullSong ? '#86efac' : '#9eefff',
-            }}
-          >
-            {isFullSong ? 'Full song' : 'Vault cut'}
+              border: isFullSong ? '1px solid rgba(52,211,153,0.35)' : '1px solid rgba(0,229,255,0.3)',
+              background: isFullSong ? 'rgba(52,211,153,0.10)' : 'rgba(0,229,255,0.07)',
+              color: isFullSong ? '#86efac' : '#00e5ff',
+            }}>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+            </svg>
+            {isFullSong ? 'FULL SONG' : 'EXCLUSIVE'}
           </span>
           <div className="flex gap-2">
             {track.spotifyUrl && track.spotifyUrl !== '#' && (
-              <a
-                href={track.spotifyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <a href={track.spotifyUrl} target="_blank" rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="rounded-full p-1.5 transition-colors hover:bg-white/5"
-                aria-label={`Open ${track.title} on Spotify`}
-              >
-                <Music className="h-4 w-4 text-green-400 hover:text-green-300" />
+                className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
+                <Music className="w-4 h-4 text-green-400 hover:text-green-300" />
               </a>
             )}
             {track.appleMusicUrl && track.appleMusicUrl !== '#' && (
-              <a
-                href={track.appleMusicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <a href={track.appleMusicUrl} target="_blank" rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="rounded-full p-1.5 transition-colors hover:bg-white/5"
-                aria-label={`Open ${track.title} on Apple Music`}
-              >
-                <Music4 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
+                <Music4 className="w-4 h-4 text-red-400 hover:text-red-300" />
               </a>
             )}
           </div>
