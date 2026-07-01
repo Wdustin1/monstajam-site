@@ -1,3 +1,5 @@
+import FeaturedVote from '@/components/FeaturedVote';
+
 const HUB_CARDS = [
   {
     eyebrow: '01',
@@ -146,6 +148,7 @@ export default function CommunityHub() {
             </div>
 
             <div className="grid gap-4">
+              <FeaturedVote />
               {HUB_CARDS.map((card) => (
                 <article
                   key={card.title}

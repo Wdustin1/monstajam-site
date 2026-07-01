@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const root = process.cwd();
 const componentPath = join(root, 'src/components/CommunityHub.tsx');
+const featuredVotePath = join(root, 'src/components/FeaturedVote.tsx');
 const pagePath = join(root, 'src/app/page.tsx');
 
 test('Community Hub component exists with the required public sections', () => {
@@ -57,6 +58,48 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     false,
     'CommunityHub should not rely on the old loose WhatsApp placeholder CTA'
   );
+});
+
+test('Featured Vote module exists with local frontend vote options', () => {
+  assert.ok(existsSync(featuredVotePath), 'src/components/FeaturedVote.tsx should exist');
+
+  const source = readFileSync(featuredVotePath, 'utf8');
+  const requiredFeaturedVoteAnchors = [
+    "'use client'",
+    'data-section-id="featured-vote"',
+    'Featured Vote',
+    'What should MonstaJam push next?',
+    "label: 'Song'",
+    "label: 'Cover art'",
+    "label: 'Remix'",
+    "label: 'Artist'",
+    "label: 'Future release'",
+    'monstajam-featured-vote',
+    'localStorage.getItem',
+    'localStorage.setItem',
+    'aria-pressed',
+    'Vote saved on this device',
+  ];
+
+  for (const anchor of requiredFeaturedVoteAnchors) {
+    assert.ok(source.includes(anchor), `FeaturedVote should include ${anchor}`);
+  }
+});
+
+test('Community Hub renders the Featured Vote before roadmap cards', () => {
+  const source = readFileSync(componentPath, 'utf8');
+
+  assert.ok(
+    source.includes("import FeaturedVote from '@/components/FeaturedVote';"),
+    'CommunityHub should import FeaturedVote'
+  );
+
+  const featuredVoteIndex = source.indexOf('<FeaturedVote />');
+  const cardsIndex = source.indexOf('{HUB_CARDS.map((card) => (');
+
+  assert.ok(featuredVoteIndex !== -1, 'CommunityHub should render <FeaturedVote />');
+  assert.ok(cardsIndex !== -1, 'CommunityHub should render the roadmap cards');
+  assert.ok(featuredVoteIndex < cardsIndex, 'FeaturedVote should appear before the roadmap cards');
 });
 
 test('homepage imports and renders the Community Hub before the music library', () => {
