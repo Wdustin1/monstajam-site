@@ -1,44 +1,167 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'monstajam-featured-vote';
+const VISITOR_ID_KEY = 'monstajam-visitor-id';
 
 const VOTE_OPTIONS = [
   {
+    id: 'fallback-song',
     label: 'Song',
     description: 'Which track should get the next push?',
+    voteCount: 0,
   },
   {
+    id: 'fallback-cover-art',
     label: 'Cover art',
     description: 'Which visual should represent the drop?',
+    voteCount: 0,
   },
   {
+    id: 'fallback-remix',
     label: 'Remix',
     description: 'Which remix idea deserves a lane?',
+    voteCount: 0,
   },
   {
+    id: 'fallback-artist',
     label: 'Artist',
     description: 'Which artist should MonstaJam spotlight?',
+    voteCount: 0,
   },
   {
+    id: 'fallback-future-release',
     label: 'Future release',
     description: 'What should the community help shape next?',
+    voteCount: 0,
   },
 ];
 
+type VoteOption = {
+  id: string;
+  label: string;
+  description: string;
+  voteCount: number;
+};
+
+type FeaturedVotePayload = {
+  options: VoteOption[];
+  selectedOptionId: string | null;
+  totals: {
+    votes: number;
+  };
+};
+
+function getOrCreateVisitorId() {
+  const existing = localStorage.getItem(VISITOR_ID_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const id = `visitor_${crypto.randomUUID()}`;
+  localStorage.setItem(VISITOR_ID_KEY, id);
+  return id;
+}
+
 export default function FeaturedVote() {
-  const [selectedVote, setSelectedVote] = useState<string | null>(() => {
+  const [visitorId] = useState<string | null>(() => {
     if (typeof window === 'undefined') {
       return null;
     }
 
-    return localStorage.getItem(STORAGE_KEY);
+    return getOrCreateVisitorId();
   });
+  const [options, setOptions] = useState<VoteOption[]>(VOTE_OPTIONS);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [totalVotes, setTotalVotes] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [statusText, setStatusText] = useState('Loading the live vote…');
 
-  function handleVote(label: string) {
-    setSelectedVote(label);
-    localStorage.setItem(STORAGE_KEY, label);
+  useEffect(() => {
+    if (!visitorId) {
+      return;
+    }
+
+    const currentVisitorId = visitorId;
+    let isCancelled = false;
+
+    async function loadFeaturedVote() {
+      try {
+        const response = await fetch(`/api/community/featured-vote?visitorId=${encodeURIComponent(currentVisitorId)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load featured vote');
+        }
+
+        const payload = (await response.json()) as FeaturedVotePayload;
+        if (isCancelled) {
+          return;
+        }
+
+        setOptions(payload.options);
+        setSelectedOptionId(payload.selectedOptionId);
+        setTotalVotes(payload.totals.votes);
+        setStatusText(
+          payload.selectedOptionId
+            ? 'Vote saved on this device and synced to the database.'
+            : 'Choose one option to preview the vote flow.'
+        );
+      } catch (error) {
+        console.error(error);
+        if (!isCancelled) {
+          const savedLabel = localStorage.getItem(STORAGE_KEY);
+          setSelectedOptionId(
+            savedLabel ? VOTE_OPTIONS.find((option) => option.label === savedLabel)?.id ?? null : null
+          );
+          setStatusText('Vote is offline right now; your browser can still preview the selection.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadFeaturedVote();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [visitorId]);
+
+  async function handleVote(option: VoteOption) {
+    if (!visitorId || isLoading || isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSelectedOptionId(option.id);
+    setStatusText('Saving vote…');
+    localStorage.setItem(STORAGE_KEY, option.label);
+
+    try {
+      const response = await fetch('/api/community/featured-vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId, optionId: option.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save featured vote');
+      }
+
+      const payload = (await response.json()) as FeaturedVotePayload;
+      setOptions(payload.options);
+      setSelectedOptionId(payload.selectedOptionId);
+      setTotalVotes(payload.totals.votes);
+      setStatusText('Vote saved on this device and synced to the database.');
+    } catch (error) {
+      console.error(error);
+      setStatusText('Could not sync yet. Your device selection is still saved for this preview.');
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -53,28 +176,32 @@ export default function FeaturedVote() {
               Featured Vote
             </span>
             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
-              Frontend preview
+              Database backed
+            </span>
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
+              {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
             </span>
           </div>
           <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
             What should MonstaJam push next?
           </h3>
           <p className="text-sm leading-relaxed text-gray-400">
-            Pick one direction for the first community campaign. For now this saves on your device so we can shape the voting experience before wiring the backend.
+            Pick one direction for the first community campaign. This now saves through the MonstaJam database, while still keeping a simple browser identity for the MVP.
           </p>
         </div>
 
         <div className="grid gap-2.5">
-          {VOTE_OPTIONS.map((option) => {
-            const isSelected = selectedVote === option.label;
+          {options.map((option) => {
+            const isSelected = selectedOptionId === option.id;
 
             return (
               <button
-                key={option.label}
+                key={option.id}
                 type="button"
                 aria-pressed={isSelected}
-                onClick={() => handleVote(option.label)}
-                className={`rounded-2xl border p-4 text-left transition-all ${
+                disabled={isLoading || isSaving}
+                onClick={() => handleVote(option)}
+                className={`rounded-2xl border p-4 text-left transition-all disabled:cursor-wait disabled:opacity-75 ${
                   isSelected
                     ? 'border-cyan-200 bg-cyan-200/15 shadow-[0_0_18px_rgba(0,229,255,0.18)]'
                     : 'border-white/10 bg-black/25 hover:border-cyan-300/35 hover:bg-cyan-300/[0.07]'
@@ -87,6 +214,9 @@ export default function FeaturedVote() {
                     </span>
                     <span className="mt-1 block text-xs leading-relaxed text-gray-500">
                       {option.description}
+                    </span>
+                    <span className="mt-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/70">
+                      {option.voteCount} {option.voteCount === 1 ? 'vote' : 'votes'}
                     </span>
                   </span>
                   <span
@@ -106,12 +236,10 @@ export default function FeaturedVote() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-relaxed text-gray-400">
-          {selectedVote ? (
-            <span>
-              Vote saved on this device: <strong className="text-cyan-100">{selectedVote}</strong>. You can change it anytime while this preview is local-only.
-            </span>
+          {selectedOptionId ? (
+            <span>{statusText}</span>
           ) : (
-            <span>Choose one option to preview the vote flow.</span>
+            <span>{statusText}</span>
           )}
         </div>
       </div>

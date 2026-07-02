@@ -57,3 +57,130 @@ model Credit {
 
   @@map("credits")
 }
+
+enum VoteCampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum CreditAction {
+  VOTE
+  COMMENT
+  SHARE
+  JOIN
+  SUPPORT
+  ARTIST_APPLICATION
+  ADMIN_ADJUSTMENT
+}
+
+enum ArtistApplicationStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model FanProfile {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  visitorId      String         @unique
+  displayName    String?
+  email          String?
+  socialUrl      String?
+  creditsBalance Int           @default(0)
+  joinedAt       DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  votes              Vote[]
+  creditLedger       CreditLedger[]
+  artistApplications ArtistApplication[]
+
+  @@map("fan_profiles")
+}
+
+model VoteCampaign {
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  slug        String             @unique
+  title       String
+  question    String
+  description String?
+  status      VoteCampaignStatus @default(DRAFT)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  options VoteOption[]
+  votes   Vote[]
+
+  @@map("vote_campaigns")
+}
+
+model VoteOption {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  campaign    VoteCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String       @db.ObjectId
+  label       String
+  description String?
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  votes Vote[]
+
+  @@unique([campaignId, label])
+  @@map("vote_options")
+}
+
+model Vote {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  campaign     VoteCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId   String       @db.ObjectId
+  option       VoteOption   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionId     String       @db.ObjectId
+  fanProfile   FanProfile?  @relation(fields: [fanProfileId], references: [id], onDelete: SetNull)
+  fanProfileId String?      @db.ObjectId
+  visitorId    String
+  creditsSpent Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([campaignId, visitorId])
+  @@index([optionId])
+  @@index([visitorId])
+  @@map("votes")
+}
+
+model CreditLedger {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  fanProfile   FanProfile?  @relation(fields: [fanProfileId], references: [id], onDelete: SetNull)
+  fanProfileId String?      @db.ObjectId
+  visitorId    String
+  action       CreditAction
+  amount       Int
+  reason       String
+  createdAt    DateTime     @default(now())
+
+  @@index([visitorId])
+  @@map("credit_ledger")
+}
+
+model ArtistApplication {
+  id           String                  @id @default(auto()) @map("_id") @db.ObjectId
+  fanProfile   FanProfile?             @relation(fields: [fanProfileId], references: [id], onDelete: SetNull)
+  fanProfileId String?                 @db.ObjectId
+  visitorId    String?
+  artistName   String
+  email        String?
+  socialUrl    String?
+  songUrl      String?
+  genre        String?
+  message      String?
+  status       ArtistApplicationStatus @default(NEW)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([visitorId])
+  @@map("artist_applications")
+}
