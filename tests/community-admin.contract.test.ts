@@ -11,17 +11,13 @@ const pagePath = join(root, 'src/app/upload/community/page.tsx');
 const uploadDashboardPath = join(root, 'src/components/UploadDashboard.tsx');
 const packagePath = join(root, 'package.json');
 
-test('community admin summary helper returns vote and application rollups', () => {
+test('community admin summary helper returns vote and rewards rollups without artist application intake', () => {
   assert.ok(existsSync(helperPath), 'src/lib/community/adminSummary.ts should exist');
 
   const source = readFileSync(helperPath, 'utf8');
   const requiredHelperAnchors = [
     'buildCommunityAdminSummary',
     'prisma.voteCampaign.findMany',
-    'prisma.artistApplication.findMany',
-    'prisma.artistApplication.groupBy',
-    'applicationStatusCounts',
-    'recentApplications',
     'voteCount',
     'votePercent',
     'fanProfiles',
@@ -30,6 +26,16 @@ test('community admin summary helper returns vote and application rollups', () =
 
   for (const anchor of requiredHelperAnchors) {
     assert.ok(source.includes(anchor), `admin summary helper should include ${anchor}`);
+  }
+
+  const forbiddenHelperAnchors = [
+    'prisma.artistApplication',
+    'applicationStatusCounts',
+    'recentApplications',
+  ];
+
+  for (const forbidden of forbiddenHelperAnchors) {
+    assert.equal(source.includes(forbidden), false, `admin summary helper should not include artist application intake: ${forbidden}`);
   }
 });
 
@@ -63,13 +69,25 @@ test('community admin dashboard page reads protected summary data', () => {
     '/api/community/admin/summary',
     "credentials: 'include'",
     'Vote campaigns',
-    'Artist applications',
-    'Recent applications',
+    'Rewards ledger',
     'Sign in to view community data',
   ];
 
   for (const anchor of requiredComponentAnchors) {
     assert.ok(componentSource.includes(anchor), `community admin dashboard should include ${anchor}`);
+  }
+
+  const forbiddenComponentAnchors = [
+    'Artist applications',
+    'Recent applications',
+    'recentApplications',
+    'artistApplications',
+    'applicationStatusCounts',
+    'public apply form',
+  ];
+
+  for (const forbidden of forbiddenComponentAnchors) {
+    assert.equal(componentSource.includes(forbidden), false, `community admin dashboard should not include artist application intake: ${forbidden}`);
   }
 
   assert.ok(pageSource.includes('CommunityAdminDashboard'), 'admin page should render the dashboard component');

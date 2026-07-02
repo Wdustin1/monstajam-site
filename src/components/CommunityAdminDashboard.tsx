@@ -9,8 +9,6 @@ type Summary = {
     fanProfiles: number;
     votes: number;
     creditLedgerRows: number;
-    artistApplications: number;
-    applicationStatusCounts: Record<string, number>;
   };
   campaigns: Array<{
     id: string;
@@ -27,17 +25,6 @@ type Summary = {
       voteCount: number;
       votePercent: number;
     }>;
-  }>;
-  recentApplications: Array<{
-    id: string;
-    artistName: string;
-    email: string | null;
-    socialUrl: string | null;
-    songUrl: string | null;
-    genre: string | null;
-    message: string | null;
-    status: string;
-    createdAt: string;
   }>;
 };
 
@@ -125,7 +112,7 @@ export default function CommunityAdminDashboard() {
               Community hub admin
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Read the live Featured Vote breakdown, fan profile counts, credit ledger state, and recent artist applications without opening Mongo manually.
+              Read the live Featured Vote breakdown, fan profile count, and rewards ledger state without opening Mongo manually.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -153,8 +140,8 @@ export default function CommunityAdminDashboard() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard label="Vote campaigns" value={summary.totals.campaigns} detail={`${summary.totals.votes} total votes`} />
               <StatCard label="Fan profiles" value={summary.totals.fanProfiles} detail="Browser visitors captured" />
-              <StatCard label="Artist applications" value={summary.totals.artistApplications} detail={`${summary.totals.applicationStatusCounts.NEW ?? 0} new`} />
-              <StatCard label="Credits ledger" value={summary.totals.creditLedgerRows} detail="Reward rows recorded" />
+              <StatCard label="Vote activity" value={summary.totals.votes} detail="One vote per visitor per campaign" />
+              <StatCard label="Rewards ledger" value={summary.totals.creditLedgerRows} detail="Credit rows recorded" />
             </div>
 
             <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
@@ -196,33 +183,13 @@ export default function CommunityAdminDashboard() {
 
             <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
               <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
-                <h2 className="text-xl font-semibold text-white">Recent applications</h2>
-                <p className="text-sm text-slate-400">Artist applications will appear here as soon as the public apply form is wired.</p>
+                <h2 className="text-xl font-semibold text-white">Rewards ledger</h2>
+                <p className="text-sm text-slate-400">Credit rows stay empty until the reward rules are switched on.</p>
               </div>
-              <div className="mt-5 space-y-3">
-                {summary.recentApplications.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-white/10 p-6 text-sm text-slate-400">No artist applications yet.</div>
-                ) : (
-                  summary.recentApplications.map((application) => (
-                    <article key={application.id} className="rounded-lg border border-white/10 bg-slate-950/50 p-4">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <h3 className="text-base font-semibold text-white">{application.artistName}</h3>
-                          <p className="mt-1 text-sm text-slate-400">{application.genre ?? 'Genre not set'} · {formatDate(application.createdAt)}</p>
-                        </div>
-                        <span className="rounded-full border border-cyan-300/25 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-cyan-100">
-                          {application.status}
-                        </span>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-400 md:grid-cols-3">
-                        <span>{application.email ?? 'No email'}</span>
-                        <span>{application.socialUrl ?? 'No social link'}</span>
-                        <span>{application.songUrl ?? 'No demo link'}</span>
-                      </div>
-                      {application.message && <p className="mt-3 text-sm leading-6 text-slate-300">{application.message}</p>}
-                    </article>
-                  ))
-                )}
+              <div className="mt-5 rounded-lg border border-dashed border-white/10 p-6 text-sm text-slate-400">
+                {summary.totals.creditLedgerRows === 0
+                  ? 'No reward ledger rows yet. This is ready for vote, join, and support credits later.'
+                  : `${summary.totals.creditLedgerRows} reward ledger rows recorded.`}
               </div>
             </section>
           </div>

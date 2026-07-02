@@ -16,7 +16,7 @@ test('Community Hub component exists with the required public sections', () => {
     'data-section-id="community-hub"',
     'Vote on Music',
     'Community Chat',
-    'Artist Hub',
+    'Drop Requests',
     'Rewards / Credits',
     'Premium / Token Access',
     'Coming Soon',
@@ -40,9 +40,8 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     "id: 'join-community'",
     'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
     'Join the community',
-    "id: 'apply-artist'",
-    'NEXT_PUBLIC_MONSTAJAM_ARTIST_APPLY_URL',
-    'Apply as an artist',
+    "id: 'request-drop'",
+    'Suggest the next drop',
     "id: 'earn-credits'",
     'See credit rules',
     "id: 'premium-access'",
@@ -58,6 +57,19 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     false,
     'CommunityHub should not rely on the old loose WhatsApp placeholder CTA'
   );
+
+  const forbiddenArtistApplyCopy = [
+    'Apply as an artist',
+    'apply-artist',
+    'NEXT_PUBLIC_MONSTAJAM_ARTIST_APPLY_URL',
+    'Artist Hub',
+    'artist submissions',
+    'Artist action',
+  ];
+
+  for (const forbidden of forbiddenArtistApplyCopy) {
+    assert.equal(source.includes(forbidden), false, `CommunityHub should not include artist apply copy: ${forbidden}`);
+  }
 });
 
 test('Featured Vote module exists with local frontend vote options', () => {

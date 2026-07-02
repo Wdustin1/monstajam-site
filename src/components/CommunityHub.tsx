@@ -21,12 +21,12 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '03',
-    id: 'artist-hub',
-    title: 'Artist Hub',
-    status: 'Apply + submit',
+    id: 'drop-requests',
+    title: 'Drop Requests',
+    status: 'Fan input',
     body:
-      'Artists can apply, submit music, build profiles, and eventually open private rooms for fans around releases, demos, and drops.',
-    bullets: ['artist profiles', 'music submissions', 'private rooms later'],
+      'Collect what listeners want more of: song ideas, remix directions, cover concepts, collabs, and future release themes. Keep it fan-led instead of turning the hub into another generic submission funnel.',
+    bullets: ['song ideas', 'remix requests', 'cover directions'],
   },
   {
     eyebrow: '04',
@@ -43,7 +43,7 @@ const HUB_CARDS = [
     title: 'Premium / Token Access',
     status: 'Coming Soon',
     body:
-      'Coming Soon: private artist chats, listening rooms, early demos, Q&A sessions, badges, VIP areas, subscriptions, and ETH / Monsta token access.',
+      'Coming Soon: private listening rooms, early demos, Q&A sessions, badges, VIP areas, subscriptions, and ETH / Monsta token access.',
     bullets: ['VIP rooms', 'early demos', 'Monsta tokens'],
   },
 ];
@@ -64,11 +64,11 @@ const HUB_ACTIONS = [
     body: 'Use the configured WhatsApp or community invite when it is ready; until then this jumps to the chat plan.',
   },
   {
-    id: 'apply-artist',
-    label: 'Apply as an artist',
-    eyebrow: 'Artist action',
-    href: process.env.NEXT_PUBLIC_MONSTAJAM_ARTIST_APPLY_URL || '#artist-hub',
-    body: 'Point artists toward the submission lane now, then wire this to the real application form next.',
+    id: 'request-drop',
+    label: 'Suggest the next drop',
+    eyebrow: 'Fan action',
+    href: '#drop-requests',
+    body: 'Point the crowd toward requests for songs, remixes, cover directions, collabs, and future release themes.',
   },
   {
     id: 'earn-credits',
@@ -114,7 +114,7 @@ export default function CommunityHub() {
                   Vote, talk, support, and help decide what drops next.
                 </h2>
                 <p className="text-sm md:text-base text-gray-400 leading-relaxed max-w-xl">
-                  MonstaJam can become the home base for fans, artists, and AI music creators who want to support each other instead of getting lost in a feed.
+                  MonstaJam can become the home base for fans, producers, and AI music creators who want to support each other instead of getting lost in a feed.
                 </p>
               </div>
 
@@ -143,7 +143,7 @@ export default function CommunityHub() {
               </div>
 
               <p className="text-xs text-gray-500 leading-relaxed">
-                First version stays lightweight: clear hub copy, voting direction, chat entry point, artist submissions, and credits. Native chat and token-gated rooms come after the community proves itself.
+                First version stays lightweight: clear hub copy, voting direction, chat entry point, drop requests, and credits. Native chat and token-gated rooms come after the community proves itself.
               </p>
             </div>
 

@@ -70,16 +70,9 @@ enum CreditAction {
   SHARE
   JOIN
   SUPPORT
-  ARTIST_APPLICATION
   ADMIN_ADJUSTMENT
 }
 
-enum ArtistApplicationStatus {
-  NEW
-  REVIEWED
-  APPROVED
-  REJECTED
-}
 
 model FanProfile {
   id             String         @id @default(auto()) @map("_id") @db.ObjectId
@@ -92,9 +85,8 @@ model FanProfile {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  votes              Vote[]
-  creditLedger       CreditLedger[]
-  artistApplications ArtistApplication[]
+  votes        Vote[]
+  creditLedger CreditLedger[]
 
   @@map("fan_profiles")
 }
@@ -164,23 +156,4 @@ model CreditLedger {
 
   @@index([visitorId])
   @@map("credit_ledger")
-}
-
-model ArtistApplication {
-  id           String                  @id @default(auto()) @map("_id") @db.ObjectId
-  fanProfile   FanProfile?             @relation(fields: [fanProfileId], references: [id], onDelete: SetNull)
-  fanProfileId String?                 @db.ObjectId
-  visitorId    String?
-  artistName   String
-  email        String?
-  socialUrl    String?
-  songUrl      String?
-  genre        String?
-  message      String?
-  status       ArtistApplicationStatus @default(NEW)
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-
-  @@index([visitorId])
-  @@map("artist_applications")
 }

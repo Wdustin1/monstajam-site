@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 
 export const metadata = {
   title: 'Community Hub Admin — MonstaJam',
-  description: 'Read MonstaJam community vote and artist application activity.',
+  description: 'Read MonstaJam community vote and rewards activity.',
 };
 
 export default function CommunityAdminPage() {

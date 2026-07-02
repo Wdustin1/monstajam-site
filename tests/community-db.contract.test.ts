@@ -14,7 +14,6 @@ test('Prisma schema defines the community hub persistence layer', () => {
   const requiredSchemaAnchors = [
     'enum VoteCampaignStatus',
     'enum CreditAction',
-    'enum ArtistApplicationStatus',
     'model FanProfile',
     'visitorId      String         @unique',
     'creditsBalance Int           @default(0)',
@@ -27,12 +26,22 @@ test('Prisma schema defines the community hub persistence layer', () => {
     'model Vote',
     '@@unique([campaignId, visitorId])',
     'model CreditLedger',
-    'model ArtistApplication',
-    'status       ArtistApplicationStatus @default(NEW)',
   ];
 
   for (const anchor of requiredSchemaAnchors) {
     assert.ok(source.includes(anchor), `schema should include ${anchor}`);
+  }
+
+  const forbiddenSchemaAnchors = [
+    'enum ArtistApplicationStatus',
+    'model ArtistApplication',
+    'artistApplications',
+    'ARTIST_APPLICATION',
+    '@@map("artist_applications")',
+  ];
+
+  for (const forbidden of forbiddenSchemaAnchors) {
+    assert.equal(source.includes(forbidden), false, `schema should not include artist apply persistence: ${forbidden}`);
   }
 });
 

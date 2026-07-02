@@ -1,54 +1,18 @@
 import { prisma } from '@/lib/prisma';
 
-const APPLICATION_STATUSES = ['NEW', 'REVIEWED', 'APPROVED', 'REJECTED'] as const;
-
-type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
-
-function emptyApplicationStatusCounts() {
-  return APPLICATION_STATUSES.reduce<Record<ApplicationStatus, number>>((counts, status) => {
-    counts[status] = 0;
-    return counts;
-  }, {} as Record<ApplicationStatus, number>);
-}
-
 export async function buildCommunityAdminSummary() {
-  const [campaigns, recentApplications, applicationGroups, fanProfiles, totalVotes, creditLedgerRows] =
-    await Promise.all([
-      prisma.voteCampaign.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: {
-          options: { orderBy: { sortOrder: 'asc' } },
-          votes: { select: { id: true, optionId: true, visitorId: true, createdAt: true } },
-        },
-      }),
-      prisma.artistApplication.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 12,
-        select: {
-          id: true,
-          artistName: true,
-          email: true,
-          socialUrl: true,
-          songUrl: true,
-          genre: true,
-          message: true,
-          status: true,
-          createdAt: true,
-        },
-      }),
-      prisma.artistApplication.groupBy({
-        by: ['status'],
-        _count: { _all: true },
-      }),
-      prisma.fanProfile.count(),
-      prisma.vote.count(),
-      prisma.creditLedger.count(),
-    ]);
-
-  const applicationStatusCounts = emptyApplicationStatusCounts();
-  for (const group of applicationGroups) {
-    applicationStatusCounts[group.status as ApplicationStatus] = group._count._all;
-  }
+  const [campaigns, fanProfiles, totalVotes, creditLedgerRows] = await Promise.all([
+    prisma.voteCampaign.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        options: { orderBy: { sortOrder: 'asc' } },
+        votes: { select: { id: true, optionId: true, visitorId: true, createdAt: true } },
+      },
+    }),
+    prisma.fanProfile.count(),
+    prisma.vote.count(),
+    prisma.creditLedger.count(),
+  ]);
 
   const campaignSummaries = campaigns.map((campaign) => {
     const totalCampaignVotes = campaign.votes.length;
@@ -88,21 +52,8 @@ export async function buildCommunityAdminSummary() {
       fanProfiles,
       votes: totalVotes,
       creditLedgerRows,
-      artistApplications: recentApplications.length,
-      applicationStatusCounts,
     },
     campaigns: campaignSummaries,
-    recentApplications: recentApplications.map((application) => ({
-      id: application.id,
-      artistName: application.artistName,
-      email: application.email,
-      socialUrl: application.socialUrl,
-      songUrl: application.songUrl,
-      genre: application.genre,
-      message: application.message,
-      status: application.status,
-      createdAt: application.createdAt.toISOString(),
-    })),
   };
 }
 
