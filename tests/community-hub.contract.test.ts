@@ -16,7 +16,7 @@ test('Community Hub component exists with the required public sections', () => {
     'data-section-id="community-hub"',
     'Vote on Music',
     'Community Chat',
-    'Drop Requests',
+    'Live Vote Campaigns',
     'Rewards / Credits',
     'Premium / Token Access',
     'Coming Soon',
@@ -40,8 +40,8 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     "id: 'join-community'",
     'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
     'Join the community',
-    "id: 'request-drop'",
-    'Suggest the next drop',
+    "id: 'live-vote'",
+    'Vote in the live poll',
     "id: 'earn-credits'",
     'See credit rules',
     "id: 'premium-access'",
@@ -65,6 +65,9 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     'Artist Hub',
     'artist submissions',
     'Artist action',
+    'Drop Requests',
+    'Suggest the next drop',
+    'request-drop',
   ];
 
   for (const forbidden of forbiddenArtistApplyCopy) {

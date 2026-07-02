@@ -6,6 +6,8 @@ import test from 'node:test';
 const root = process.cwd();
 const helperPath = join(root, 'src/lib/community/adminSummary.ts');
 const routePath = join(root, 'src/app/api/community/admin/summary/route.ts');
+const campaignRoutePath = join(root, 'src/app/api/community/admin/vote-campaigns/route.ts');
+const campaignUpdateRoutePath = join(root, 'src/app/api/community/admin/vote-campaigns/[campaignId]/route.ts');
 const componentPath = join(root, 'src/components/CommunityAdminDashboard.tsx');
 const pagePath = join(root, 'src/app/upload/community/page.tsx');
 const uploadDashboardPath = join(root, 'src/components/UploadDashboard.tsx');
@@ -58,6 +60,40 @@ test('community admin summary API is protected by admin session', () => {
   }
 });
 
+test('community admin vote campaign APIs are protected and mutate campaigns', () => {
+  assert.ok(existsSync(campaignRoutePath), 'admin vote campaign create route should exist');
+  assert.ok(existsSync(campaignUpdateRoutePath), 'admin vote campaign update route should exist');
+
+  const createSource = readFileSync(campaignRoutePath, 'utf8');
+  const updateSource = readFileSync(campaignUpdateRoutePath, 'utf8');
+
+  const requiredCreateAnchors = [
+    'export async function POST',
+    'isAdminRequest',
+    'Unauthorized',
+    'ManagedVoteCampaignSchema.safeParse',
+    'createManagedVoteCampaign',
+    '{ status: 201',
+  ];
+
+  for (const anchor of requiredCreateAnchors) {
+    assert.ok(createSource.includes(anchor), `admin campaign create route should include ${anchor}`);
+  }
+
+  const requiredUpdateAnchors = [
+    'export async function PATCH',
+    'params: Promise<{ campaignId: string }>',
+    'ManagedVoteCampaignUpdateSchema.safeParse',
+    'updateManagedVoteCampaign',
+    'VoteCampaignOptionEditError',
+    '{ status: 409 }',
+  ];
+
+  for (const anchor of requiredUpdateAnchors) {
+    assert.ok(updateSource.includes(anchor), `admin campaign update route should include ${anchor}`);
+  }
+});
+
 test('community admin dashboard page reads protected summary data', () => {
   assert.ok(existsSync(componentPath), 'src/components/CommunityAdminDashboard.tsx should exist');
   assert.ok(existsSync(pagePath), 'src/app/upload/community/page.tsx should exist');
@@ -67,7 +103,11 @@ test('community admin dashboard page reads protected summary data', () => {
   const requiredComponentAnchors = [
     'Community hub admin',
     '/api/community/admin/summary',
+    '/api/community/admin/vote-campaigns',
     "credentials: 'include'",
+    'Create vote campaign',
+    'Activate',
+    'Archive',
     'Vote campaigns',
     'Rewards ledger',
     'Sign in to view community data',

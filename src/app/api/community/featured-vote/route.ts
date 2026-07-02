@@ -1,68 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { VoteCampaignStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import {
-  FEATURED_VOTE_CAMPAIGN,
-  FEATURED_VOTE_OPTIONS,
-  FEATURED_VOTE_SLUG,
-  FeaturedVoteRequestSchema,
-  buildFeaturedVotePayload,
-} from '@/lib/community/featuredVote';
-
-async function ensureFeaturedVoteCampaign() {
-  const campaign = await prisma.voteCampaign.upsert({
-    where: { slug: FEATURED_VOTE_SLUG },
-    update: {
-      title: FEATURED_VOTE_CAMPAIGN.title,
-      question: FEATURED_VOTE_CAMPAIGN.question,
-      description: FEATURED_VOTE_CAMPAIGN.description,
-      status: VoteCampaignStatus.ACTIVE,
-    },
-    create: {
-      slug: FEATURED_VOTE_CAMPAIGN.slug,
-      title: FEATURED_VOTE_CAMPAIGN.title,
-      question: FEATURED_VOTE_CAMPAIGN.question,
-      description: FEATURED_VOTE_CAMPAIGN.description,
-      status: VoteCampaignStatus.ACTIVE,
-    },
-  });
-
-  for (const option of FEATURED_VOTE_OPTIONS) {
-    await prisma.voteOption.upsert({
-      where: {
-        campaignId_label: {
-          campaignId: campaign.id,
-          label: option.label,
-        },
-      },
-      update: {
-        description: option.description,
-        sortOrder: option.sortOrder,
-      },
-      create: {
-        campaignId: campaign.id,
-        label: option.label,
-        description: option.description,
-        sortOrder: option.sortOrder,
-      },
-    });
-  }
-
-  return prisma.voteCampaign.findUniqueOrThrow({
-    where: { id: campaign.id },
-    include: {
-      options: { orderBy: { sortOrder: 'asc' } },
-      votes: { select: { optionId: true, visitorId: true } },
-    },
-  });
-}
+import { FeaturedVoteRequestSchema, buildFeaturedVotePayload } from '@/lib/community/featuredVote';
+import { getActiveVoteCampaignForPublic } from '@/lib/community/voteCampaigns';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const visitorId = searchParams.get('visitorId');
 
   try {
-    const campaign = await ensureFeaturedVoteCampaign();
+    const campaign = await getActiveVoteCampaignForPublic();
     return NextResponse.json(buildFeaturedVotePayload(campaign, visitorId));
   } catch (err) {
     console.error(err);
@@ -89,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { optionId, visitorId } = parsed.data;
 
   try {
-    const campaign = await ensureFeaturedVoteCampaign();
+    const campaign = await getActiveVoteCampaignForPublic();
     const option = campaign.options.find((item) => item.id === optionId);
 
     if (!option) {

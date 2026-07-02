@@ -46,6 +46,14 @@ type VoteOption = {
 };
 
 type FeaturedVotePayload = {
+  campaign: {
+    id: string;
+    slug: string;
+    title: string;
+    question: string;
+    description: string;
+    status: string;
+  };
   options: VoteOption[];
   selectedOptionId: string | null;
   totals: {
@@ -72,6 +80,9 @@ export default function FeaturedVote() {
 
     return getOrCreateVisitorId();
   });
+  const [campaignTitle, setCampaignTitle] = useState('Featured Vote');
+  const [campaignQuestion, setCampaignQuestion] = useState('What should MonstaJam push next?');
+  const [campaignDescription, setCampaignDescription] = useState('Pick one direction for the active community campaign.');
   const [options, setOptions] = useState<VoteOption[]>(VOTE_OPTIONS);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [totalVotes, setTotalVotes] = useState(0);
@@ -99,6 +110,9 @@ export default function FeaturedVote() {
           return;
         }
 
+        setCampaignTitle(payload.campaign.title);
+        setCampaignQuestion(payload.campaign.question);
+        setCampaignDescription(payload.campaign.description || 'Pick one direction for the active community campaign.');
         setOptions(payload.options);
         setSelectedOptionId(payload.selectedOptionId);
         setTotalVotes(payload.totals.votes);
@@ -152,6 +166,9 @@ export default function FeaturedVote() {
       }
 
       const payload = (await response.json()) as FeaturedVotePayload;
+      setCampaignTitle(payload.campaign.title);
+      setCampaignQuestion(payload.campaign.question);
+      setCampaignDescription(payload.campaign.description || 'Pick one direction for the active community campaign.');
       setOptions(payload.options);
       setSelectedOptionId(payload.selectedOptionId);
       setTotalVotes(payload.totals.votes);
@@ -173,7 +190,7 @@ export default function FeaturedVote() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
-              Featured Vote
+              {campaignTitle}
             </span>
             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
               Database backed
@@ -183,10 +200,10 @@ export default function FeaturedVote() {
             </span>
           </div>
           <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
-            What should MonstaJam push next?
+            {campaignQuestion}
           </h3>
           <p className="text-sm leading-relaxed text-gray-400">
-            Pick one direction for the first community campaign. This now saves through the MonstaJam database, while still keeping a simple browser identity for the MVP.
+            {campaignDescription} The active poll is controlled from the backstage community admin.
           </p>
         </div>
 

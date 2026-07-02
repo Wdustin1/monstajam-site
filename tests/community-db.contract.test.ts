@@ -6,6 +6,7 @@ import test from 'node:test';
 const root = process.cwd();
 const schemaPath = join(root, 'prisma/schema.prisma');
 const helperPath = join(root, 'src/lib/community/featuredVote.ts');
+const campaignHelperPath = join(root, 'src/lib/community/voteCampaigns.ts');
 const routePath = join(root, 'src/app/api/community/featured-vote/route.ts');
 const packagePath = join(root, 'package.json');
 
@@ -69,16 +70,33 @@ test('Featured vote helper defines the first database-backed campaign contract',
   }
 });
 
-test('Featured vote API exposes GET and POST handlers with vote upsert behavior', () => {
+test('Managed vote campaign helper supports admin-created active polls', () => {
+  assert.ok(existsSync(campaignHelperPath), 'src/lib/community/voteCampaigns.ts should exist');
+
+  const source = readFileSync(campaignHelperPath, 'utf8');
+  const requiredManagedCampaignAnchors = [
+    'ManagedVoteCampaignSchema',
+    'ManagedVoteCampaignUpdateSchema',
+    'getActiveVoteCampaignForPublic',
+    'createManagedVoteCampaign',
+    'updateManagedVoteCampaign',
+    'closeOtherActiveCampaigns',
+    'VoteCampaignOptionEditError',
+  ];
+
+  for (const anchor of requiredManagedCampaignAnchors) {
+    assert.ok(source.includes(anchor), `managed vote campaign helper should include ${anchor}`);
+  }
+});
+
+test('Featured vote API exposes GET and POST handlers against the active campaign', () => {
   assert.ok(existsSync(routePath), 'src/app/api/community/featured-vote/route.ts should exist');
 
   const source = readFileSync(routePath, 'utf8');
   const requiredRouteAnchors = [
     'export async function GET',
     'export async function POST',
-    'ensureFeaturedVoteCampaign',
-    'prisma.voteCampaign.upsert',
-    'prisma.voteOption.upsert',
+    'getActiveVoteCampaignForPublic',
     'prisma.fanProfile.upsert',
     'prisma.vote.upsert',
     'FeaturedVoteRequestSchema.safeParse',

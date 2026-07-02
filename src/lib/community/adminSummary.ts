@@ -26,6 +26,7 @@ export async function buildCommunityAdminSummary() {
       slug: campaign.slug,
       title: campaign.title,
       question: campaign.question,
+      description: campaign.description ?? '',
       status: campaign.status,
       createdAt: campaign.createdAt.toISOString(),
       updatedAt: campaign.updatedAt.toISOString(),

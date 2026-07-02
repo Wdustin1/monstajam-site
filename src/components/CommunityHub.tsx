@@ -21,12 +21,12 @@ const HUB_CARDS = [
   },
   {
     eyebrow: '03',
-    id: 'drop-requests',
-    title: 'Drop Requests',
-    status: 'Fan input',
+    id: 'live-vote-campaigns',
+    title: 'Live Vote Campaigns',
+    status: 'Admin managed',
     body:
-      'Collect what listeners want more of: song ideas, remix directions, cover concepts, collabs, and future release themes. Keep it fan-led instead of turning the hub into another generic submission funnel.',
-    bullets: ['song ideas', 'remix requests', 'cover directions'],
+      'Rotate focused polls from backstage so fans always have a simple way to participate: pick a track, choose a cover, rank remix ideas, or decide what gets pushed next.',
+    bullets: ['active polls', 'public results', 'campaign rotation'],
   },
   {
     eyebrow: '04',
@@ -64,11 +64,11 @@ const HUB_ACTIONS = [
     body: 'Use the configured WhatsApp or community invite when it is ready; until then this jumps to the chat plan.',
   },
   {
-    id: 'request-drop',
-    label: 'Suggest the next drop',
+    id: 'live-vote',
+    label: 'Vote in the live poll',
     eyebrow: 'Fan action',
-    href: '#drop-requests',
-    body: 'Point the crowd toward requests for songs, remixes, cover directions, collabs, and future release themes.',
+    href: '#featured-vote',
+    body: 'Jump straight into the active campaign and help decide what MonstaJam pushes next.',
   },
   {
     id: 'earn-credits',
@@ -143,7 +143,7 @@ export default function CommunityHub() {
               </div>
 
               <p className="text-xs text-gray-500 leading-relaxed">
-                First version stays lightweight: clear hub copy, voting direction, chat entry point, drop requests, and credits. Native chat and token-gated rooms come after the community proves itself.
+                First version stays lightweight: clear hub copy, voting campaigns, chat entry point, and credits. Native chat and token-gated rooms come after the community proves itself.
               </p>
             </div>
 
