@@ -6,7 +6,9 @@ import test from 'node:test';
 const root = process.cwd();
 const componentPath = join(root, 'src/components/CommunityHub.tsx');
 const featuredVotePath = join(root, 'src/components/FeaturedVote.tsx');
-const pagePath = join(root, 'src/app/page.tsx');
+const homePagePath = join(root, 'src/app/page.tsx');
+const communityPagePath = join(root, 'src/app/community/page.tsx');
+const navbarPath = join(root, 'src/components/Navbar.tsx');
 
 test('Community Hub component exists with the required public sections', () => {
   assert.ok(existsSync(componentPath), 'src/components/CommunityHub.tsx should exist');
@@ -29,13 +31,34 @@ test('Community Hub component exists with the required public sections', () => {
   }
 });
 
+test('Community Hub is tab based instead of rendering every module in one long homepage section', () => {
+  const source = readFileSync(componentPath, 'utf8');
+  const requiredTabAnchors = [
+    "'use client'",
+    'data-section-id="community-tabs"',
+    'role="tablist"',
+    'role="tab"',
+    'role="tabpanel"',
+    'aria-selected',
+    'setActiveTab',
+    "id: 'vote'",
+    "id: 'talk'",
+    "id: 'rewards'",
+    "id: 'access'",
+  ];
+
+  for (const anchor of requiredTabAnchors) {
+    assert.ok(source.includes(anchor), `CommunityHub tab contract should include ${anchor}`);
+  }
+});
+
 test('Community Hub exposes real CTA action cards instead of loose placeholders', () => {
   const source = readFileSync(componentPath, 'utf8');
   const requiredCtas = [
     'data-section-id="community-actions"',
     'data-cta-id={action.id}',
     "id: 'vote-track'",
-    "href: '#library'",
+    "href: '/#library'",
     'Vote on a track',
     "id: 'join-community'",
     'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
@@ -101,34 +124,30 @@ test('Featured Vote module exists with local frontend vote options', () => {
   }
 });
 
-test('Community Hub renders the Featured Vote before roadmap cards', () => {
-  const source = readFileSync(componentPath, 'utf8');
+test('Community route owns the hub and the homepage no longer renders the full hub section', () => {
+  assert.ok(existsSync(communityPagePath), 'src/app/community/page.tsx should exist');
 
+  const communityPage = readFileSync(communityPagePath, 'utf8');
   assert.ok(
-    source.includes("import FeaturedVote from '@/components/FeaturedVote';"),
-    'CommunityHub should import FeaturedVote'
+    communityPage.includes("import CommunityHub from '@/components/CommunityHub';"),
+    'community page should import CommunityHub'
   );
+  assert.ok(communityPage.includes('<Navbar activeLink="community" />'), 'community page should mark Community nav active');
+  assert.ok(communityPage.includes('<CommunityHub />'), 'community page should render <CommunityHub />');
 
-  const featuredVoteIndex = source.indexOf('<FeaturedVote />');
-  const cardsIndex = source.indexOf('{HUB_CARDS.map((card) => (');
-
-  assert.ok(featuredVoteIndex !== -1, 'CommunityHub should render <FeaturedVote />');
-  assert.ok(cardsIndex !== -1, 'CommunityHub should render the roadmap cards');
-  assert.ok(featuredVoteIndex < cardsIndex, 'FeaturedVote should appear before the roadmap cards');
+  const homePage = readFileSync(homePagePath, 'utf8');
+  assert.equal(
+    homePage.includes("import CommunityHub from '@/components/CommunityHub';"),
+    false,
+    'homepage should not import the full CommunityHub anymore'
+  );
+  assert.equal(homePage.includes('<CommunityHub />'), false, 'homepage should not render the full CommunityHub anymore');
 });
 
-test('homepage imports and renders the Community Hub before the music library', () => {
-  const source = readFileSync(pagePath, 'utf8');
+test('Navbar links to the standalone Community page', () => {
+  const source = readFileSync(navbarPath, 'utf8');
 
-  assert.ok(
-    source.includes("import CommunityHub from '@/components/CommunityHub';"),
-    'homepage should import CommunityHub'
-  );
-
-  const hubIndex = source.indexOf('<CommunityHub />');
-  const libraryIndex = source.indexOf('<MusicLibrary tracks={tracks} />');
-
-  assert.ok(hubIndex !== -1, 'homepage should render <CommunityHub />');
-  assert.ok(libraryIndex !== -1, 'homepage should render <MusicLibrary />');
-  assert.ok(hubIndex < libraryIndex, 'CommunityHub should appear before the music library');
+  assert.ok(source.includes("{ label: 'Community'"), 'navbar should include a Community link');
+  assert.ok(source.includes("href: '/community'"), 'navbar Community link should point at /community');
+  assert.ok(source.includes("key: 'community'"), 'navbar Community link should expose active key');
 });

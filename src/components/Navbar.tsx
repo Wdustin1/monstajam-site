@@ -9,10 +9,11 @@ interface NavbarProps {
 }
 
 const LINKS = [
-  { label: 'Beats',         href: '/',        key: 'home' },
-  { label: 'Music',         href: '/#library', key: 'music' },
-  { label: 'Genres',        href: '/genres',   key: 'genres' },
-  { label: 'Video & Media', href: '/videos',   key: 'videos' },
+  { label: 'Beats',         href: '/',          key: 'home' },
+  { label: 'Music',         href: '/#library',  key: 'music' },
+  { label: 'Community',     href: '/community', key: 'community' },
+  { label: 'Genres',        href: '/genres',    key: 'genres' },
+  { label: 'Video & Media', href: '/videos',    key: 'videos' },
 ];
 
 export default function Navbar({ activeLink }: NavbarProps) {
