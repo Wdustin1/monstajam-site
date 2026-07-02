@@ -16,7 +16,7 @@ export default function Hero({
 }) {
   return (
     <section
-      className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
+      className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 lg:gap-8 xl:gap-12 relative"
       style={{ minHeight: 'calc(100vh - 260px)' }}
     >
       {/* Ambient glow blobs behind content */}
@@ -26,10 +26,10 @@ export default function Hero({
         style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.10) 0%, transparent 70%)', filter: 'blur(40px)' }} />
 
       {/* ── Left: Text ── */}
-      <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10">
+      <div className="w-full lg:w-[48%] flex flex-col gap-6 z-10">
 
         <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
-          style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)' }}>
+          style={{ fontSize: 'clamp(2.5rem, 9vw, 5rem)' }}>
           <span style={{
             background: 'linear-gradient(90deg, #00ffff, #0088ff)',
             WebkitBackgroundClip: 'text',
@@ -117,7 +117,7 @@ export default function Hero({
       </div>
 
       {/* ── Right: Vinyl ── */}
-      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative lg:pl-8">
+      <div className="w-full lg:w-[48%] flex justify-center mt-2 lg:mt-0 relative lg:pl-0">
         {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-72 h-72 rounded-full"
@@ -127,25 +127,25 @@ export default function Hero({
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {
-              width: 315px; height: 260px;
+              width: 336px; height: 246px;
               display: flex; align-items: center; justify-content: center;
               overflow: visible;
             }
             .vinyl-scale-wrapper > * {
-              transform: scale(0.72);
+              transform: scale(0.60);
               transform-origin: center center;
               flex-shrink: 0;
             }
             @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 360px; height: 294px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.82); }
+              .vinyl-scale-wrapper { width: 403px; height: 274px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.72); }
             }
             @media (min-width: 640px) {
-              .vinyl-scale-wrapper { width: 395px; height: 324px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.9); }
+              .vinyl-scale-wrapper { width: 487px; height: 335px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.87); }
             }
-            @media (min-width: 1024px) {
-              .vinyl-scale-wrapper { width: 440px; height: 360px; }
+            @media (min-width: 1280px) {
+              .vinyl-scale-wrapper { width: 560px; height: 380px; }
               .vinyl-scale-wrapper > * { transform: scale(1); }
             }
           `}</style>

@@ -3,6 +3,11 @@
 body {
   background-color: #05000A;
   color: #ffffff;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 .neon-text-cyan {
