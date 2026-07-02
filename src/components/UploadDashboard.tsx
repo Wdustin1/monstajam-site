@@ -752,6 +752,12 @@ export default function UploadDashboard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/upload/community"
+              className="inline-flex items-center gap-2 rounded-md border border-cyan-300/25 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/50 hover:text-white"
+            >
+              Community
+            </a>
             <button
               type="button"
               onClick={() => {
