@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { CommunitySettingsSchema } from '../src/lib/community/communitySettings';
+import {
+  CommunitySettingsSchema,
+  normalizeStoredCommunitySettings,
+} from '../src/lib/community/communitySettings';
 
 const root = process.cwd();
 const schemaPath = join(root, 'prisma/schema.prisma');
@@ -39,6 +42,8 @@ test('community room settings validate safe links and expose public/admin helper
     "url.protocol === 'https:'",
     'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
     'getPublicCommunitySettings',
+    'normalizeStoredCommunitySettings',
+    'CommunitySettingsSchema.safeParse(input)',
     'saveCommunitySettings',
     'prisma.communitySettings.upsert',
     "id: 'primary'",
@@ -67,6 +72,33 @@ test('community room settings reject unsafe or malformed invite links', () => {
     });
     assert.equal(result.success, false, `${inviteUrl} must be rejected`);
   }
+});
+
+test('persisted room settings fail closed when Mongo contains unsafe or malformed data', () => {
+  const unsafe = normalizeStoredCommunitySettings({
+    platform: 'Broken platform',
+    roomName: 'x',
+    inviteUrl: 'javascript:alert(1)',
+    announcement: 'a'.repeat(1000),
+    isOpen: true,
+  });
+  assert.deepEqual(unsafe, {
+    platform: 'WhatsApp',
+    roomName: 'MonstaJam Community',
+    inviteUrl: null,
+    announcement: null,
+    isOpen: false,
+  });
+
+  const valid = normalizeStoredCommunitySettings({
+    platform: 'Discord',
+    roomName: 'MonstaJam Listening Room',
+    inviteUrl: 'https://discord.gg/example',
+    announcement: 'Talk about the new release.',
+    isOpen: true,
+  });
+  assert.equal(valid.inviteUrl, 'https://discord.gg/example');
+  assert.equal(valid.isOpen, true);
 });
 
 test('community room settings APIs separate public read from protected writes', () => {
@@ -102,6 +134,8 @@ test('backstage can manage the room and the public Talk tab consumes it', () => 
 
   for (const anchor of [
     '/api/community/settings',
+    'isValidRoomSettings',
+    "new URL(candidate.inviteUrl).protocol === 'https:'",
     'roomSettings',
     'roomSettings.announcement',
     'Join on',

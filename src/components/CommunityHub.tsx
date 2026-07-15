@@ -30,6 +30,30 @@ const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   isOpen: false,
 };
 
+function isValidRoomSettings(value: unknown): value is RoomSettings {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<RoomSettings>;
+  const validPlatform = ['WhatsApp', 'Discord', 'Telegram', 'Other'].includes(candidate.platform ?? '');
+  const validRoomName = typeof candidate.roomName === 'string' && candidate.roomName.length >= 2 && candidate.roomName.length <= 80;
+  const validAnnouncement = candidate.announcement === null || (typeof candidate.announcement === 'string' && candidate.announcement.length <= 180);
+  let validInviteUrl = candidate.inviteUrl === null;
+
+  if (typeof candidate.inviteUrl === 'string' && candidate.inviteUrl.length <= 500) {
+    try {
+      validInviteUrl = new URL(candidate.inviteUrl).protocol === 'https:';
+    } catch {
+      validInviteUrl = false;
+    }
+  }
+
+  return validPlatform
+    && validRoomName
+    && validAnnouncement
+    && validInviteUrl
+    && typeof candidate.isOpen === 'boolean'
+    && (!candidate.isOpen || Boolean(candidate.inviteUrl));
+}
+
 export default function CommunityHub() {
   const [activeTab, setActiveTab] = useState<CommunityTabId>('vote');
   const [roomSettings, setRoomSettings] = useState<RoomSettings>(DEFAULT_ROOM_SETTINGS);
@@ -46,8 +70,8 @@ export default function CommunityHub() {
           signal: controller.signal,
         });
         if (!response.ok) return;
-        const payload = (await response.json()) as RoomSettings;
-        if (typeof payload.roomName === 'string' && typeof payload.isOpen === 'boolean') {
+        const payload: unknown = await response.json();
+        if (isValidRoomSettings(payload)) {
           setRoomSettings(payload);
         }
       } catch (error) {

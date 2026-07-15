@@ -21,9 +21,9 @@ const SecureInviteUrlSchema = z
 export const CommunitySettingsSchema = z.object({
   platform: z.enum(['WhatsApp', 'Discord', 'Telegram', 'Other']),
   roomName: z.string().trim().min(2).max(80),
-  inviteUrl: z.union([SecureInviteUrlSchema, z.literal('')]).transform((value) => value || null),
+  inviteUrl: z.union([SecureInviteUrlSchema, z.literal(''), z.null()]).transform((value) => value || null),
   announcement: z
-    .union([z.string().trim().max(180), z.literal('')])
+    .union([z.string().trim().max(180), z.null()])
     .transform((value) => value || null),
   isOpen: z.boolean(),
 });
@@ -35,6 +35,29 @@ export type PublicCommunitySettings = {
   announcement: string | null;
   isOpen: boolean;
 };
+
+function closedDefaultSettings(): PublicCommunitySettings {
+  return {
+    platform: DEFAULT_PLATFORM,
+    roomName: DEFAULT_ROOM_NAME,
+    inviteUrl: null,
+    announcement: null,
+    isOpen: false,
+  };
+}
+
+export function normalizeStoredCommunitySettings(input: unknown): PublicCommunitySettings {
+  const parsed = CommunitySettingsSchema.safeParse(input);
+  if (!parsed.success) return closedDefaultSettings();
+
+  return {
+    platform: parsed.data.platform,
+    roomName: parsed.data.roomName,
+    inviteUrl: parsed.data.inviteUrl,
+    announcement: parsed.data.announcement,
+    isOpen: parsed.data.isOpen && Boolean(parsed.data.inviteUrl),
+  };
+}
 
 function safeEnvironmentInviteUrl() {
   const value = process.env.NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL?.trim();
@@ -57,13 +80,7 @@ export async function getPublicCommunitySettings(): Promise<PublicCommunitySetti
     };
   }
 
-  return {
-    platform: CommunitySettingsSchema.shape.platform.parse(stored.platform),
-    roomName: stored.roomName,
-    inviteUrl: stored.inviteUrl,
-    announcement: stored.announcement,
-    isOpen: stored.isOpen && Boolean(stored.inviteUrl),
-  };
+  return normalizeStoredCommunitySettings(stored);
 }
 
 export async function saveCommunitySettings(input: unknown): Promise<PublicCommunitySettings> {
@@ -87,11 +104,5 @@ export async function saveCommunitySettings(input: unknown): Promise<PublicCommu
     },
   });
 
-  return {
-    platform: CommunitySettingsSchema.shape.platform.parse(saved.platform),
-    roomName: saved.roomName,
-    inviteUrl: saved.inviteUrl,
-    announcement: saved.announcement,
-    isOpen: saved.isOpen && Boolean(saved.inviteUrl),
-  };
+  return normalizeStoredCommunitySettings(saved);
 }
