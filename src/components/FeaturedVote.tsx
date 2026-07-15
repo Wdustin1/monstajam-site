@@ -7,11 +7,11 @@ import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
 const STORAGE_KEY = 'monstajam-featured-vote';
 
 const VOTE_OPTIONS = [
-  { id: 'fallback-song', label: 'Song', description: 'Which track should get the next push?', voteCount: 0 },
-  { id: 'fallback-cover-art', label: 'Cover art', description: 'Which visual should represent the drop?', voteCount: 0 },
-  { id: 'fallback-remix', label: 'Remix', description: 'Which remix idea deserves a lane?', voteCount: 0 },
-  { id: 'fallback-artist', label: 'Artist', description: 'Which artist should MonstaJam spotlight?', voteCount: 0 },
-  { id: 'fallback-future-release', label: 'Future release', description: 'What should the community help shape next?', voteCount: 0 },
+  { id: 'fallback-song', label: 'Song', description: 'Open the first fan vote around a real MonstaJam track.', voteCount: 0 },
+  { id: 'fallback-cover-art', label: 'Cover art', description: 'Let fans choose the visual for an upcoming release.', voteCount: 0 },
+  { id: 'fallback-remix', label: 'Remix', description: 'Let fans choose which remix concept moves forward.', voteCount: 0 },
+  { id: 'fallback-artist-spotlight', label: 'Artist spotlight', description: 'Let fans choose who the community spotlights.', voteCount: 0 },
+  { id: 'fallback-future-release', label: 'Future release', description: 'Let fans choose which unreleased song comes next.', voteCount: 0 },
 ];
 
 type VoteOption = {
@@ -20,6 +20,8 @@ type VoteOption = {
   description: string;
   voteCount: number;
 };
+
+type LoadState = 'loading' | 'ready' | 'error';
 
 type FeaturedVotePayload = {
   campaign: {
@@ -41,15 +43,17 @@ export default function FeaturedVote() {
     if (typeof window === 'undefined') return null;
     return getOrCreateCommunityVisitorId();
   });
-  const [campaignTitle, setCampaignTitle] = useState('Featured Vote');
-  const [campaignQuestion, setCampaignQuestion] = useState('What should MonstaJam push next?');
-  const [campaignDescription, setCampaignDescription] = useState('Pick one direction for the active community campaign.');
+  const [campaignTitle, setCampaignTitle] = useState('Community Kickoff Vote');
+  const [campaignQuestion, setCampaignQuestion] = useState('What should fans vote on first?');
+  const [campaignDescription, setCampaignDescription] = useState('Choose the first music decision MonstaJam opens to the community.');
   const [options, setOptions] = useState<VoteOption[]>(VOTE_OPTIONS);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [totalVotes, setTotalVotes] = useState(0);
   const [creditsBalance, setCreditsBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [statusText, setStatusText] = useState('Loading the live vote…');
 
   useEffect(() => {
@@ -70,11 +74,12 @@ export default function FeaturedVote() {
 
         setCampaignTitle(payload.campaign.title);
         setCampaignQuestion(payload.campaign.question);
-        setCampaignDescription(payload.campaign.description || 'Pick one direction for the active community campaign.');
+        setCampaignDescription(payload.campaign.description || 'Choose the first music decision MonstaJam opens to the community.');
         setOptions(payload.options);
         setSelectedOptionId(payload.selectedOptionId);
         setTotalVotes(payload.totals.votes);
         setCreditsBalance(payload.rewards.creditsBalance);
+        setLoadState('ready');
         setStatusText(
           payload.selectedOptionId
             ? 'Vote saved on this device and counted in the live results.'
@@ -83,9 +88,9 @@ export default function FeaturedVote() {
       } catch (error) {
         console.error(error);
         if (!isCancelled) {
-          const savedLabel = localStorage.getItem(STORAGE_KEY);
-          setSelectedOptionId(savedLabel ? VOTE_OPTIONS.find((option) => option.label === savedLabel)?.id ?? null : null);
-          setStatusText('The live vote is temporarily offline. Try again in a moment.');
+          setSelectedOptionId(null);
+          setLoadState('error');
+          setStatusText('The live vote could not load. Voting is paused until the campaign reconnects.');
         }
       } finally {
         if (!isCancelled) setIsLoading(false);
@@ -94,10 +99,17 @@ export default function FeaturedVote() {
 
     loadFeaturedVote();
     return () => { isCancelled = true; };
-  }, [visitorId]);
+  }, [visitorId, loadAttempt]);
+
+  function retryFeaturedVote() {
+    setIsLoading(true);
+    setLoadState('loading');
+    setStatusText('Checking the live vote again…');
+    setLoadAttempt((attempt) => attempt + 1);
+  }
 
   async function handleVote(option: VoteOption) {
-    if (!visitorId || isLoading || isSaving) return;
+    if (!visitorId || isLoading || isSaving || loadState !== 'ready') return;
 
     const previousSelectedOptionId = selectedOptionId;
     const previousStoredLabel = localStorage.getItem(STORAGE_KEY);
@@ -117,7 +129,7 @@ export default function FeaturedVote() {
       const payload = (await response.json()) as FeaturedVotePayload;
       setCampaignTitle(payload.campaign.title);
       setCampaignQuestion(payload.campaign.question);
-      setCampaignDescription(payload.campaign.description || 'Pick one direction for the active community campaign.');
+      setCampaignDescription(payload.campaign.description || 'Choose the first music decision MonstaJam opens to the community.');
       setOptions(payload.options);
       setSelectedOptionId(payload.selectedOptionId);
       setTotalVotes(payload.totals.votes);
@@ -170,7 +182,7 @@ export default function FeaturedVote() {
                 key={option.id}
                 type="button"
                 aria-pressed={isSelected}
-                disabled={isLoading || isSaving}
+                disabled={isLoading || isSaving || loadState !== 'ready'}
                 onClick={() => handleVote(option)}
                 className={`group relative min-h-[132px] overflow-hidden rounded-2xl border p-4 text-left transition disabled:cursor-wait disabled:opacity-70 ${
                   index === options.length - 1 && options.length % 2 === 1 ? 'sm:col-span-2' : ''
@@ -207,10 +219,23 @@ export default function FeaturedVote() {
           <div
             role="status"
             aria-live="polite"
-            className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-5 text-gray-300"
+            className="flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-5 text-gray-300"
           >
-            {isSaving && <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin text-cyan-200" />}
-            {statusText}
+            <span className="flex items-center gap-2">
+              {(isSaving || loadState === 'loading') && (
+                <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin text-cyan-200" />
+              )}
+              {statusText}
+            </span>
+            {loadState === 'error' && (
+              <button
+                type="button"
+                onClick={retryFeaturedVote}
+                className="min-h-10 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-4 py-2 font-black uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-200/20"
+              >
+                Retry live vote
+              </button>
+            )}
           </div>
           <div className="rounded-xl border border-amber-200/20 bg-amber-200/[0.07] px-4 py-3 text-xs font-semibold leading-5 text-amber-100/90">
             +5 for your first vote. Switching picks earns no extra credits.

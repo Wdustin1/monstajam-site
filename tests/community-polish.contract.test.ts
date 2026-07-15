@@ -1,19 +1,22 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
 const root = process.cwd();
 const hub = readFileSync(join(root, 'src/components/CommunityHub.tsx'), 'utf8');
 const vote = readFileSync(join(root, 'src/components/FeaturedVote.tsx'), 'utf8');
+const voteContract = readFileSync(join(root, 'src/lib/community/featuredVote.ts'), 'utf8');
 const rewards = readFileSync(join(root, 'src/components/CommunityRewards.tsx'), 'utf8');
 const navbar = readFileSync(join(root, 'src/components/Navbar.tsx'), 'utf8');
 const footer = readFileSync(join(root, 'src/components/Footer.tsx'), 'utf8');
 const globals = readFileSync(join(root, 'src/app/globals.css'), 'utf8');
+const kickoffRolloutPath = join(root, 'scripts/community-kickoff-campaign.ts');
+const packagePath = join(root, 'package.json');
 
 test('community hub is a focused fan surface instead of an internal roadmap dashboard', () => {
   for (const anchor of [
-    'Shape the next drop.',
+    'Vote on the music. Build the community.',
     'data-section-id="community-status-rail"',
     'data-section-id="community-tabs"',
     'handleTabKeyDown',
@@ -38,6 +41,48 @@ test('community hub is a focused fan surface instead of an internal roadmap dash
   }
 });
 
+test('community voting copy explains the client intent in concrete language', () => {
+  for (const anchor of [
+    'Vote on the music. Build the community.',
+    'songs, cover art, remixes, artist spotlights, and upcoming releases',
+  ]) {
+    assert.ok(hub.includes(anchor), `CommunityHub should explain ${anchor}`);
+  }
+
+  for (const anchor of [
+    'Community Kickoff Vote',
+    'What should fans vote on first?',
+    'Choose the first music decision MonstaJam opens to the community.',
+    "label: 'Artist spotlight'",
+  ]) {
+    assert.ok(voteContract.includes(anchor), `featured vote contract should include ${anchor}`);
+  }
+
+  const publicVoteSources = `${hub}\n${vote}\n${voteContract}`;
+  for (const vagueCopy of ['What should MonstaJam push next?', 'next push', 'shaping what MonstaJam should push next']) {
+    assert.equal(publicVoteSources.includes(vagueCopy), false, `public voting copy should remove vague phrase: ${vagueCopy}`);
+  }
+});
+
+test('kickoff campaign rollout refuses destructive edits after voting starts', () => {
+  assert.ok(existsSync(kickoffRolloutPath), 'community kickoff rollout script should exist');
+  const rollout = readFileSync(kickoffRolloutPath, 'utf8');
+  const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { scripts?: Record<string, string> };
+
+  for (const anchor of [
+    'FEATURED_VOTE_CAMPAIGN',
+    'FEATURED_VOTE_OPTIONS',
+    'prisma.vote.count',
+    'assert.equal(voteCount, 0',
+    'prisma.$transaction',
+    'tx.voteOption.update',
+  ]) {
+    assert.ok(rollout.includes(anchor), `kickoff rollout should include ${anchor}`);
+  }
+
+  assert.equal(pkg.scripts?.['db:community-kickoff'], 'tsx scripts/community-kickoff-campaign.ts');
+});
+
 test('featured vote is compact, result-aware, and rolls back failed optimistic votes', () => {
   for (const anchor of [
     'previousSelectedOptionId',
@@ -48,6 +93,12 @@ test('featured vote is compact, result-aware, and rolls back failed optimistic v
     'sm:grid-cols-2',
     'votePercentage',
     'Live vote',
+    'const [loadState',
+    'const [loadAttempt',
+    "setLoadState('error')",
+    "loadState !== 'ready'",
+    'Retry live vote',
+    'setLoadAttempt',
   ]) {
     assert.ok(vote.includes(anchor), `FeaturedVote should include ${anchor}`);
   }
@@ -62,8 +113,20 @@ test('featured vote is compact, result-aware, and rolls back failed optimistic v
   }
 });
 
-test('rewards surface uses returned recent reward activity', () => {
-  for (const anchor of ['Recent activity', 'rewards.recentRewards', 'reward.reason', 'formatRewardDate']) {
+test('rewards surface uses returned activity and distinguishes loading, error, and empty states', () => {
+  for (const anchor of [
+    'Recent activity',
+    'rewards.recentRewards',
+    'reward.reason',
+    'formatRewardDate',
+    'const [rewardsState',
+    "rewardsState === 'loading'",
+    "rewardsState === 'error'",
+    'Activity is temporarily unavailable',
+    'Retry rewards',
+    'setRewardsAttempt',
+    'No rewards yet. Cast your first vote to start the activity log.',
+  ]) {
     assert.ok(rewards.includes(anchor), `CommunityRewards should render ${anchor}`);
   }
 });

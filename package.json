@@ -15,6 +15,7 @@
     "test:community-polish": "tsx --test tests/community-polish.contract.test.ts",
     "test:community-rewards-smoke": "tsx scripts/community-rewards-smoke.ts",
     "db:community-rewards": "tsx scripts/community-rewards-rollout.ts",
+    "db:community-kickoff": "tsx scripts/community-kickoff-campaign.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts"
   },
   "prisma": {

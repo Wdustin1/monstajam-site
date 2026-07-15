@@ -4,36 +4,36 @@ export const FEATURED_VOTE_SLUG = 'what-should-monstajam-push-next';
 
 export const FEATURED_VOTE_CAMPAIGN = {
   slug: FEATURED_VOTE_SLUG,
-  title: 'Featured Vote',
-  question: 'What should MonstaJam push next?',
+  title: 'Community Kickoff Vote',
+  question: 'What should fans vote on first?',
   description:
-    'The first community campaign for shaping what MonstaJam should push next.',
+    'Choose the first music decision MonstaJam opens to the community. Future campaigns can feature real songs, cover art, remixes, artist spotlights, and upcoming releases.',
 } as const;
 
 export const FEATURED_VOTE_OPTIONS = [
   {
     label: 'Song',
-    description: 'Which track should get the next push?',
+    description: 'Open the first fan vote around a real MonstaJam track.',
     sortOrder: 1,
   },
   {
     label: 'Cover art',
-    description: 'Which visual should represent the drop?',
+    description: 'Let fans choose the visual for an upcoming release.',
     sortOrder: 2,
   },
   {
     label: 'Remix',
-    description: 'Which remix idea deserves a lane?',
+    description: 'Let fans choose which remix concept moves forward.',
     sortOrder: 3,
   },
   {
-    label: 'Artist',
-    description: 'Which artist should MonstaJam spotlight?',
+    label: 'Artist spotlight',
+    description: 'Let fans choose who the community spotlights.',
     sortOrder: 4,
   },
   {
     label: 'Future release',
-    description: 'What should the community help shape next?',
+    description: 'Let fans choose which unreleased song comes next.',
     sortOrder: 5,
   },
 ] as const;

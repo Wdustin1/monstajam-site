@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, Coins, History } from 'lucide-react';
 import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
 
+type RewardsState = 'loading' | 'ready' | 'error';
+
 type RewardPayload = {
   creditsBalance: number;
   voteReward: number;
@@ -26,6 +28,8 @@ export default function CommunityRewards() {
     return getOrCreateCommunityVisitorId();
   });
   const [rewards, setRewards] = useState<RewardPayload | null>(null);
+  const [rewardsState, setRewardsState] = useState<RewardsState>('loading');
+  const [rewardsAttempt, setRewardsAttempt] = useState(0);
   const [status, setStatus] = useState('Loading your credit balance…');
 
   useEffect(() => {
@@ -42,17 +46,28 @@ export default function CommunityRewards() {
         const payload = (await response.json()) as RewardPayload;
         if (!cancelled) {
           setRewards(payload);
+          setRewardsState('ready');
           setStatus('Saved to this browser for now. Community accounts can connect balances later.');
         }
       } catch (error) {
         console.error(error);
-        if (!cancelled) setStatus('Credit balance is temporarily unavailable. Try again in a moment.');
+        if (!cancelled) {
+          setRewardsState('error');
+          setStatus('Credit balance is temporarily unavailable. Nothing has been assumed about your history.');
+        }
       }
     }
 
     loadRewards();
     return () => { cancelled = true; };
-  }, [visitorId]);
+  }, [visitorId, rewardsAttempt]);
+
+  function retryRewards() {
+    setRewards(null);
+    setRewardsState('loading');
+    setStatus('Checking your balance again…');
+    setRewardsAttempt((attempt) => attempt + 1);
+  }
 
   return (
     <section data-section-id="community-rewards" className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
@@ -95,7 +110,22 @@ export default function CommunityRewards() {
             <h2 className="text-sm font-black uppercase tracking-[0.15em] text-white">Recent activity</h2>
           </div>
 
-          {rewards && rewards.recentRewards.length > 0 ? (
+          {rewardsState === 'loading' ? (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-sm leading-6 text-gray-500">
+              Loading recent activity…
+            </div>
+          ) : rewardsState === 'error' ? (
+            <div className="mt-4 rounded-2xl border border-amber-200/20 bg-amber-200/[0.06] px-4 py-5">
+              <p className="text-sm leading-6 text-amber-50">Activity is temporarily unavailable. We are not treating that as an empty history.</p>
+              <button
+                type="button"
+                onClick={retryRewards}
+                className="mt-3 min-h-10 rounded-full border border-amber-100/25 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 hover:bg-amber-100/10"
+              >
+                Retry rewards
+              </button>
+            </div>
+          ) : rewards && rewards.recentRewards.length > 0 ? (
             <div className="mt-4 divide-y divide-white/10">
               {rewards.recentRewards.map((reward) => (
                 <div key={`${reward.createdAt}-${reward.reason}`} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">

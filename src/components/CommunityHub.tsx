@@ -59,17 +59,17 @@ export default function CommunityHub() {
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
               MonstaJam Community
             </div>
-            <h1 className="mt-5 max-w-3xl text-4xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-5xl md:text-7xl">
-              Shape the next drop.
+            <h1 className="mt-5 max-w-4xl text-4xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-5xl md:text-7xl">
+              Vote on the music. Build the community.
             </h1>
-            <p className="mt-5 max-w-2xl text-sm leading-7 text-gray-300 sm:text-base">
-              Listen with the crowd, cast your vote, and earn credit for showing up. MonstaJam puts fans inside the release process—not at the end of it.
+            <p className="mt-5 max-w-3xl text-sm leading-7 text-gray-300 sm:text-base">
+              MonstaJam is a home base where fans and AI music creators can vote on songs, cover art, remixes, artist spotlights, and upcoming releases—then join the conversation around every decision.
             </p>
             <a
               href="#community-tabs"
               className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-cyan-200 px-5 py-3 text-xs font-black uppercase tracking-[0.17em] text-[#041014] no-underline transition hover:bg-white"
             >
-              Enter the live vote
+              Choose the first vote
               <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </a>
           </div>

@@ -16,9 +16,9 @@ test('Community Hub component exists as a focused fan participation surface', ()
   const source = readFileSync(componentPath, 'utf8');
   const requiredAnchors = [
     'data-section-id="community-hub"',
-    'Shape the next drop.',
+    'Vote on the music. Build the community.',
     'MonstaJam Community',
-    'Enter the live vote',
+    'Choose the first vote',
     'Join the conversation',
     'Listen first',
     'Premium listening is on the way',
@@ -94,12 +94,12 @@ test('Featured Vote module exists with local frontend vote options', () => {
   const requiredFeaturedVoteAnchors = [
     "'use client'",
     'data-section-id="featured-vote"',
-    'Featured Vote',
-    'What should MonstaJam push next?',
+    'Community Kickoff Vote',
+    'What should fans vote on first?',
     "label: 'Song'",
     "label: 'Cover art'",
     "label: 'Remix'",
-    "label: 'Artist'",
+    "label: 'Artist spotlight'",
     "label: 'Future release'",
     'monstajam-featured-vote',
     'localStorage.getItem',
