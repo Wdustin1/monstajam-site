@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePlayer } from '@/context/PlayerContext';
 import { proxyCoverUrl } from '@/lib/proxy-cover';
 import type { TrackWithCredits } from './MusicLibrary';
@@ -12,8 +12,7 @@ interface TrackDetailProps {
 }
 
 export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps) {
-  const [showLyrics, setShowLyrics] = useState(false);
-  const { toggle, currentTrack, isPlaying, setQueue, play } = usePlayer();
+  const { toggle, currentTrack, isPlaying, setQueue } = usePlayer();
 
   const handlePlay = () => {
     // Set queue with all tracks so Next/Prev work
@@ -30,12 +29,12 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
     : '0 0 10px rgba(255,0,255,0.8), 0 0 20px rgba(255,0,255,0.4)';
 
   return (
-    <main className="flex-grow container mx-auto px-5 md:px-8 pt-24 md:pt-28 pb-36 md:pb-40 z-10 flex flex-col lg:flex-row gap-8 lg:gap-24 items-start justify-center max-w-7xl">
+    <main id="main-content" tabIndex={-1} className="flex-grow container mx-auto px-5 md:px-8 pt-24 md:pt-28 pb-36 md:pb-40 z-10 flex flex-col lg:flex-row gap-8 lg:gap-24 items-start justify-center max-w-7xl">
       {/* Back link */}
       <div className="absolute top-24 left-8 z-20 hidden lg:block">
         <Link
           href="/#library"
-          className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+          className="flex min-h-11 items-center gap-2 py-3 text-sm text-gray-400 transition-colors hover:text-white"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M10 19l-7-7m0 0l7-7m-7 7h18" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -55,10 +54,12 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
         >
           <div className={`w-full aspect-square rounded-[calc(1rem-4px)] overflow-hidden relative ${!track.coverUrl ? track.color : ''} flex items-center justify-center`}>
             {track.coverUrl ? (
-              <img
+              <Image
                 src={proxyCoverUrl(track.coverUrl)}
                 alt={`${track.title} cover art`}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
               />
             ) : (
               <div className="flex flex-col items-center gap-3 opacity-60">
@@ -77,7 +78,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
         {/* Mobile back link */}
         <Link
           href="/#library"
-          className="lg:hidden text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+          className="-my-3 flex min-h-11 items-center gap-2 py-3 text-sm text-gray-400 transition-colors hover:text-white lg:hidden"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M10 19l-7-7m0 0l7-7m-7 7h18" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -108,10 +109,10 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
           </h2>
         </div>
 
-        {/* Story */}
+        {/* Lyrics */}
         {track.story && (
           <div className="flex flex-col gap-3">
-            <h3 className="text-lg font-bold text-white uppercase tracking-wider">The Story</h3>
+            <h3 className="text-lg font-bold text-white uppercase tracking-wider">Lyrics</h3>
             <p className="text-[#a0a0a0] text-sm leading-relaxed max-w-2xl">{track.story}</p>
           </div>
         )}
@@ -145,7 +146,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
                 : <path clipRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" fillRule="evenodd" />
               }
             </svg>
-            {isCurrentTrack && isPlaying ? 'Pause' : 'Play Now'}
+            {isCurrentTrack && isPlaying ? 'Pause' : 'Play on MonstaJam'}
           </button>
 
           {track.spotifyUrl && track.spotifyUrl !== '#' && (
@@ -179,36 +180,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
           )}
         </div>
 
-        {/* Exclusive Content — only render if there's something to show */}
-        {track.story && (
-          <div className="flex flex-col gap-4 mt-6">
-            <h3 className="text-lg font-bold text-white uppercase tracking-wider">Exclusive Content</h3>
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => setShowLyrics((v) => !v)}
-                className="bg-transparent text-[#00ffff] font-bold py-3 px-8 rounded-full text-sm tracking-wider transition-all"
-                style={{
-                  border: '2px solid #00ffff',
-                  boxShadow: '0 0 10px rgba(0,255,255,0.4), inset 0 0 10px rgba(0,255,255,0.2)',
-                }}
-              >
-                {showLyrics ? 'Hide Story' : 'Read Story'}
-              </button>
-            </div>
-            {showLyrics && (
-              <div
-                className="rounded-2xl p-6 text-sm text-gray-300 leading-relaxed whitespace-pre-line"
-                style={{
-                  background: 'rgba(0,255,255,0.04)',
-                  border: '1px solid rgba(0,255,255,0.15)',
-                  boxShadow: 'inset 0 0 20px rgba(0,255,255,0.05)',
-                }}
-              >
-                {track.story}
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
     </main>
   );

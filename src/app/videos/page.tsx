@@ -4,8 +4,9 @@ import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
 
 export const metadata = {
-  title: 'Music Video Gallery — MonstaJam',
+  title: 'Music Video Gallery',
   description: 'Watch exclusive music videos and live sessions.',
+  alternates: { canonical: '/videos' },
 };
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export default async function VideosPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#05000A' }}>
       <Navbar activeLink="videos" />
-      <main id="main-content" className="flex-grow px-6 md:px-12 py-8 max-w-[1600px] mx-auto w-full pt-28">
+      <main id="main-content" tabIndex={-1} className="flex-grow px-6 md:px-12 py-8 max-w-[1600px] mx-auto w-full pt-28">
         <VideoGallery videos={videos} />
       </main>
       <Footer />

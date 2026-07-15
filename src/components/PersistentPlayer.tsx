@@ -20,7 +20,7 @@ function formatTime(seconds: number) {
 export default function PersistentPlayer() {
   const {
     currentTrack, isPlaying, progress, currentTime, duration,
-    volume, pause, play, toggle, seek, setVolume,
+    volume, pause, play, seek, setVolume,
     next, prev, shuffleOn, repeatOn, toggleShuffle, toggleRepeat,
   } = usePlayer();
 
@@ -56,7 +56,20 @@ export default function PersistentPlayer() {
 
   const handlePlayPause = () => {
     if (!currentTrack) return;
-    isPlaying ? pause() : play(currentTrack);
+    if (isPlaying) pause();
+    else play(currentTrack);
+  };
+
+  const handleSeekKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    let nextProgress = progress;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') nextProgress += 0.05;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') nextProgress -= 0.05;
+    else if (event.key === 'Home') nextProgress = 0;
+    else if (event.key === 'End') nextProgress = 1;
+    else return;
+
+    event.preventDefault();
+    seek(Math.min(1, Math.max(0, nextProgress)));
   };
 
   const hasTrack = !!currentTrack;
@@ -70,7 +83,9 @@ export default function PersistentPlayer() {
   };
 
   return (
-    <footer
+    <div
+      role="region"
+      aria-label="Audio player"
       className="fixed bottom-0 left-0 w-full z-50"
       style={{
         background: 'rgba(5, 0, 10, 0.96)',
@@ -80,29 +95,38 @@ export default function PersistentPlayer() {
         boxShadow: '0 -8px 40px rgba(0,0,0,0.7), 0 -1px 0 rgba(255,0,170,0.2)',
       }}
     >
-      {/* ── Progress bar — clickable ── */}
+      {/* ── Progress bar — 24px hit area with a 3px visual track ── */}
       <div
-        className="absolute top-0 left-0 w-full h-[3px] cursor-pointer group"
-        style={{ background: 'rgba(255,255,255,0.06)' }}
+        className="group absolute -top-5 left-0 h-6 w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+        role="slider"
+        tabIndex={0}
+        aria-label="Playback position"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+        onKeyDown={handleSeekKeyDown}
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           seek((e.clientX - rect.left) / rect.width);
         }}
       >
-        <div
-          className="absolute top-0 left-0 h-full transition-none"
-          style={{
-            width: `${progress * 100}%`,
-            background: 'linear-gradient(90deg, #00e5ff, #7c3aed, #ff00aa)',
-            boxShadow: '0 0 10px rgba(176,38,255,0.9)',
-          }}
-        />
-        {hasTrack && (
+        <div className="absolute bottom-0 left-0 h-[3px] w-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ left: `calc(${progress * 100}% - 6px)`, boxShadow: '0 0 8px rgba(255,0,170,0.8)' }}
+            className="absolute left-0 top-0 h-full transition-none"
+            style={{
+              width: `${progress * 100}%`,
+              background: 'linear-gradient(90deg, #00e5ff, #7c3aed, #ff00aa)',
+              boxShadow: '0 0 10px rgba(176,38,255,0.9)',
+            }}
           />
-        )}
+          {hasTrack && (
+            <div
+              className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              style={{ left: `calc(${progress * 100}% - 6px)`, boxShadow: '0 0 8px rgba(255,0,170,0.8)' }}
+            />
+          )}
+        </div>
       </div>
 
       {/* ── MOBILE LAYOUT (< md) ── */}
@@ -133,13 +157,13 @@ export default function PersistentPlayer() {
           {/* Prev / Play / Next */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={prev} disabled={!hasTrack} aria-label="Previous"
-              className="text-gray-400 hover:text-white transition-colors disabled:opacity-30">
+              className="grid h-10 w-10 place-items-center text-gray-400 transition-colors hover:text-white disabled:opacity-30">
               <SkipBack className="w-5 h-5 fill-current" />
             </button>
             <button
               onClick={handlePlayPause}
               disabled={!hasTrack}
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 disabled:opacity-30"
+              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 disabled:opacity-30"
               aria-label={isPlaying ? 'Pause' : 'Play'}
               style={{
                 background: 'linear-gradient(135deg, #00e5ff, #7c3aed)',
@@ -152,7 +176,7 @@ export default function PersistentPlayer() {
               }
             </button>
             <button onClick={next} disabled={!hasTrack} aria-label="Next"
-              className="text-gray-400 hover:text-white transition-colors disabled:opacity-30">
+              className="grid h-10 w-10 place-items-center text-gray-400 transition-colors hover:text-white disabled:opacity-30">
               <SkipForward className="w-5 h-5 fill-current" />
             </button>
           </div>
@@ -235,7 +259,7 @@ export default function PersistentPlayer() {
 
         {/* RIGHT: Controls + Volume */}
         <div className="flex items-center justify-end gap-4 w-1/4">
-          <button onClick={toggleShuffle} aria-label="Shuffle" className="transition-colors"
+          <button onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={shuffleOn} className="p-2 transition-colors"
             style={{ color: shuffleOn ? '#00e5ff' : '#4b5563' }}>
             <Shuffle className="w-4 h-4" />
           </button>
@@ -264,7 +288,7 @@ export default function PersistentPlayer() {
             className="text-gray-400 hover:text-white transition-colors disabled:opacity-30">
             <SkipForward className="w-5 h-5 fill-current" />
           </button>
-          <button onClick={toggleRepeat} aria-label="Repeat" className="transition-colors"
+          <button onClick={toggleRepeat} aria-label="Repeat" aria-pressed={repeatOn} className="p-2 transition-colors"
             style={{ color: repeatOn ? '#00e5ff' : '#4b5563' }}>
             <Repeat className="w-4 h-4" />
           </button>
@@ -296,6 +320,6 @@ export default function PersistentPlayer() {
           </div>
         </div>
       </div>
-    </footer>
+    </div>
   );
 }

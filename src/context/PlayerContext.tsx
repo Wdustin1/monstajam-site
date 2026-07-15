@@ -64,7 +64,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolumeState] = useState(0.75);
-  const [queue, setQueueState] = useState<PlayerTrack[]>([]);
+  const [, setQueueState] = useState<PlayerTrack[]>([]);
   const [shuffleOn, setShuffleOn] = useState(false);
   const [repeatOn, setRepeatOn] = useState(false);
 
@@ -225,7 +225,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setTimeout(() => play(q[nextIdx]), 0);
       return q;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shuffleOn, play]);
 
   const prevTrack = useCallback(() => {
@@ -245,7 +244,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setTimeout(() => play(q[prevIdx]), 0);
       return q;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [play]);
 
   const toggleShuffle = () => setShuffleOn(v => !v);

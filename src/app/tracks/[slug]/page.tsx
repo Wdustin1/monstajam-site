@@ -11,8 +11,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const track = await prisma.track.findUnique({ where: { slug } });
   if (!track) return {};
   return {
-    title: `${track.title}${track.subtitle ? ` (${track.subtitle})` : ''} — MonstaJam`,
+    title: `${track.title}${track.subtitle ? ` (${track.subtitle})` : ''}`,
     description: track.story?.slice(0, 160) ?? 'Exclusive unreleased content on MonstaJam.',
+    alternates: { canonical: `/tracks/${slug}` },
   };
 }
 

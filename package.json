@@ -18,9 +18,6 @@
     "db:community-rewards": "tsx scripts/community-rewards-rollout.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.99.3",
@@ -29,7 +26,7 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
     "mongodb": "^7.1.1",
-    "next": "16.2.0",
+    "next": "16.2.10",
     "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -42,9 +39,14 @@
     "@types/react-dom": "^19",
     "dotenv": "^17.3.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.0",
+    "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.1",
     "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.10"
+    }
   }
 }

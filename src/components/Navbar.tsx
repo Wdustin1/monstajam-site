@@ -9,7 +9,7 @@ interface NavbarProps {
 }
 
 const LINKS = [
-  { label: 'Beats',         href: '/',          key: 'home' },
+  { label: 'Home', href: '/', key: 'home' },
   { label: 'Music',         href: '/#library',  key: 'music' },
   { label: 'Community',     href: '/community', key: 'community' },
   { label: 'Genres',        href: '/genres',    key: 'genres' },
@@ -23,7 +23,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
     <header className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-[#050505]/90 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-5">
 
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-3">
+      <Link href="/" className="flex min-h-11 items-center gap-3">
         <Image
           src="/monstajam-logo.png"
           alt="MonstaJam"
@@ -45,10 +45,10 @@ export default function Navbar({ activeLink }: NavbarProps) {
             <Link
               key={key}
               href={href}
-              className={`transition-colors pb-1 ${
+              className={`flex min-h-11 items-center border-b-2 transition-colors ${
                 isActive
-                  ? 'text-[#00e5ff] border-b-2 border-[#00e5ff]'
-                  : 'text-gray-300 hover:text-white border-b-2 border-transparent'
+                  ? 'text-[#00e5ff] border-[#00e5ff]'
+                  : 'text-gray-300 hover:text-white border-transparent'
               }`}
             >
               {label}

@@ -4,7 +4,7 @@ export default function Loading() {
       {/* Navbar skeleton */}
       <div className="w-full h-[73px] bg-[#050505]/90 border-b border-white/5 fixed top-0 z-50" />
 
-      <main className="flex-grow pt-24 max-w-7xl mx-auto px-8 w-full">
+      <main id="main-content" tabIndex={-1} className="flex-grow pt-24 max-w-7xl mx-auto px-8 w-full">
         {/* Hero skeleton */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-12 py-16 min-h-[calc(100vh-96px)]">
           <div className="w-full lg:w-1/2 flex flex-col gap-6">

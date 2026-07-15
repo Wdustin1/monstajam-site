@@ -270,7 +270,7 @@ export default function CommunityAdminDashboard() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white sm:px-6 lg:px-8">
+    <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white [&_button]:min-h-11 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(0,199,190,0.14),transparent_28%),radial-gradient(circle_at_86%_2%,rgba(255,80,130,0.12),transparent_24%)]" />
       <div className="relative mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
@@ -300,9 +300,9 @@ export default function CommunityAdminDashboard() {
           </div>
         </header>
 
-        {loading && <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.04] p-6 text-slate-300">Loading community summary…</div>}
-        {error && <div className="mt-6 rounded-xl border border-rose-300/20 bg-rose-300/10 p-6 text-rose-100">{error}</div>}
-        {actionMessage && <div className="mt-6 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-6 text-emerald-100">{actionMessage}</div>}
+        {loading && <div role="status" className="mt-6 rounded-xl border border-white/10 bg-white/[0.04] p-6 text-slate-300">Loading community summary…</div>}
+        {error && <div role="alert" className="mt-6 rounded-xl border border-rose-300/20 bg-rose-300/10 p-6 text-rose-100">{error}</div>}
+        {actionMessage && <div role="status" aria-live="polite" className="mt-6 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-6 text-emerald-100">{actionMessage}</div>}
 
         {summary && (
           <div className="mt-6 space-y-6">

@@ -36,7 +36,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05000A]">
+    <main id="main-content" tabIndex={-1} className="min-h-screen flex items-center justify-center bg-[#05000A]">
       {/* Ambient glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[120px]" />
@@ -71,6 +71,9 @@ export default function AdminLoginPage() {
           <input
             id="password"
             type="password"
+            autoComplete="current-password"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'login-error' : undefined}
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Enter admin password"
@@ -78,7 +81,7 @@ export default function AdminLoginPage() {
             className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
           />
           {error && (
-            <p className="text-red-400 text-sm">{error}</p>
+            <p id="login-error" role="alert" className="text-red-400 text-sm">{error}</p>
           )}
         </div>
 
@@ -90,6 +93,6 @@ export default function AdminLoginPage() {
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
       </form>
-    </div>
+    </main>
   );
 }

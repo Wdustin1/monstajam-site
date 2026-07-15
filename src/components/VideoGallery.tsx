@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Play, Share2, Check, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { tryCopyText } from '@/lib/copyText';
 
 interface Video {
   id: string;
@@ -19,19 +21,46 @@ interface VideoGalleryProps {
   videos: Video[];
 }
 
+const SHARE_URL = 'https://monstajam-site.vercel.app/videos';
+
+function copyWithSelection(text: string): boolean {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    return typeof document.execCommand === 'function' && document.execCommand('copy');
+  } finally {
+    textarea.remove();
+  }
+}
+
 export default function VideoGallery({ videos }: VideoGalleryProps) {
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState(false);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
   const handleShare = async () => {
-    const url = 'https://monstajam-site.vercel.app/videos';
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      prompt('Copy this URL:', url);
+    const url = SHARE_URL;
+    setShareError(false);
+    const didCopy = await tryCopyText(url, {
+      clipboardWrite: navigator.clipboard
+        ? (text) => navigator.clipboard.writeText(text)
+        : undefined,
+      fallbackCopy: copyWithSelection,
+    });
+
+    if (!didCopy) {
+      setShareError(true);
+      return;
     }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
@@ -52,24 +81,41 @@ export default function VideoGallery({ videos }: VideoGalleryProps) {
           }}>GALLERY</span>
         </h1>
 
-        <div className="flex gap-4 flex-shrink-0">
+        <div className="flex flex-shrink-0 flex-col items-start gap-2 md:items-end">
           <button
             onClick={handleShare}
-            className="px-6 py-2 rounded-full flex items-center gap-2 font-medium text-sm text-white transition-all hover:bg-fuchsia-500/10"
+            className="flex min-h-11 items-center gap-2 rounded-full px-6 py-2 text-sm font-medium text-white transition-all hover:bg-fuchsia-500/10"
             style={{ border: '2px solid #ff00ff', boxShadow: '0 0 10px rgba(255,0,255,0.4), inset 0 0 10px rgba(255,0,255,0.15)' }}
           >
             {copied ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
             {copied ? 'Copied!' : 'Share'}
           </button>
+          <span className="sr-only" role="status" aria-live="polite">
+            {copied ? 'Video gallery link copied.' : ''}
+          </span>
+          {shareError && (
+            <label role="alert" className="flex flex-col gap-1 text-xs text-amber-200">
+              Copy this link
+              <input
+                readOnly
+                value={SHARE_URL}
+                onFocus={(event) => event.currentTarget.select()}
+                className="w-64 max-w-[80vw] rounded-md border border-amber-200/30 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-amber-200"
+              />
+            </label>
+          )}
         </div>
       </section>
 
       {/* ── Grid or empty state ── */}
       {videos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-gray-600">
+        <div className="flex flex-col items-center justify-center py-24 text-center text-gray-600 sm:py-32">
           <Play className="w-16 h-16 mb-4 opacity-20" />
-          <p className="text-lg font-semibold text-gray-500">No videos yet</p>
-          <p className="text-sm mt-1">Add videos via the admin dashboard</p>
+          <p className="text-lg font-semibold text-gray-300">Videos are on the way</p>
+          <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">Until the first visual drops, the complete music library is ready to play.</p>
+          <Link href="/#library" className="mt-6 inline-flex min-h-11 items-center rounded-full border border-cyan-300/40 px-5 py-3 text-sm font-bold text-cyan-100 no-underline transition hover:bg-cyan-300/10">
+            Explore the music library
+          </Link>
         </div>
       ) : (
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

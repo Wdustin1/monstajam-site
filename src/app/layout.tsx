@@ -10,8 +10,25 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "MonstaJam - Unreleased Beats",
-  description: "Discover the beats and tracks that never made it to the mainstream. Curated for true fans.",
+  metadataBase: new URL('https://monstajam-site.vercel.app'),
+  title: {
+    default: 'MonstaJam',
+    template: '%s | MonstaJam',
+  },
+  description: 'Exclusive music, videos, and community decisions by Monsta Jam.',
+  openGraph: {
+    type: 'website',
+    siteName: 'MonstaJam',
+    title: 'MonstaJam',
+    description: 'Exclusive music, videos, and community decisions by Monsta Jam.',
+    images: [{ url: '/monstajam-logo.png', width: 400, height: 400, alt: 'MonstaJam' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'MonstaJam',
+    description: 'Exclusive music, videos, and community decisions by Monsta Jam.',
+    images: ['/monstajam-logo.png'],
+  },
   icons: {
     icon: '/favicon.png',
     apple: '/favicon.png',

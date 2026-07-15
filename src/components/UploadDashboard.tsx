@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import {
   AlertTriangle,
@@ -271,6 +271,7 @@ function Toggle({
     <button
       type="button"
       onClick={() => onChange(!checked)}
+      aria-pressed={checked}
       className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-white/20"
     >
       <span>
@@ -325,7 +326,7 @@ function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void 
   if (!toast) return null;
 
   return (
-    <div className="fixed right-5 top-5 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-white/10 bg-slate-950/95 p-4 text-sm shadow-2xl shadow-black/40">
+    <div role="status" aria-live="polite" className="fixed right-5 top-5 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-white/10 bg-slate-950/95 p-4 text-sm shadow-2xl shadow-black/40">
       {toast.type === 'success' ? (
         <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-300" />
       ) : (
@@ -345,25 +346,38 @@ function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!confirm) return;
+    cancelButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [confirm, onCancel]);
+
   if (!confirm) return null;
 
   const title = confirm.kind === 'track' ? confirm.item.title : confirm.item.title;
   const noun = confirm.kind === 'track' ? 'track' : 'video';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4">
-      <div className="w-full max-w-md rounded-lg border border-rose-400/30 bg-slate-950 p-6 shadow-2xl shadow-black/60">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" className="w-full max-w-md rounded-lg border border-rose-400/30 bg-slate-950 p-6 shadow-2xl shadow-black/60">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-md bg-rose-400/10 text-rose-300">
             <Trash2 className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Delete {noun}</h3>
-            <p className="mt-1 text-sm text-slate-400">This removes &quot;{title}&quot; from the database.</p>
+            <h3 id="delete-dialog-title" className="text-lg font-semibold text-white">Delete {noun}</h3>
+            <p id="delete-dialog-description" className="mt-1 text-sm text-slate-400">This permanently removes &quot;{title}&quot; from the database.</p>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
             className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white"
@@ -735,7 +749,7 @@ export default function UploadDashboard() {
   const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
 
   return (
-    <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white sm:px-6 lg:px-8">
+    <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white [&_button]:min-h-11 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(0,199,190,0.14),transparent_28%),radial-gradient(circle_at_86%_2%,rgba(255,80,130,0.12),transparent_24%)]" />
       <div className="relative mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">

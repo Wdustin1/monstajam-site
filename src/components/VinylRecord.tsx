@@ -272,11 +272,16 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
 
       {/* ── Play / Pause ── OUTSIDE preserve-3d wrapper so pointer events work */}
       <button
+        type="button"
         onClick={handleToggle}
+        disabled={!displayTrack}
+        aria-label={`${isPlaying ? 'Pause' : 'Play'} ${displayTrack?.title ?? 'featured track'}`}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
         style={{
           position: 'absolute',
-          top: R - 22, left: R - 22,
-          width: 44, height: 44, borderRadius: '50%',
+          top: R - 33, left: R - 33,
+          width: 66, height: 66, borderRadius: '50%',
           background: isPlaying ? 'rgba(255,0,170,0.20)' : 'rgba(0,220,255,0.16)',
           border: `2px solid ${isPlaying ? 'rgba(255,0,170,0.75)' : 'rgba(0,220,255,0.65)'}`,
           boxShadow: isPlaying
@@ -285,9 +290,9 @@ export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', zIndex: 30,
           backdropFilter: 'blur(6px)',
-          opacity: hovered ? 1 : 0,
-          pointerEvents: hovered ? 'auto' : 'none',
-          transition: 'opacity 0.25s ease, box-shadow 0.3s ease, background 0.3s ease',
+          opacity: isPlaying || hovered ? 1 : 0.82,
+          transform: isPlaying || hovered ? 'scale(1)' : 'scale(0.94)',
+          transition: 'opacity 0.25s ease, transform 0.25s ease, box-shadow 0.3s ease, background 0.3s ease',
         }}
       >
         {isPlaying

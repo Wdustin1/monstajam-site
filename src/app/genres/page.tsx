@@ -4,8 +4,9 @@ import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
 
 export const metadata = {
-  title: 'Browse Genres — MonstaJam',
+  title: 'Browse Genres',
   description: 'Browse exclusive tracks by genre on MonstaJam.',
+  alternates: { canonical: '/genres' },
 };
 
 export const dynamic = 'force-dynamic';
@@ -20,9 +21,9 @@ export default async function GenresPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#05000A' }}>
       <Navbar activeLink="genres" />
-      <div className="flex-grow pt-24 pb-32">
+      <main id="main-content" tabIndex={-1} className="flex-grow pt-24 pb-32">
         <GenreBrowser tracks={tracks} />
-      </div>
+      </main>
       <Footer />
     </div>
   );

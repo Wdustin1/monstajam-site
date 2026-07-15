@@ -41,21 +41,33 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const display = value === 'All' ? label : value;
+  const listId = `library-${label.toLowerCase()}-options`;
 
   // Close on outside click
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handlePointer = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [open]);
 
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={listId}
         className="flex items-center justify-between px-4 py-3 rounded-full bg-[#111118] border border-white/10 hover:border-white/20 transition-colors text-sm gap-3 min-w-[104px]"
         style={{ backdropFilter: 'blur(8px)' }}
       >
@@ -63,10 +75,10 @@ function Dropdown({ label, options, value, onChange }: DropdownProps) {
         <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl min-w-full"
+        <div id={listId} role="listbox" aria-label={`${label} filter`} className="absolute top-full mt-2 left-0 bg-[#0e0e14] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl min-w-full"
           style={{ backdropFilter: 'blur(12px)' }}>
           {options.map((opt) => (
-            <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
+            <button key={opt} type="button" role="option" aria-selected={value === opt} onClick={() => { onChange(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${value === opt ? 'text-[#00e5ff]' : 'text-gray-300'}`}>
               {opt}
             </button>
@@ -146,9 +158,9 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Escape' && setSearch('')}
               placeholder="Search tracks..."
-              className="bg-transparent border-none outline-none focus:ring-0 text-white placeholder-gray-600 w-full ml-3 text-sm" />
+              className="-my-3 ml-3 min-h-11 w-full border-none bg-transparent py-3 text-sm text-white outline-none placeholder-gray-600 focus:ring-0" />
             {search && (
-              <button onClick={() => setSearch('')} className="ml-2 text-gray-500 hover:text-white transition-colors flex-shrink-0" aria-label="Clear search">
+              <button onClick={() => setSearch('')} className="-my-3 ml-2 grid h-11 w-11 flex-shrink-0 place-items-center text-gray-500 transition-colors hover:text-white" aria-label="Clear search">
                 <X className="w-4 h-4" />
               </button>
             )}

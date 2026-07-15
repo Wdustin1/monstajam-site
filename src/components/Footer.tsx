@@ -41,7 +41,7 @@ export default function Footer() {
             <div className="flex items-center gap-4">
               {SOCIAL_LINKS.map((s) => (
                 <a key={s.label}
-                  className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 text-gray-500 hover:text-white hover:border-white/25 transition-all"
+                  className="w-11 h-11 rounded-full flex items-center justify-center border border-white/10 text-gray-500 hover:text-white hover:border-white/25 transition-all"
                   href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label}>
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">{s.icon}</svg>
                 </a>

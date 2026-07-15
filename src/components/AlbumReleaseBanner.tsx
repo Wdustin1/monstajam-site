@@ -30,17 +30,17 @@ export default function AlbumReleaseBanner() {
           <div className="text-center md:text-left">
             <div className="mb-2 flex flex-wrap items-center justify-center gap-2 md:justify-start">
               <span className="border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
-                New album release
+                Latest album
               </span>
               <span className="border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
-                July 1
+                Out now
               </span>
             </div>
             <h2 id="cold-world-volume-2-heading" className="text-balance text-2xl font-black leading-[0.95] tracking-tight text-white md:text-4xl">
               Tyler J - Cold World Volume 2
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-              Cold World Volume 2 releases July 1. Produced by Monsta Jam Productions.
+              Cold World Volume 2 is out now. Produced by Monsta Jam Productions.
             </p>
           </div>
 

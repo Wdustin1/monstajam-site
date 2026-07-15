@@ -79,9 +79,9 @@ export default function Hero({
             Explore Library
           </button>
 
-          {/* Watch Videos — magenta hollow */}
+          {/* Keep the secondary action useful even before the first video is published. */}
           <a
-            href="/videos"
+            href={videoCount > 0 ? '/videos' : '/community'}
             className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105 no-underline"
             style={{
               border: '1px solid rgba(255,0,255,0.4)',
@@ -89,18 +89,24 @@ export default function Hero({
               boxShadow: '0 0 12px rgba(255,0,255,0.2)',
             }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24">
-              <rect x="2" y="4" width="20" height="16" rx="3" strokeWidth="2"/>
-              <path d="M10 9l5 3-5 3V9z" fill="#ff44ff" stroke="none"/>
-            </svg>
-            <span style={{ color: '#ff99ff' }}>Watch Videos</span>
+            {videoCount > 0 ? (
+              <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="3" strokeWidth="2"/>
+                <path d="M10 9l5 3-5 3V9z" fill="#ff44ff" stroke="none"/>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            <span style={{ color: '#ff99ff' }}>{videoCount > 0 ? 'Watch Videos' : 'Join Community'}</span>
           </a>
         </div>
 
         {/* Social proof strip */}
         <div className="flex items-center gap-5 mt-2 pt-6 border-t border-white/5">
           <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">{trackCount}+</span>
+            <span className="text-white font-black text-lg leading-none">{trackCount}</span>
             <span className="text-gray-500 text-xs mt-0.5">Exclusive Tracks</span>
           </div>
           <div className="w-px h-8 bg-white/10" />

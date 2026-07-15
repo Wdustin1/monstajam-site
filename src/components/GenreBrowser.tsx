@@ -52,7 +52,10 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
       {/* ── Mobile genre selector ── */}
       <div className="md:hidden px-6 pb-4">
         <button
+          type="button"
           onClick={() => setMobileMenuOpen(v => !v)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-genre-options"
           className="flex items-center justify-between w-full px-4 py-3 rounded-xl border text-sm font-medium text-white"
           style={{ borderColor: '#b026ff', background: 'rgba(176,38,255,0.1)' }}
         >
@@ -62,10 +65,13 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
           </svg>
         </button>
         {mobileMenuOpen && (
-          <div className="mt-1 rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0e0e14' }}>
+          <div id="mobile-genre-options" role="listbox" aria-label="Choose a genre" className="mt-1 rounded-xl border border-white/10 overflow-hidden" style={{ background: '#0e0e14' }}>
             {genres.map(g => (
               <button
                 key={g}
+                type="button"
+                role="option"
+                aria-selected={activeGenre === g}
                 onClick={() => { setActiveGenre(g); setMobileMenuOpen(false); }}
                 className={`w-full text-left px-4 py-3 text-sm transition-colors ${activeGenre === g ? 'text-[#b026ff]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
               >
@@ -83,7 +89,9 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
           {genres.map((g) => (
             <li key={g}>
               <button
+                type="button"
                 onClick={() => setActiveGenre(g)}
+                aria-pressed={activeGenre === g}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium transition-all text-left text-sm ${
                   activeGenre === g
                     ? 'border text-white'
@@ -105,8 +113,8 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
       </aside>
 
       {/* ── Main grid ── */}
-      <main className="flex-1 overflow-y-auto px-6 md:pr-10" style={{ scrollbarWidth: 'none' }}>
-        <h1 className="text-3xl font-bold mb-2 text-white tracking-wide">
+      <section className="flex-1 overflow-y-auto px-6 md:pr-10" style={{ scrollbarWidth: 'none' }} aria-labelledby="genre-results-heading">
+        <h1 id="genre-results-heading" className="text-3xl font-bold mb-2 text-white tracking-wide">
           {activeGenre === 'All' ? 'All Genres' : activeGenre}
         </h1>
         <p className="text-gray-500 text-sm mb-6">
@@ -124,7 +132,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
               return (
                 <div
                   key={track.slug}
-                  className="group rounded-2xl overflow-hidden border border-transparent hover:border-white/10 transition-all cursor-pointer"
+                  className="group rounded-2xl overflow-hidden border border-transparent hover:border-white/10 transition-all"
                   style={{ backgroundColor: '#1a1a20' }}
                 >
                   {/* Cover */}
@@ -143,12 +151,12 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
                       </svg>
                     )}
                     {/* Play overlay */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-100 transition-opacity z-10 md:bg-black/50 md:opacity-0 md:group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         onClick={() => handlePlay(track)}
                         className="w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110"
                         style={{ background: '#ff00ff', boxShadow: '0 0 20px rgba(255,0,255,0.8)' }}
-                        aria-label={`Play ${track.title}`}
+                        aria-label={`${isActive && isPlaying ? 'Pause' : 'Play'} ${track.title}`}
                       >
                         {isActive && isPlaying ? (
                           <svg className="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 24 24">
@@ -171,7 +179,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
 
                   {/* Info */}
                   <div className="p-3">
-                    <Link href={`/tracks/${track.slug}`} className="block hover:text-[#ff00ff] transition-colors">
+                    <Link href={`/tracks/${track.slug}`} className="flex min-h-11 items-center transition-colors hover:text-[#ff00ff]">
                       <h3 className="font-bold text-white text-sm leading-tight truncate">{track.title}</h3>
                     </Link>
                     <p className="text-gray-400 text-xs mt-0.5 truncate">{track.artist}</p>
@@ -192,7 +200,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
             })}
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
