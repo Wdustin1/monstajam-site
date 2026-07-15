@@ -80,7 +80,6 @@ model FanProfile {
   displayName    String?
   email          String?
   socialUrl      String?
-  creditsBalance Int           @default(0)
   joinedAt       DateTime      @default(now())
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -146,14 +145,17 @@ model Vote {
 
 model CreditLedger {
   id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  sourceKey    String       @unique
   fanProfile   FanProfile?  @relation(fields: [fanProfileId], references: [id], onDelete: SetNull)
   fanProfileId String?      @db.ObjectId
   visitorId    String
+  campaignId   String?      @db.ObjectId
   action       CreditAction
   amount       Int
   reason       String
   createdAt    DateTime     @default(now())
 
   @@index([visitorId])
+  @@index([campaignId])
   @@map("credit_ledger")
 }

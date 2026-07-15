@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FeaturedVote from '@/components/FeaturedVote';
+import CommunityRewards from '@/components/CommunityRewards';
 
 const HUB_CARDS = [
   {
@@ -40,8 +41,8 @@ const HUB_CARDS = [
     title: 'Rewards / Credits',
     status: 'Engagement loop',
     body:
-      'Fans earn credits by voting, commenting, sharing, joining campaigns, and supporting releases. Credits become the bridge into deeper access.',
-    bullets: ['earn credits', 'spend votes', 'unlock perks'],
+      'The live credit loop starts with one browser-scoped reward: earn five credits for the first vote in each campaign. More actions only unlock when they are real.',
+    bullets: ['+5 first vote', 'once per campaign', 'more actions later'],
     tab: 'rewards',
   },
   {
@@ -83,10 +84,10 @@ const HUB_ACTIONS = [
   },
   {
     id: 'earn-credits',
-    label: 'See credit rules',
+    label: 'See live credit balance',
     eyebrow: 'Rewards action',
     href: '#rewards-credits',
-    body: 'See how fans earn credits by voting, commenting, sharing, and supporting drops.',
+    body: 'Check the balance saved to this browser and the reward rules that are live today.',
     tab: 'rewards',
   },
   {
@@ -122,7 +123,7 @@ const COMMUNITY_TABS = [
     eyebrow: 'Credits layer',
     heading: 'Turn participation into credits and perks.',
     body:
-      'Voting, sharing, commenting, and campaign support can become a simple credit loop that rewards the people who help releases move.',
+      'The first real reward is live now: each browser earns five credits for its first vote in a campaign, without farming extra credits by switching picks.',
   },
   {
     id: 'access',
@@ -252,6 +253,7 @@ export default function CommunityHub() {
 
               <div className="grid gap-4">
                 {activeTab === 'vote' && <FeaturedVote />}
+                {activeTab === 'rewards' && <CommunityRewards />}
 
                 {activeCards.map((card) => (
                   <article

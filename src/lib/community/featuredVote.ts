@@ -38,12 +38,14 @@ export const FEATURED_VOTE_OPTIONS = [
   },
 ] as const;
 
+export const CommunityVisitorIdSchema = z
+  .string()
+  .min(8, 'visitorId is required')
+  .max(120)
+  .regex(/^[a-zA-Z0-9:_-]+$/, 'visitorId contains unsupported characters');
+
 export const FeaturedVoteRequestSchema = z.object({
-  visitorId: z
-    .string()
-    .min(8, 'visitorId is required')
-    .max(120)
-    .regex(/^[a-zA-Z0-9:_-]+$/, 'visitorId contains unsupported characters'),
+  visitorId: CommunityVisitorIdSchema,
   optionId: z.string().min(1, 'optionId is required').max(120),
 });
 

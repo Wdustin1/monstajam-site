@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
 
 const STORAGE_KEY = 'monstajam-featured-vote';
-const VISITOR_ID_KEY = 'monstajam-visitor-id';
 
 const VOTE_OPTIONS = [
   {
@@ -59,18 +59,11 @@ type FeaturedVotePayload = {
   totals: {
     votes: number;
   };
+  rewards: {
+    creditsBalance: number;
+    voteReward: number;
+  };
 };
-
-function getOrCreateVisitorId() {
-  const existing = localStorage.getItem(VISITOR_ID_KEY);
-  if (existing) {
-    return existing;
-  }
-
-  const id = `visitor_${crypto.randomUUID()}`;
-  localStorage.setItem(VISITOR_ID_KEY, id);
-  return id;
-}
 
 export default function FeaturedVote() {
   const [visitorId] = useState<string | null>(() => {
@@ -78,7 +71,7 @@ export default function FeaturedVote() {
       return null;
     }
 
-    return getOrCreateVisitorId();
+    return getOrCreateCommunityVisitorId();
   });
   const [campaignTitle, setCampaignTitle] = useState('Featured Vote');
   const [campaignQuestion, setCampaignQuestion] = useState('What should MonstaJam push next?');
@@ -86,6 +79,7 @@ export default function FeaturedVote() {
   const [options, setOptions] = useState<VoteOption[]>(VOTE_OPTIONS);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [totalVotes, setTotalVotes] = useState(0);
+  const [creditsBalance, setCreditsBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [statusText, setStatusText] = useState('Loading the live vote…');
@@ -116,6 +110,7 @@ export default function FeaturedVote() {
         setOptions(payload.options);
         setSelectedOptionId(payload.selectedOptionId);
         setTotalVotes(payload.totals.votes);
+        setCreditsBalance(payload.rewards.creditsBalance);
         setStatusText(
           payload.selectedOptionId
             ? 'Vote saved on this device and synced to the database.'
@@ -172,7 +167,8 @@ export default function FeaturedVote() {
       setOptions(payload.options);
       setSelectedOptionId(payload.selectedOptionId);
       setTotalVotes(payload.totals.votes);
-      setStatusText('Vote saved on this device and synced to the database.');
+      setCreditsBalance(payload.rewards.creditsBalance);
+      setStatusText('Vote saved and synced. Your first vote in each campaign earns +5 credits.');
     } catch (error) {
       console.error(error);
       setStatusText('Could not sync yet. Your device selection is still saved for this preview.');
@@ -197,6 +193,9 @@ export default function FeaturedVote() {
             </span>
             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
               {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+            </span>
+            <span className="rounded-full border border-amber-200/25 bg-amber-200/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-100">
+              {creditsBalance} credits
             </span>
           </div>
           <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
@@ -253,11 +252,8 @@ export default function FeaturedVote() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-relaxed text-gray-400">
-          {selectedOptionId ? (
-            <span>{statusText}</span>
-          ) : (
-            <span>{statusText}</span>
-          )}
+          <span>{statusText}</span>
+          <span className="mt-1 block text-amber-100/80">+5 credits for the first vote in each campaign. Changing your pick does not earn more.</span>
         </div>
       </div>
     </section>

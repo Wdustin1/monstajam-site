@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { FeaturedVoteRequestSchema, buildFeaturedVotePayload } from '@/lib/community/featuredVote';
+import {
+  CommunityVisitorIdSchema,
+  FeaturedVoteRequestSchema,
+  buildFeaturedVotePayload,
+} from '@/lib/community/featuredVote';
+import { getFanRewards, saveVoteAndAwardCredits } from '@/lib/community/rewards';
 import { getActiveVoteCampaignForPublic } from '@/lib/community/voteCampaigns';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const visitorId = searchParams.get('visitorId');
+  const parsedVisitorId = visitorId ? CommunityVisitorIdSchema.safeParse(visitorId) : null;
+
+  if (parsedVisitorId && !parsedVisitorId.success) {
+    return NextResponse.json({ error: 'Invalid visitorId' }, { status: 422 });
+  }
 
   try {
     const campaign = await getActiveVoteCampaignForPublic();
-    return NextResponse.json(buildFeaturedVotePayload(campaign, visitorId));
+    const rewardsPayload = parsedVisitorId?.success
+      ? await getFanRewards(parsedVisitorId.data)
+      : { creditsBalance: 0, voteReward: 5, recentRewards: [] };
+
+    return NextResponse.json({
+      ...buildFeaturedVotePayload(campaign, visitorId),
+      rewards: rewardsPayload,
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Failed to load featured vote' }, { status: 500 });
@@ -42,42 +58,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vote option not found' }, { status: 404 });
     }
 
-    const fanProfile = await prisma.fanProfile.upsert({
-      where: { visitorId },
-      update: {},
-      create: { visitorId },
+    const rewardsPayload = await saveVoteAndAwardCredits({
+      visitorId,
+      campaignId: campaign.id,
+      campaignTitle: campaign.title,
+      optionId: option.id,
     });
 
-    await prisma.vote.upsert({
-      where: {
-        campaignId_visitorId: {
-          campaignId: campaign.id,
-          visitorId,
-        },
-      },
-      update: {
-        optionId: option.id,
-        fanProfileId: fanProfile.id,
-        creditsSpent: 0,
-      },
-      create: {
-        campaignId: campaign.id,
-        optionId: option.id,
-        fanProfileId: fanProfile.id,
-        visitorId,
-        creditsSpent: 0,
-      },
-    });
+    const updatedCampaign = await getActiveVoteCampaignForPublic();
 
-    const updatedCampaign = await prisma.voteCampaign.findUniqueOrThrow({
-      where: { id: campaign.id },
-      include: {
-        options: { orderBy: { sortOrder: 'asc' } },
-        votes: { select: { optionId: true, visitorId: true } },
-      },
+    return NextResponse.json({
+      ...buildFeaturedVotePayload(updatedCampaign, visitorId),
+      rewards: rewardsPayload,
     });
-
-    return NextResponse.json(buildFeaturedVotePayload(updatedCampaign, visitorId));
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Failed to save featured vote' }, { status: 500 });

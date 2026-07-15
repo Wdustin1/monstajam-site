@@ -66,7 +66,7 @@ test('Community Hub exposes real CTA action cards instead of loose placeholders'
     "id: 'live-vote'",
     'Vote in the live poll',
     "id: 'earn-credits'",
-    'See credit rules',
+    'See live credit balance',
     "id: 'premium-access'",
     'Watch premium access',
   ];

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 
 export async function buildCommunityAdminSummary() {
-  const [campaigns, fanProfiles, totalVotes, creditLedgerRows] = await Promise.all([
+  const [campaigns, fanProfiles, totalVotes, creditLedgerRows, issuedCredits, recentRewards] = await Promise.all([
     prisma.voteCampaign.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -12,6 +12,22 @@ export async function buildCommunityAdminSummary() {
     prisma.fanProfile.count(),
     prisma.vote.count(),
     prisma.creditLedger.count(),
+    prisma.creditLedger.aggregate({
+      where: { amount: { gt: 0 } },
+      _sum: { amount: true },
+    }),
+    prisma.creditLedger.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: {
+        id: true,
+        action: true,
+        amount: true,
+        reason: true,
+        campaignId: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   const campaignSummaries = campaigns.map((campaign) => {
@@ -53,8 +69,13 @@ export async function buildCommunityAdminSummary() {
       fanProfiles,
       votes: totalVotes,
       creditLedgerRows,
+      creditsIssued: issuedCredits._sum.amount ?? 0,
     },
     campaigns: campaignSummaries,
+    recentRewards: recentRewards.map((reward) => ({
+      ...reward,
+      createdAt: reward.createdAt.toISOString(),
+    })),
   };
 }
 

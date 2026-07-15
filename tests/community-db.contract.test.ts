@@ -17,7 +17,6 @@ test('Prisma schema defines the community hub persistence layer', () => {
     'enum CreditAction',
     'model FanProfile',
     'visitorId      String         @unique',
-    'creditsBalance Int           @default(0)',
     'model VoteCampaign',
     'slug        String             @unique',
     'status      VoteCampaignStatus @default(DRAFT)',
@@ -39,6 +38,7 @@ test('Prisma schema defines the community hub persistence layer', () => {
     'artistApplications',
     'ARTIST_APPLICATION',
     '@@map("artist_applications")',
+    'creditsBalance Int',
   ];
 
   for (const forbidden of forbiddenSchemaAnchors) {
@@ -97,8 +97,7 @@ test('Featured vote API exposes GET and POST handlers against the active campaig
     'export async function GET',
     'export async function POST',
     'getActiveVoteCampaignForPublic',
-    'prisma.fanProfile.upsert',
-    'prisma.vote.upsert',
+    'saveVoteAndAwardCredits',
     'FeaturedVoteRequestSchema.safeParse',
     'Validation failed',
   ];

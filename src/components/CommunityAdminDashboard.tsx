@@ -11,6 +11,7 @@ type Summary = {
     fanProfiles: number;
     votes: number;
     creditLedgerRows: number;
+    creditsIssued: number;
   };
   campaigns: Array<{
     id: string;
@@ -28,6 +29,14 @@ type Summary = {
       voteCount: number;
       votePercent: number;
     }>;
+  }>;
+  recentRewards: Array<{
+    id: string;
+    action: string;
+    amount: number;
+    reason: string;
+    campaignId: string | null;
+    createdAt: string;
   }>;
 };
 
@@ -241,7 +250,7 @@ export default function CommunityAdminDashboard() {
               <StatCard label="Vote campaigns" value={summary.totals.campaigns} detail={`${summary.totals.votes} total votes`} />
               <StatCard label="Fan profiles" value={summary.totals.fanProfiles} detail="Browser visitors captured" />
               <StatCard label="Vote activity" value={summary.totals.votes} detail="One vote per visitor per campaign" />
-              <StatCard label="Rewards ledger" value={summary.totals.creditLedgerRows} detail="Credit rows recorded" />
+              <StatCard label="Credits issued" value={summary.totals.creditsIssued} detail={`${summary.totals.creditLedgerRows} reward rows`} />
             </div>
 
             <section className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.05] p-5">
@@ -379,12 +388,25 @@ export default function CommunityAdminDashboard() {
             <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
               <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
                 <h2 className="text-xl font-semibold text-white">Rewards ledger</h2>
-                <p className="text-sm text-slate-400">Credit rows stay empty until the reward rules are switched on.</p>
+                <p className="text-sm text-slate-400">The first vote in each campaign now issues five credits once per browser visitor.</p>
               </div>
-              <div className="mt-5 rounded-lg border border-dashed border-white/10 p-6 text-sm text-slate-400">
-                {summary.totals.creditLedgerRows === 0
-                  ? 'No reward ledger rows yet. This is ready for vote, join, and support credits later.'
-                  : `${summary.totals.creditLedgerRows} reward ledger rows recorded.`}
+              <div className="mt-5 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Recent reward activity</h3>
+                {summary.recentRewards.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-white/10 p-6 text-sm text-slate-400">
+                    No rewards issued yet. The first public vote will appear here.
+                  </div>
+                ) : (
+                  summary.recentRewards.map((reward) => (
+                    <div key={reward.id} className="flex flex-col gap-2 rounded-lg border border-white/10 bg-slate-950/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-white">{reward.reason}</div>
+                        <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{reward.action} · {formatDate(reward.createdAt)}</div>
+                      </div>
+                      <div className="font-mono text-lg font-semibold text-emerald-200">+{reward.amount}</div>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </div>
