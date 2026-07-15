@@ -19,7 +19,7 @@ export type VideoUpdateInput = z.infer<typeof VideoUpdateSchema>;
 
 const urlOrEmpty = z.string().max(500).url().or(z.literal('')).optional();
 
-export const TrackCreateSchema = z.object({
+const TrackBaseSchema = z.object({
   title:         z.string().min(1, 'Title is required').max(200),
   subtitle:      z.string().max(200).optional(),
   artist:        z.string().min(1).max(200),
@@ -39,7 +39,17 @@ export const TrackCreateSchema = z.object({
   accentCyan:    z.boolean().optional().nullable(),
 });
 
-export const TrackUpdateSchema = TrackCreateSchema
+export const TrackCreateSchema = TrackBaseSchema.superRefine((track, context) => {
+  if (track.published && !track.audioUrl) {
+    context.addIssue({
+      code: 'custom',
+      path: ['audioUrl'],
+      message: 'Published tracks require an audio URL',
+    });
+  }
+});
+
+export const TrackUpdateSchema = TrackBaseSchema
   .omit({ slug: true, number: true })
   .partial();
 

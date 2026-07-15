@@ -14,6 +14,7 @@ const communityHubPath = join(root, 'src/components/CommunityHub.tsx');
 const adminSummaryPath = join(root, 'src/lib/community/adminSummary.ts');
 const adminDashboardPath = join(root, 'src/components/CommunityAdminDashboard.tsx');
 const rolloutScriptPath = join(root, 'scripts/community-rewards-rollout.ts');
+const rewardsSmokeScriptPath = join(root, 'scripts/community-rewards-smoke.ts');
 const packagePath = join(root, 'package.json');
 
 test('credit ledger supports one idempotent reward per campaign and visitor', () => {
@@ -47,42 +48,67 @@ test('rewards helper atomically saves the vote and idempotent reward while deriv
   assert.equal(source.includes('prisma.fanProfile.update'), false, 'ledger-derived balances should not maintain a stale profile mirror');
 });
 
-test('Mongo rollout refuses legacy rows and establishes the unique reward index', () => {
+test('Mongo rollout refuses malformed unique-key data and establishes every community index', () => {
   assert.ok(existsSync(rolloutScriptPath), 'community rewards rollout script should exist');
   const source = readFileSync(rolloutScriptPath, 'utf8');
   const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { scripts?: Record<string, string> };
 
-  for (const anchor of ['missingSourceKey', 'countDocuments', 'createIndex', 'credit_ledger_sourceKey_key', 'unique: true']) {
+  for (const anchor of ['COMMUNITY_INDEX_SPECS', 'missingKeyQuery', 'assertUniqueDataIsReady', 'countDocuments', 'createIndex', 'unique: spec.unique']) {
     assert.ok(source.includes(anchor), `rollout script should include ${anchor}`);
   }
 
   assert.equal(pkg.scripts?.['db:community-rewards'], 'tsx scripts/community-rewards-rollout.ts');
 });
 
-test('public rewards API validates visitor identity and returns a no-store balance payload', () => {
+test('public rewards API uses the signed visitor session and returns a no-store balance payload', () => {
   assert.ok(existsSync(rewardsRoutePath), 'public rewards route should exist');
   const source = readFileSync(rewardsRoutePath, 'utf8');
 
   for (const anchor of [
     'export async function GET',
-    'CommunityVisitorIdSchema.safeParse',
+    'getOrCreateVisitorSession',
+    'attachVisitorSession',
     'getFanRewards',
-    "'Cache-Control': 'no-store'",
-    "status: 422",
+    "'Cache-Control', 'no-store'",
   ]) {
     assert.ok(source.includes(anchor), `rewards API should include ${anchor}`);
   }
+});
+
+test('community rewards smoke follows the signed visitor cookie and cleans the server-issued UUID', () => {
+  const source = readFileSync(rewardsSmokeScriptPath, 'utf8');
+  for (const anchor of [
+    'monstajam_visitor',
+    'getSetCookie',
+    "headers.set('Cookie'",
+    'verifyVisitorSessionToken',
+    'ownsVisitorData',
+    'smoke visitor must not match pre-existing data',
+    "JSON.stringify({ optionId: option.id })",
+    "JSON.stringify({ optionId: initial.options[1].id })",
+  ]) {
+    assert.ok(source.includes(anchor), `rewards smoke should include ${anchor}`);
+  }
+  assert.equal(source.includes('?visitorId='), false, 'smoke must not send a caller-controlled visitor query');
+  assert.equal(source.includes('JSON.stringify({ visitorId'), false, 'smoke must not send a caller-controlled visitor body');
 });
 
 test('featured voting grants the campaign reward and returns the current credit balance', () => {
   const routeSource = readFileSync(featuredVoteRoutePath, 'utf8');
   const componentSource = readFileSync(featuredVoteComponentPath, 'utf8');
 
-  for (const anchor of ['saveVoteAndAwardCredits', 'getFanRewards', 'rewards:']) {
+  for (const anchor of [
+    'saveVoteAndAwardCredits',
+    'getFanRewards',
+    'publicVotePayload',
+    'VoteUnavailableError',
+    'getVoteCampaignForPublicById',
+  ]) {
     assert.ok(routeSource.includes(anchor), `featured vote route should include ${anchor}`);
   }
 
   assert.equal(routeSource.includes('prisma.vote.upsert'), false, 'route should not save the vote outside the reward transaction');
+  assert.doesNotMatch(routeSource, /\/option\|active campaign\//, 'route must not classify arbitrary errors by message text');
 
   for (const anchor of ['creditsBalance', '+5 credits', 'first vote in each campaign']) {
     assert.ok(componentSource.includes(anchor), `FeaturedVote should explain the live reward: ${anchor}`);

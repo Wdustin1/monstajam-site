@@ -125,7 +125,8 @@ test('Featured vote API exposes GET and POST handlers against the active campaig
     'getActiveVoteCampaignForPublic',
     'saveVoteAndAwardCredits',
     'FeaturedVoteRequestSchema.safeParse',
-    'Validation failed',
+    'getOrCreateVisitorSession',
+    'Invalid vote',
   ];
 
   for (const anchor of requiredRouteAnchors) {

@@ -17,10 +17,30 @@ test('admin passwords use constant-time digest comparison and reject missing con
   assert.equal(verifyAdminPassword(undefined, secret), false);
 });
 
-test('signed admin sessions reject tampering, expiry, and implausible future lifetimes', () => {
+test('signed admin sessions reject tampering, non-canonical signatures, expiry, and implausible future lifetimes', () => {
   const token = createAdminSessionToken(secret, now);
   assert.equal(verifyAdminSessionToken(token, secret, now), true);
-  assert.equal(verifyAdminSessionToken(`${token.slice(0, -1)}x`, secret, now), false);
+
+  const parts = token.split('.');
+  const signature = parts.at(-1)!;
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const lastIndex = alphabet.indexOf(signature.at(-1)!);
+  const equivalentLastCharacter = alphabet[(lastIndex & 0b111100) | ((lastIndex + 1) & 0b11)];
+  const nonCanonicalSignature = `${signature.slice(0, -1)}${equivalentLastCharacter}`;
+  assert.notEqual(nonCanonicalSignature, signature);
+  assert.equal(
+    Buffer.from(nonCanonicalSignature, 'base64url').equals(Buffer.from(signature, 'base64url')),
+    true,
+    'test fixture must decode to the same HMAC bytes',
+  );
+  assert.equal(
+    verifyAdminSessionToken([...parts.slice(0, -1), nonCanonicalSignature].join('.'), secret, now),
+    false,
+  );
+
+  const firstSignatureCharacter = signature[0] === 'A' ? 'B' : 'A';
+  const significantTamper = [...parts.slice(0, -1), `${firstSignatureCharacter}${signature.slice(1)}`].join('.');
+  assert.equal(verifyAdminSessionToken(significantTamper, secret, now), false);
   assert.equal(verifyAdminSessionToken(token, 'different-secret-at-least-32-chars', now), false);
   assert.equal(
     verifyAdminSessionToken(token, secret, now + (ADMIN_SESSION_MAX_AGE_SECONDS + 1) * 1000),

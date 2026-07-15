@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const track = await prisma.track.findUnique({ where: { slug } });
+  const track = await prisma.track.findFirst({ where: { slug, published: true } });
   if (!track) return {};
   return {
     title: `${track.title}${track.subtitle ? ` (${track.subtitle})` : ''}`,
@@ -19,8 +19,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function TrackPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const track = await prisma.track.findUnique({
-    where: { slug },
+  const track = await prisma.track.findFirst({
+    where: { slug, published: true },
     include: { credits: true },
   });
   if (!track) notFound();

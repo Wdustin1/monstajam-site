@@ -1,3 +1,5 @@
+export {};
+
 type Track = {
   slug: string;
   title: string;

@@ -101,16 +101,18 @@ test('Featured Vote module exists with local frontend vote options', () => {
     "label: 'Remix'",
     "label: 'Artist spotlight'",
     "label: 'Future release'",
-    'monstajam-featured-vote',
-    'localStorage.getItem',
-    'localStorage.setItem',
+    "fetch('/api/community/featured-vote'",
+    'JSON.stringify({ optionId: option.id })',
     'aria-pressed',
-    'Vote saved on this device',
+    'Vote saved for this browser',
   ];
 
   for (const anchor of requiredFeaturedVoteAnchors) {
     assert.ok(source.includes(anchor), `FeaturedVote should include ${anchor}`);
   }
+
+  assert.equal(source.includes('localStorage'), false, 'visitor identity and vote state should come from the signed server cookie');
+  assert.equal(source.includes('visitorId'), false, 'the client must not submit a caller-controlled visitor identity');
 });
 
 test('Community route owns the hub and the homepage no longer renders the full hub section', () => {

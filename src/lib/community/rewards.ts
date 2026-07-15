@@ -1,9 +1,16 @@
-import { CreditAction, Prisma } from '@prisma/client';
+import { CreditAction, Prisma, VoteCampaignStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 export const VOTE_CREDIT_REWARD = 5;
 const MAX_TRANSACTION_ATTEMPTS = 5;
 const RETRYABLE_TRANSACTION_CODES = new Set(['P2002', 'P2034']);
+
+export class VoteUnavailableError extends Error {
+  constructor(message = 'Vote option is not available on an active campaign.') {
+    super(message);
+    this.name = 'VoteUnavailableError';
+  }
+}
 
 export function buildVoteRewardSourceKey(campaignId: string, visitorId: string) {
   return `vote:${campaignId}:${visitorId}`;
@@ -57,12 +64,10 @@ async function retryTransactionDelay(attempt: number) {
 export async function saveVoteAndAwardCredits({
   visitorId,
   campaignId,
-  campaignTitle,
   optionId,
 }: {
   visitorId: string;
   campaignId: string;
-  campaignTitle: string;
   optionId: string;
 }) {
   const sourceKey = buildVoteRewardSourceKey(campaignId, visitorId);
@@ -70,6 +75,29 @@ export async function saveVoteAndAwardCredits({
   for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
+        // This authorization check deliberately writes the campaign row. MongoDB then
+        // creates a write conflict if an admin closes the campaign or replaces its
+        // options concurrently, so one transaction retries against the new state.
+        const campaignTouch = await tx.voteCampaign.updateMany({
+          where: {
+            id: campaignId,
+            status: VoteCampaignStatus.ACTIVE,
+            options: { some: { id: optionId } },
+          },
+          data: { updatedAt: new Date() },
+        });
+        if (campaignTouch.count !== 1) {
+          throw new VoteUnavailableError();
+        }
+
+        const campaign = await tx.voteCampaign.findUnique({
+          where: { id: campaignId },
+          select: { title: true },
+        });
+        if (!campaign) {
+          throw new VoteUnavailableError('Vote campaign is unavailable.');
+        }
+
         const fanProfile = await tx.fanProfile.upsert({
           where: { visitorId },
           update: {},
@@ -107,7 +135,7 @@ export async function saveVoteAndAwardCredits({
             campaignId,
             action: CreditAction.VOTE,
             amount: VOTE_CREDIT_REWARD,
-            reason: `First vote in ${campaignTitle}`,
+            reason: `First vote in ${campaign.title}`,
           },
         });
 

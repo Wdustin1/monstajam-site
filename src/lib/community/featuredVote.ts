@@ -38,14 +38,7 @@ export const FEATURED_VOTE_OPTIONS = [
   },
 ] as const;
 
-export const CommunityVisitorIdSchema = z
-  .string()
-  .min(8, 'visitorId is required')
-  .max(120)
-  .regex(/^[a-zA-Z0-9:_-]+$/, 'visitorId contains unsupported characters');
-
 export const FeaturedVoteRequestSchema = z.object({
-  visitorId: CommunityVisitorIdSchema,
   optionId: z.string().min(1, 'optionId is required').max(120),
 });
 
@@ -63,10 +56,11 @@ type FeaturedVoteCampaignRecord = {
     label: string;
     description: string | null;
     sortOrder: number;
+    _count?: { votes: number };
   }>;
   votes: Array<{
     optionId: string;
-    visitorId: string;
+    visitorId?: string;
   }>;
 };
 
@@ -74,13 +68,18 @@ export function buildFeaturedVotePayload(
   campaign: FeaturedVoteCampaignRecord,
   visitorId?: string | null
 ) {
-  const voteCounts = campaign.votes.reduce<Record<string, number>>((counts, vote) => {
-    counts[vote.optionId] = (counts[vote.optionId] ?? 0) + 1;
+  const voteCounts = campaign.options.reduce<Record<string, number>>((counts, option) => {
+    counts[option.id] = option._count?.votes ?? 0;
     return counts;
   }, {});
+  if (campaign.options.every((option) => option._count === undefined)) {
+    for (const vote of campaign.votes) {
+      voteCounts[vote.optionId] = (voteCounts[vote.optionId] ?? 0) + 1;
+    }
+  }
 
   const selectedVote = visitorId
-    ? campaign.votes.find((vote) => vote.visitorId === visitorId)
+    ? campaign.votes.find((vote) => vote.visitorId === undefined || vote.visitorId === visitorId)
     : undefined;
 
   const options = [...campaign.options]
@@ -105,7 +104,7 @@ export function buildFeaturedVotePayload(
     options,
     selectedOptionId: selectedVote?.optionId ?? null,
     totals: {
-      votes: campaign.votes.length,
+      votes: options.reduce((total, option) => total + option.voteCount, 0),
     },
   };
 }

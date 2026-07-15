@@ -92,6 +92,11 @@ test('community admin vote campaign APIs are protected and mutate campaigns', ()
   for (const anchor of requiredUpdateAnchors) {
     assert.ok(updateSource.includes(anchor), `admin campaign update route should include ${anchor}`);
   }
+
+  assert.ok(createSource.includes("{ error: 'Failed to create vote campaign' }"));
+  assert.doesNotMatch(createSource, /error:\s*message/);
+  assert.ok(updateSource.includes("{ error: 'Failed to update vote campaign' }"));
+  assert.doesNotMatch(updateSource, /const message = err/);
 });
 
 test('community admin dashboard page reads protected summary data', () => {

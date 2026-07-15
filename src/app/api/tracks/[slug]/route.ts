@@ -4,6 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
 
+const MAX_TRACK_UPDATE_ATTEMPTS = 5;
+
+function isRetryableTrackConflict(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2034';
+}
+
 // GET /api/tracks/[slug]
 export async function GET(
   _req: NextRequest,
@@ -15,7 +21,7 @@ export async function GET(
       where: { slug },
       include: { credits: true },
     });
-    if (!track) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!track || !track.published) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(track);
   } catch (err) {
     console.error(err);
@@ -54,17 +60,45 @@ export async function PUT(
     ...(accentCyan != null && { accentCyan }),
   };
 
-  try {
-    const track = await prisma.track.update({
-      where: { slug },
-      data: trackData,
-      include: { credits: true },
-    });
-    return NextResponse.json(track);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Failed to update track' }, { status: 500 });
+  for (let attempt = 1; attempt <= MAX_TRACK_UPDATE_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const existing = await tx.track.findUnique({
+          where: { slug },
+          select: { published: true, audioUrl: true },
+        });
+        if (!existing) return { status: 'not-found' as const };
+
+        const nextPublished = parsed.data.published ?? existing.published;
+        const nextAudioUrl = parsed.data.audioUrl !== undefined ? parsed.data.audioUrl : existing.audioUrl;
+        if (nextPublished && !nextAudioUrl) return { status: 'invalid-audio' as const };
+
+        const track = await tx.track.update({
+          where: { slug },
+          data: trackData,
+          include: { credits: true },
+        });
+        return { status: 'updated' as const, track };
+      });
+
+      if (result.status === 'not-found') {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      if (result.status === 'invalid-audio') {
+        return NextResponse.json(
+          { error: 'Validation failed', details: { audioUrl: ['Published tracks require an audio URL'] } },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json(result.track);
+    } catch (error) {
+      if (isRetryableTrackConflict(error) && attempt < MAX_TRACK_UPDATE_ATTEMPTS) continue;
+      console.error(error);
+      return NextResponse.json({ error: 'Failed to update track' }, { status: 500 });
+    }
   }
+
+  return NextResponse.json({ error: 'Failed to update track' }, { status: 500 });
 }
 
 // DELETE /api/tracks/[slug] (admin only)

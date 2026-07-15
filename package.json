@@ -16,7 +16,8 @@
     "test:community-room": "tsx --test tests/community-room.contract.test.ts",
     "test:community-rewards-smoke": "tsx scripts/community-rewards-smoke.ts",
     "db:community-rewards": "tsx scripts/community-rewards-rollout.ts",
-    "test:admin-smoke": "tsx scripts/admin-smoke.ts"
+    "test:admin-smoke": "tsx scripts/admin-smoke.ts",
+    "test:track-concurrency-smoke": "tsx scripts/track-concurrency-smoke.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

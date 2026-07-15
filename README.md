@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Environment
+
+Create `.env.local` with the deployment credentials used by the app:
+
+- `DATABASE_URL` — MongoDB connection string.
+- `ADMIN_SECRET` — admin password/session secret (at least 16 characters).
+- `COMMUNITY_VISITOR_SECRET` — a separate, random visitor-cookie signing secret (at least 32 characters; never reuse `ADMIN_SECRET`).
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob token for admin uploads.
+
+Before deploying community voting or rewards changes, apply and verify the required MongoDB indexes:
+
+```bash
+npm run db:community-rewards
+```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

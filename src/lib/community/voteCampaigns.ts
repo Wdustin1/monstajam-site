@@ -1,4 +1,4 @@
-import { VoteCampaignStatus } from '@prisma/client';
+import { Prisma, VoteCampaignStatus } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { FEATURED_VOTE_CAMPAIGN, FEATURED_VOTE_OPTIONS, FEATURED_VOTE_SLUG } from '@/lib/community/featuredVote';
@@ -48,12 +48,14 @@ function slugify(value: string) {
   return slug || `vote-${Date.now()}`;
 }
 
-async function uniqueSlug(input: string) {
+type VoteCampaignDatabase = typeof prisma | Prisma.TransactionClient;
+
+async function uniqueSlug(input: string, database: VoteCampaignDatabase = prisma) {
   const base = slugify(input);
   let slug = base;
   let suffix = 2;
 
-  while (await prisma.voteCampaign.findUnique({ where: { slug }, select: { id: true } })) {
+  while (await database.voteCampaign.findUnique({ where: { slug }, select: { id: true } })) {
     slug = `${base}-${suffix}`;
     suffix += 1;
   }
@@ -80,14 +82,22 @@ function normalizeOptions(options: ManagedVoteCampaignInput['options']) {
     });
 }
 
-async function closeOtherActiveCampaigns(exceptCampaignId?: string) {
-  await prisma.voteCampaign.updateMany({
+async function closeOtherActiveCampaigns(database: VoteCampaignDatabase, exceptCampaignId?: string) {
+  await database.voteCampaign.updateMany({
     where: {
       status: VoteCampaignStatus.ACTIVE,
       ...(exceptCampaignId ? { id: { not: exceptCampaignId } } : {}),
     },
     data: { status: VoteCampaignStatus.CLOSED },
   });
+}
+
+async function lockVoteCampaign(database: Prisma.TransactionClient, campaignId: string) {
+  const locked = await database.voteCampaign.updateMany({
+    where: { id: campaignId },
+    data: { updatedAt: new Date() },
+  });
+  if (locked.count !== 1) throw new Error('Vote campaign not found.');
 }
 
 export async function ensureDefaultFeaturedVoteCampaign() {
@@ -111,37 +121,68 @@ export async function ensureDefaultFeaturedVoteCampaign() {
   });
 }
 
-export async function getVoteCampaignWithOptionsAndVotes(campaignId: string) {
-  return prisma.voteCampaign.findUniqueOrThrow({
+export async function getVoteCampaignWithOptionsAndVotes(
+  campaignId: string,
+  database: VoteCampaignDatabase = prisma,
+) {
+  return database.voteCampaign.findUniqueOrThrow({
     where: { id: campaignId },
     include: {
-      options: { orderBy: { sortOrder: 'asc' } },
-      votes: { select: { optionId: true, visitorId: true } },
+      options: {
+        orderBy: { sortOrder: 'asc' },
+        include: { _count: { select: { votes: true } } },
+      },
+      _count: { select: { votes: true } },
     },
   });
 }
 
-export async function getActiveVoteCampaignForPublic() {
-  let campaign = await prisma.voteCampaign.findFirst({
+export async function getActiveVoteCampaignForPublic(visitorId?: string) {
+  const publicInclude = {
+    options: {
+      orderBy: { sortOrder: 'asc' as const },
+      include: { _count: { select: { votes: true } } },
+    },
+    votes: {
+      ...(visitorId ? { where: { visitorId } } : { take: 0 }),
+      select: { optionId: true },
+      take: visitorId ? 1 : 0,
+    },
+  };
+
+  const campaign = await prisma.voteCampaign.findFirst({
     where: { status: VoteCampaignStatus.ACTIVE },
     orderBy: { updatedAt: 'desc' },
-    include: {
-      options: { orderBy: { sortOrder: 'asc' } },
-      votes: { select: { optionId: true, visitorId: true } },
-    },
+    include: publicInclude,
   });
+  if (campaign) return campaign;
 
-  if (campaign) {
-    return campaign;
-  }
+  const campaignCount = await prisma.voteCampaign.count();
+  if (campaignCount > 0) return null;
 
   const seeded = await ensureDefaultFeaturedVoteCampaign();
-  if (seeded.status !== VoteCampaignStatus.ACTIVE) {
-    throw new Error('No active vote campaign is available. Create or activate a new campaign in community admin.');
-  }
+  if (seeded.status !== VoteCampaignStatus.ACTIVE) return null;
+  return prisma.voteCampaign.findUnique({
+    where: { id: seeded.id },
+    include: publicInclude,
+  });
+}
 
-  campaign = await getVoteCampaignWithOptionsAndVotes(seeded.id);
-  return campaign;
+export async function getVoteCampaignForPublicById(campaignId: string, visitorId: string) {
+  return prisma.voteCampaign.findUnique({
+    where: { id: campaignId },
+    include: {
+      options: {
+        orderBy: { sortOrder: 'asc' },
+        include: { _count: { select: { votes: true } } },
+      },
+      votes: {
+        where: { visitorId },
+        select: { optionId: true },
+        take: 1,
+      },
+    },
+  });
 }
 
 export async function createManagedVoteCampaign(input: ManagedVoteCampaignInput) {
@@ -150,80 +191,67 @@ export async function createManagedVoteCampaign(input: ManagedVoteCampaignInput)
     throw new Error('Add at least two unique options.');
   }
 
-  if (input.status === VoteCampaignStatus.ACTIVE) {
-    await closeOtherActiveCampaigns();
-  }
+  return prisma.$transaction(async (tx) => {
+    if (input.status === VoteCampaignStatus.ACTIVE) {
+      await closeOtherActiveCampaigns(tx);
+    }
 
-  const campaign = await prisma.voteCampaign.create({
-    data: {
-      slug: await uniqueSlug(input.title || input.question),
-      title: input.title,
-      question: input.question,
-      description: input.description || null,
-      status: input.status,
-    },
-  });
-
-  for (const option of options) {
-    await prisma.voteOption.create({
+    const campaign = await tx.voteCampaign.create({
       data: {
-        campaignId: campaign.id,
-        label: option.label,
-        description: option.description,
-        sortOrder: option.sortOrder,
+        slug: await uniqueSlug(input.title || input.question, tx),
+        title: input.title,
+        question: input.question,
+        description: input.description || null,
+        status: input.status,
+        options: { create: options },
       },
     });
-  }
 
-  return getVoteCampaignWithOptionsAndVotes(campaign.id);
+    return getVoteCampaignWithOptionsAndVotes(campaign.id, tx);
+  });
 }
 
 export async function updateManagedVoteCampaign(campaignId: string, input: ManagedVoteCampaignUpdateInput) {
-  const existing = await prisma.voteCampaign.findUniqueOrThrow({
-    where: { id: campaignId },
-    include: { votes: { select: { id: true } } },
-  });
-
-  if (input.status === VoteCampaignStatus.ACTIVE) {
-    await closeOtherActiveCampaigns(campaignId);
-  }
-
-  const data = {
-    ...(input.title !== undefined ? { title: input.title } : {}),
-    ...(input.question !== undefined ? { question: input.question } : {}),
-    ...(input.description !== undefined ? { description: input.description || null } : {}),
-    ...(input.status !== undefined ? { status: input.status } : {}),
-  };
-
-  if (Object.keys(data).length > 0) {
-    await prisma.voteCampaign.update({
-      where: { id: existing.id },
-      data,
+  return prisma.$transaction(async (tx) => {
+    await lockVoteCampaign(tx, campaignId);
+    const existing = await tx.voteCampaign.findUniqueOrThrow({
+      where: { id: campaignId },
+      select: { id: true, status: true },
     });
-  }
 
-  if (input.options) {
-    if (existing.votes.length > 0) {
-      throw new VoteCampaignOptionEditError();
+    let normalizedOptions: ReturnType<typeof normalizeOptions> | undefined;
+    if (input.options) {
+      const voteCount = await tx.vote.count({ where: { campaignId } });
+      if (voteCount > 0) {
+        throw new VoteCampaignOptionEditError();
+      }
+      normalizedOptions = normalizeOptions(input.options);
+      if (normalizedOptions.length < 2) {
+        throw new Error('Add at least two unique options.');
+      }
     }
 
-    const options = normalizeOptions(input.options);
-    if (options.length < 2) {
-      throw new Error('Add at least two unique options.');
+    const data: Prisma.VoteCampaignUpdateInput = {
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.question !== undefined ? { question: input.question } : {}),
+      ...(input.description !== undefined ? { description: input.description || null } : {}),
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(normalizedOptions
+        ? { options: { deleteMany: {}, create: normalizedOptions } }
+        : {}),
+    };
+
+    if (input.status === VoteCampaignStatus.ACTIVE) {
+      await closeOtherActiveCampaigns(tx, existing.id);
     }
 
-    await prisma.voteOption.deleteMany({ where: { campaignId: existing.id } });
-    for (const option of options) {
-      await prisma.voteOption.create({
-        data: {
-          campaignId: existing.id,
-          label: option.label,
-          description: option.description,
-          sortOrder: option.sortOrder,
-        },
+    if (Object.keys(data).length > 0) {
+      await tx.voteCampaign.update({
+        where: { id: existing.id },
+        data,
       });
     }
-  }
 
-  return getVoteCampaignWithOptionsAndVotes(existing.id);
+    return getVoteCampaignWithOptionsAndVotes(existing.id, tx);
+  });
 }

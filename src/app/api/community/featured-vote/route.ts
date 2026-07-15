@@ -1,78 +1,164 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  CommunityVisitorIdSchema,
-  FeaturedVoteRequestSchema,
-  buildFeaturedVotePayload,
-} from '@/lib/community/featuredVote';
-import { getFanRewards, saveVoteAndAwardCredits } from '@/lib/community/rewards';
-import { getActiveVoteCampaignForPublic } from '@/lib/community/voteCampaigns';
+import { buildFeaturedVotePayload, FeaturedVoteRequestSchema } from '@/lib/community/featuredVote';
+import { getActiveVoteCampaignForPublic, getVoteCampaignForPublicById } from '@/lib/community/voteCampaigns';
+import { getFanRewards, saveVoteAndAwardCredits, VoteUnavailableError } from '@/lib/community/rewards';
+import { attachVisitorSession, getExistingVisitorSession, getOrCreateVisitorSession } from '@/lib/community/visitorSession';
+import { getRequestAddress } from '@/lib/rateLimit';
+import { consumeSharedRateLimit } from '@/lib/sharedRateLimit';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const visitorId = searchParams.get('visitorId');
-  const parsedVisitorId = visitorId ? CommunityVisitorIdSchema.safeParse(visitorId) : null;
+async function publicVotePayload(visitorId: string, campaignId?: string) {
+  const [campaign, rewards] = await Promise.all([
+    campaignId
+      ? getVoteCampaignForPublicById(campaignId, visitorId)
+      : getActiveVoteCampaignForPublic(visitorId),
+    getFanRewards(visitorId),
+  ]);
 
-  if (parsedVisitorId && !parsedVisitorId.success) {
-    return NextResponse.json({ error: 'Invalid visitorId' }, { status: 422 });
+  if (!campaign) {
+    return {
+      campaign: null,
+      options: [],
+      selectedOptionId: null,
+      totals: { votes: 0 },
+      rewards,
+      votingPaused: true,
+    };
   }
 
-  try {
-    const campaign = await getActiveVoteCampaignForPublic();
-    const rewardsPayload = parsedVisitorId?.success
-      ? await getFanRewards(parsedVisitorId.data)
-      : { creditsBalance: 0, voteReward: 5, recentRewards: [] };
+  return {
+    ...buildFeaturedVotePayload(campaign, visitorId),
+    rewards,
+    votingPaused: campaign.status !== 'ACTIVE',
+  };
+}
 
-    return NextResponse.json({
-      ...buildFeaturedVotePayload(campaign, visitorId),
-      rewards: rewardsPayload,
-    });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Failed to load featured vote' }, { status: 500 });
+function withVisitorSession(response: NextResponse, newToken: string | null) {
+  response.headers.set('Cache-Control', 'no-store');
+  return attachVisitorSession(response, newToken);
+}
+
+async function consumeVoteRateLimits(request: NextRequest, visitorId: string) {
+  const clientLimit = await consumeSharedRateLimit({
+    namespace: 'featured-vote-client',
+    key: getRequestAddress(request.headers),
+    limit: 30,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!clientLimit.allowed) return clientLimit;
+
+  const visitorLimit = await consumeSharedRateLimit({
+    namespace: 'featured-vote-visitor',
+    key: visitorId,
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!visitorLimit.allowed) return visitorLimit;
+
+  return consumeSharedRateLimit({
+    namespace: 'featured-vote-global',
+    key: 'global',
+    limit: 2_000,
+    windowMs: 10 * 60 * 1000,
+  });
+}
+
+export async function GET(request: NextRequest) {
+  let session: ReturnType<typeof getOrCreateVisitorSession>;
+  try {
+    session = getOrCreateVisitorSession(request);
+    const payload = await publicVotePayload(session.visitorId);
+    return withVisitorSession(NextResponse.json(payload), session.newToken);
+  } catch (error) {
+    console.error('Failed to load featured vote', error);
+    return NextResponse.json({ error: 'Unable to load the featured vote' }, { status: 500 });
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  let session: { visitorId: string; newToken: null };
+  try {
+    const visitorId = getExistingVisitorSession(request);
+    if (!visitorId) {
+      return NextResponse.json(
+        { error: 'Load the vote before submitting.' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    session = { visitorId, newToken: null };
+  } catch (error) {
+    console.error('Failed to read visitor session', error);
+    return NextResponse.json({ error: 'Voting is temporarily unavailable' }, { status: 503 });
+  }
+
+  let blockedLimit;
+  try {
+    const limit = await consumeVoteRateLimits(request, session.visitorId);
+    blockedLimit = limit.allowed ? null : limit;
+  } catch (error) {
+    console.error('Voting rate limiter unavailable', error);
+    return withVisitorSession(
+      NextResponse.json({ error: 'Voting is temporarily unavailable' }, { status: 503 }),
+      session.newToken,
+    );
+  }
+
+  if (blockedLimit) {
+    return withVisitorSession(
+      NextResponse.json(
+        { error: 'Too many voting attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(blockedLimit.retryAfterSeconds) } },
+      ),
+      session.newToken,
+    );
+  }
+
   let body: unknown;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return withVisitorSession(
+      NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }),
+      session.newToken,
+    );
   }
 
   const parsed = FeaturedVoteRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 422 }
+    return withVisitorSession(
+      NextResponse.json({ error: 'Invalid vote', details: parsed.error.flatten() }, { status: 400 }),
+      session.newToken,
     );
   }
 
-  const { optionId, visitorId } = parsed.data;
-
   try {
-    const campaign = await getActiveVoteCampaignForPublic();
-    const option = campaign.options.find((item) => item.id === optionId);
-
-    if (!option) {
-      return NextResponse.json({ error: 'Vote option not found' }, { status: 404 });
+    const campaign = await getActiveVoteCampaignForPublic(session.visitorId);
+    if (!campaign) {
+      return withVisitorSession(
+        NextResponse.json({ error: 'Voting is currently paused' }, { status: 409 }),
+        session.newToken,
+      );
     }
 
-    const rewardsPayload = await saveVoteAndAwardCredits({
-      visitorId,
+    await saveVoteAndAwardCredits({
       campaignId: campaign.id,
-      campaignTitle: campaign.title,
-      optionId: option.id,
+      visitorId: session.visitorId,
+      optionId: parsed.data.optionId,
     });
+    const payload = await publicVotePayload(session.visitorId, campaign.id);
 
-    const updatedCampaign = await getActiveVoteCampaignForPublic();
-
-    return NextResponse.json({
-      ...buildFeaturedVotePayload(updatedCampaign, visitorId),
-      rewards: rewardsPayload,
-    });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Failed to save featured vote' }, { status: 500 });
+    return withVisitorSession(
+      NextResponse.json(payload),
+      session.newToken,
+    );
+  } catch (error) {
+    const unavailable = error instanceof VoteUnavailableError;
+    if (!unavailable) console.error('Failed to save featured vote', error);
+    return withVisitorSession(
+      NextResponse.json(
+        { error: unavailable ? error.message : 'Unable to save vote' },
+        { status: unavailable ? 400 : 500 },
+      ),
+      session.newToken,
+    );
   }
 }

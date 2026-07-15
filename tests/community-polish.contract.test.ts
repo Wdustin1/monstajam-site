@@ -65,8 +65,6 @@ test('community voting copy explains the client intent in concrete language', ()
 test('featured vote is compact, result-aware, and rolls back failed optimistic votes', () => {
   for (const anchor of [
     'previousSelectedOptionId',
-    'previousStoredLabel',
-    'localStorage.removeItem(STORAGE_KEY)',
     'role="status"',
     'aria-live="polite"',
     'sm:grid-cols-2',
@@ -81,6 +79,8 @@ test('featured vote is compact, result-aware, and rolls back failed optimistic v
   ]) {
     assert.ok(vote.includes(anchor), `FeaturedVote should include ${anchor}`);
   }
+
+  assert.equal(vote.includes('localStorage'), false, 'optimistic rollback should not depend on caller-controlled browser identity state');
 
   for (const stale of [
     'Database backed',

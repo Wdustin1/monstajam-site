@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ campaign }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error(err);
-    const message = err instanceof Error ? err.message : 'Failed to create vote campaign';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create vote campaign' }, { status: 500 });
   }
 }

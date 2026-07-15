@@ -53,6 +53,8 @@ export function verifyAdminSessionToken(
   if (expiresAt > nowSeconds + ADMIN_SESSION_MAX_AGE_SECONDS + 60) return false;
   if (!/^[A-Za-z0-9_-]{20,40}$/.test(nonce)) return false;
 
+  if (!/^[A-Za-z0-9_-]{43}$/.test(providedSignature)) return false;
+
   const payload = `${version}.${expiresText}.${nonce}`;
   const expectedSignature = createHmac('sha256', configured).update(payload).digest();
   let provided: Buffer;
@@ -62,6 +64,7 @@ export function verifyAdminSessionToken(
     return false;
   }
 
+  if (provided.toString('base64url') !== providedSignature) return false;
   return safeEqual(provided, expectedSignature);
 }
 

@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Check, Coins, LoaderCircle, Radio } from 'lucide-react';
-import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
-
-const STORAGE_KEY = 'monstajam-featured-vote';
 
 const VOTE_OPTIONS = [
   { id: 'fallback-song', label: 'Song', description: 'Open the first fan vote around a real MonstaJam track.', voteCount: 0 },
@@ -31,18 +28,15 @@ type FeaturedVotePayload = {
     question: string;
     description: string;
     status: string;
-  };
+  } | null;
   options: VoteOption[];
   selectedOptionId: string | null;
   totals: { votes: number };
   rewards: { creditsBalance: number; voteReward: number };
+  votingPaused: boolean;
 };
 
 export default function FeaturedVote() {
-  const [visitorId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return getOrCreateCommunityVisitorId();
-  });
   const [campaignTitle, setCampaignTitle] = useState('Community Kickoff Vote');
   const [campaignQuestion, setCampaignQuestion] = useState('What should fans vote on first?');
   const [campaignDescription, setCampaignDescription] = useState('Choose the first music decision MonstaJam opens to the community.');
@@ -57,20 +51,30 @@ export default function FeaturedVote() {
   const [statusText, setStatusText] = useState('Loading the live vote…');
 
   useEffect(() => {
-    if (!visitorId) return;
-
-    const currentVisitorId = visitorId;
     let isCancelled = false;
 
     async function loadFeaturedVote() {
       try {
-        const response = await fetch(`/api/community/featured-vote?visitorId=${encodeURIComponent(currentVisitorId)}`, {
+        const response = await fetch('/api/community/featured-vote', {
           cache: 'no-store',
         });
         if (!response.ok) throw new Error('Failed to load featured vote');
 
         const payload = (await response.json()) as FeaturedVotePayload;
         if (isCancelled) return;
+
+        if (payload.votingPaused || !payload.campaign) {
+          setCampaignTitle('Voting paused');
+          setCampaignQuestion('The next fan decision is being prepared.');
+          setCampaignDescription('Check back soon for the next MonstaJam community vote.');
+          setOptions([]);
+          setSelectedOptionId(null);
+          setTotalVotes(0);
+          setCreditsBalance(payload.rewards.creditsBalance);
+          setLoadState('ready');
+          setStatusText('No campaign is open right now. Your credits are safe.');
+          return;
+        }
 
         setCampaignTitle(payload.campaign.title);
         setCampaignQuestion(payload.campaign.question);
@@ -82,7 +86,7 @@ export default function FeaturedVote() {
         setLoadState('ready');
         setStatusText(
           payload.selectedOptionId
-            ? 'Vote saved on this device and counted in the live results.'
+            ? 'Vote saved for this browser and counted in the live results.'
             : 'Choose one option to cast your vote.'
         );
       } catch (error) {
@@ -99,7 +103,7 @@ export default function FeaturedVote() {
 
     loadFeaturedVote();
     return () => { isCancelled = true; };
-  }, [visitorId, loadAttempt]);
+  }, [loadAttempt]);
 
   function retryFeaturedVote() {
     setIsLoading(true);
@@ -109,10 +113,9 @@ export default function FeaturedVote() {
   }
 
   async function handleVote(option: VoteOption) {
-    if (!visitorId || isLoading || isSaving || loadState !== 'ready') return;
+    if (isLoading || isSaving || loadState !== 'ready') return;
 
     const previousSelectedOptionId = selectedOptionId;
-    const previousStoredLabel = localStorage.getItem(STORAGE_KEY);
 
     setIsSaving(true);
     setSelectedOptionId(option.id);
@@ -122,11 +125,12 @@ export default function FeaturedVote() {
       const response = await fetch('/api/community/featured-vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visitorId, optionId: option.id }),
+        body: JSON.stringify({ optionId: option.id }),
       });
       if (!response.ok) throw new Error('Failed to save featured vote');
 
       const payload = (await response.json()) as FeaturedVotePayload;
+      if (!payload.campaign) throw new Error('Featured vote campaign is unavailable');
       setCampaignTitle(payload.campaign.title);
       setCampaignQuestion(payload.campaign.question);
       setCampaignDescription(payload.campaign.description || 'Choose the first music decision MonstaJam opens to the community.');
@@ -134,16 +138,10 @@ export default function FeaturedVote() {
       setSelectedOptionId(payload.selectedOptionId);
       setTotalVotes(payload.totals.votes);
       setCreditsBalance(payload.rewards.creditsBalance);
-      localStorage.setItem(STORAGE_KEY, option.label);
       setStatusText('Vote counted. Your first vote in each campaign earns +5 credits.');
     } catch (error) {
       console.error(error);
       setSelectedOptionId(previousSelectedOptionId);
-      if (previousStoredLabel === null) {
-        localStorage.removeItem(STORAGE_KEY);
-      } else {
-        localStorage.setItem(STORAGE_KEY, previousStoredLabel);
-      }
       setStatusText('Your vote was not saved. Nothing changed—please try again.');
     } finally {
       setIsSaving(false);

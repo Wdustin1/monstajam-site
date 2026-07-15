@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Coins, History } from 'lucide-react';
-import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
 
 type RewardsState = 'loading' | 'ready' | 'error';
 
@@ -23,22 +22,16 @@ function formatRewardDate(value: string) {
 }
 
 export default function CommunityRewards() {
-  const [visitorId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return getOrCreateCommunityVisitorId();
-  });
   const [rewards, setRewards] = useState<RewardPayload | null>(null);
   const [rewardsState, setRewardsState] = useState<RewardsState>('loading');
   const [rewardsAttempt, setRewardsAttempt] = useState(0);
   const [status, setStatus] = useState('Loading your credit balance…');
 
   useEffect(() => {
-    if (!visitorId) return;
-
     let cancelled = false;
     async function loadRewards() {
       try {
-        const response = await fetch(`/api/community/rewards?visitorId=${encodeURIComponent(visitorId!)}`, {
+        const response = await fetch('/api/community/rewards', {
           cache: 'no-store',
         });
         if (!response.ok) throw new Error('Rewards failed to load');
@@ -60,7 +53,7 @@ export default function CommunityRewards() {
 
     loadRewards();
     return () => { cancelled = true; };
-  }, [visitorId, rewardsAttempt]);
+  }, [rewardsAttempt]);
 
   function retryRewards() {
     setRewards(null);

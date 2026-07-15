@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CommunityVisitorIdSchema } from '@/lib/community/featuredVote';
 import { getFanRewards } from '@/lib/community/rewards';
+import { attachVisitorSession, getOrCreateVisitorSession } from '@/lib/community/visitorSession';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const parsed = CommunityVisitorIdSchema.safeParse(searchParams.get('visitorId'));
-
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten() },
-      { status: 422, headers: { 'Cache-Control': 'no-store' } }
-    );
-  }
-
+export async function GET(request: NextRequest) {
+  let session: ReturnType<typeof getOrCreateVisitorSession>;
   try {
-    const rewards = await getFanRewards(parsed.data);
-    return NextResponse.json(rewards, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { error: 'Failed to load community rewards' },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } }
-    );
+    session = getOrCreateVisitorSession(request);
+    const rewards = await getFanRewards(session.visitorId);
+    const response = NextResponse.json(rewards);
+    response.headers.set('Cache-Control', 'no-store');
+    return attachVisitorSession(response, session.newToken);
+  } catch (error) {
+    console.error('Failed to load community rewards', error);
+    return NextResponse.json({ error: 'Unable to load community rewards' }, { status: 500 });
   }
 }

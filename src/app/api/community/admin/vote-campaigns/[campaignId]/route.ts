@@ -42,7 +42,6 @@ export async function PATCH(req: NextRequest, { params }: CampaignRouteContext) 
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
 
-    const message = err instanceof Error ? err.message : 'Failed to update vote campaign';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update vote campaign' }, { status: 500 });
   }
 }

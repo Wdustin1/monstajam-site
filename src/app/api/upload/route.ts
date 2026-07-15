@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { isAdminRequest } from '@/lib/auth';
 
@@ -64,26 +63,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(jsonResponse);
     }
 
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const folder = (formData.get('bucket') as string) || 'covers';
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    const ext = file.name.split('.').pop() || 'bin';
-    const path = `monstajam/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const blob = await put(path, file, {
-      access: 'public',
-      contentType: file.type || 'application/octet-stream',
-    });
-
-    return NextResponse.json({ url: blob.url });
+    return NextResponse.json({ error: 'Unsupported upload request' }, { status: 415 });
   } catch (err) {
     console.error('Upload error:', err);
-    const message = err instanceof Error ? err.message : 'Upload failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }
