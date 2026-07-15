@@ -19,7 +19,7 @@ test('Community Hub component exists as a focused fan participation surface', ()
     'Vote on the music. Build the community.',
     'MonstaJam Community',
     'Choose the first vote',
-    'Join the conversation',
+    'One room. Every release.',
     'Listen first',
     'Premium listening is on the way',
     'Monsta access',
@@ -54,9 +54,9 @@ test('Community Hub is tab based instead of rendering every module in one long h
 test('Community Hub exposes useful actions and an honest invite fallback', () => {
   const source = readFileSync(componentPath, 'utf8');
   const requiredCtas = [
-    'NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL',
-    'href={communityUrl}',
-    'Join the community',
+    "fetch('/api/community/settings'",
+    'href={roomSettings.inviteUrl}',
+    'Join on {roomSettings.platform}',
     'Invite opening soon',
     'aria-disabled="true"',
     'href="/#library"',

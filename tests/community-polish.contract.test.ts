@@ -20,7 +20,7 @@ test('community hub is a focused fan surface instead of an internal roadmap dash
     'handleTabKeyDown',
     "activeTab === 'vote' && <FeaturedVote />",
     "activeTab === 'rewards' && <CommunityRewards />",
-    'Join the conversation',
+    'One room. Every release.',
     'Premium listening is on the way',
   ]) {
     assert.ok(hub.includes(anchor), `CommunityHub should include ${anchor}`);

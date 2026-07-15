@@ -40,6 +40,22 @@ type Summary = {
   }>;
 };
 
+type RoomSettings = {
+  platform: 'WhatsApp' | 'Discord' | 'Telegram' | 'Other';
+  roomName: string;
+  inviteUrl: string | null;
+  announcement: string | null;
+  isOpen: boolean;
+};
+
+const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  platform: 'WhatsApp',
+  roomName: 'MonstaJam Community',
+  inviteUrl: null,
+  announcement: null,
+  isOpen: false,
+};
+
 const DEFAULT_OPTIONS = 'Song\nCover art\nRemix\nFuture release';
 
 function formatDate(value: string) {
@@ -80,10 +96,12 @@ export default function CommunityAdminDashboard() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [roomSettings, setRoomSettings] = useState<RoomSettings>(DEFAULT_ROOM_SETTINGS);
+  const [roomSaving, setRoomSaving] = useState(false);
   const [form, setForm] = useState({
-    title: 'Featured Vote',
-    question: 'What should MonstaJam vote on next?',
-    description: 'Pick the next direction for the crowd to influence.',
+    title: 'New fan vote',
+    question: 'Which song should MonstaJam feature next?',
+    description: 'Listen to the choices, cast your vote, and help choose what gets the spotlight.',
     options: DEFAULT_OPTIONS,
     status: 'ACTIVE' as CampaignStatus,
   });
@@ -94,12 +112,18 @@ export default function CommunityAdminDashboard() {
     setUnauthorized(false);
 
     try {
-      const res = await fetch('/api/community/admin/summary', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
+      const [res, settingsRes] = await Promise.all([
+        fetch('/api/community/admin/summary', {
+          credentials: 'include',
+          cache: 'no-store',
+        }),
+        fetch('/api/community/admin/settings', {
+          credentials: 'include',
+          cache: 'no-store',
+        }),
+      ]);
 
-      if (res.status === 401) {
+      if (res.status === 401 || settingsRes.status === 401) {
         setUnauthorized(true);
         setSummary(null);
         return;
@@ -109,7 +133,12 @@ export default function CommunityAdminDashboard() {
         throw new Error('Community summary failed to load.');
       }
 
+      if (!settingsRes.ok) {
+        throw new Error('Community room settings failed to load.');
+      }
+
       setSummary((await res.json()) as Summary);
+      setRoomSettings((await settingsRes.json()) as RoomSettings);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Community summary failed to load.');
     } finally {
@@ -120,6 +149,37 @@ export default function CommunityAdminDashboard() {
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  async function saveRoomSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRoomSaving(true);
+    setActionMessage(null);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/community/admin/settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...roomSettings,
+          inviteUrl: roomSettings.inviteUrl ?? '',
+          announcement: roomSettings.announcement ?? '',
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Community room settings failed to save.');
+      }
+
+      setRoomSettings(payload as RoomSettings);
+      setActionMessage(payload.isOpen ? 'Community room is open to fans.' : 'Community room settings saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Community room settings failed to save.');
+    } finally {
+      setRoomSaving(false);
+    }
+  }
 
   async function createVoteCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,7 +241,7 @@ export default function CommunityAdminDashboard() {
 
       setActionMessage(
         status === 'ACTIVE'
-          ? 'Vote campaign activated. The homepage now shows it.'
+          ? 'Vote campaign activated. The Community Vote tab now shows it.'
           : status === 'CLOSED'
             ? 'Vote campaign archived.'
             : 'Vote campaign moved back to draft.'
@@ -220,7 +280,7 @@ export default function CommunityAdminDashboard() {
               Community hub admin
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Create vote campaigns, activate the live homepage poll, archive old polls, and read the results without opening Mongo manually.
+              Run fan votes, connect the live community room, archive old polls, and read participation without opening Mongo manually.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -253,10 +313,93 @@ export default function CommunityAdminDashboard() {
               <StatCard label="Credits issued" value={summary.totals.creditsIssued} detail={`${summary.totals.creditLedgerRows} reward rows`} />
             </div>
 
+            <section className="rounded-xl border border-fuchsia-300/20 bg-fuchsia-300/[0.05] p-5">
+              <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">Community room</h2>
+                    <p className="mt-1 text-sm text-slate-400">Connect the Talk tab to the fan room without a redeploy.</p>
+                  </div>
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${roomSettings.isOpen ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : 'border-slate-300/20 bg-slate-300/10 text-slate-300'}`}>
+                    {roomSettings.isOpen ? 'Open' : 'Invite pending'}
+                  </span>
+                </div>
+              </div>
+              <form onSubmit={saveRoomSettings} className="mt-5 grid gap-4 lg:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold text-slate-300">
+                  Platform
+                  <select
+                    value={roomSettings.platform}
+                    onChange={(event) => setRoomSettings((current) => ({ ...current, platform: event.target.value as RoomSettings['platform'] }))}
+                    className="min-h-11 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none transition focus:border-fuchsia-300/60"
+                  >
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Discord">Discord</option>
+                    <option value="Telegram">Telegram</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-slate-300">
+                  Room name
+                  <input
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    value={roomSettings.roomName}
+                    onChange={(event) => setRoomSettings((current) => ({ ...current, roomName: event.target.value }))}
+                    className="min-h-11 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none transition focus:border-fuchsia-300/60"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-slate-300 lg:col-span-2">
+                  Invite URL
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://chat.whatsapp.com/..."
+                    value={roomSettings.inviteUrl ?? ''}
+                    onChange={(event) => setRoomSettings((current) => ({ ...current, inviteUrl: event.target.value || null }))}
+                    className="min-h-11 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none transition focus:border-fuchsia-300/60"
+                  />
+                  <span className="font-normal text-slate-500">Secure HTTPS invite links only. Leave blank until the room is ready.</span>
+                </label>
+                <label className="grid gap-2 text-sm font-semibold text-slate-300 lg:col-span-2">
+                  Fan announcement
+                  <textarea
+                    maxLength={180}
+                    rows={2}
+                    placeholder="Drop news, listening-room times, or the conversation prompt."
+                    value={roomSettings.announcement ?? ''}
+                    onChange={(event) => setRoomSettings((current) => ({ ...current, announcement: event.target.value || null }))}
+                    className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none transition focus:border-fuchsia-300/60"
+                  />
+                </label>
+                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm font-semibold text-slate-300 lg:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={roomSettings.isOpen}
+                    disabled={!roomSettings.inviteUrl}
+                    onChange={(event) => setRoomSettings((current) => ({ ...current, isOpen: event.target.checked }))}
+                    className="h-5 w-5 accent-fuchsia-300"
+                  />
+                  Open the room to fans
+                  {!roomSettings.inviteUrl && <span className="font-normal text-slate-500">Add an invite URL first.</span>}
+                </label>
+                <div className="lg:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={roomSaving}
+                    className="min-h-11 rounded-md bg-fuchsia-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-fuchsia-200 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {roomSaving ? 'Saving room…' : 'Save room settings'}
+                  </button>
+                </div>
+              </form>
+            </section>
+
             <section className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.05] p-5">
               <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
                 <h2 className="text-xl font-semibold text-white">Create vote campaign</h2>
-                <p className="text-sm text-slate-400">Keep participation simple: create a poll, make it active, and the homepage Featured Vote updates automatically.</p>
+                <p className="text-sm text-slate-400">Create a focused poll, make it active, and the Community Vote tab updates automatically.</p>
               </div>
               <form onSubmit={createVoteCampaign} className="mt-5 grid gap-4 lg:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold text-slate-300">
@@ -274,7 +417,7 @@ export default function CommunityAdminDashboard() {
                     onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as CampaignStatus }))}
                     className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-white outline-none transition focus:border-cyan-300/60"
                   >
-                    <option value="ACTIVE">Create as active homepage vote</option>
+                    <option value="ACTIVE">Create as active community vote</option>
                     <option value="DRAFT">Save as draft</option>
                   </select>
                 </label>

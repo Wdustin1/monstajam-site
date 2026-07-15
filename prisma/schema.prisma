@@ -159,3 +159,16 @@ model CreditLedger {
   @@index([campaignId])
   @@map("credit_ledger")
 }
+
+model CommunitySettings {
+  id           String   @id @map("_id")
+  platform     String
+  roomName     String
+  inviteUrl    String?
+  announcement String?
+  isOpen       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("community_settings")
+}

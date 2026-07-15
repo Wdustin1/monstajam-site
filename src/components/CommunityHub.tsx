@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Headphones, LockKeyhole, MessageCircle, Sparkles, Trophy } from 'lucide-react';
 import FeaturedVote from '@/components/FeaturedVote';
@@ -14,13 +14,52 @@ const COMMUNITY_TABS = [
 ] as const;
 
 type CommunityTabId = (typeof COMMUNITY_TABS)[number]['id'];
+type RoomSettings = {
+  platform: 'WhatsApp' | 'Discord' | 'Telegram' | 'Other';
+  roomName: string;
+  inviteUrl: string | null;
+  announcement: string | null;
+  isOpen: boolean;
+};
 
-const communityUrl = process.env.NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL;
+const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  platform: 'WhatsApp',
+  roomName: 'MonstaJam Community',
+  inviteUrl: null,
+  announcement: null,
+  isOpen: false,
+};
 
 export default function CommunityHub() {
   const [activeTab, setActiveTab] = useState<CommunityTabId>('vote');
+  const [roomSettings, setRoomSettings] = useState<RoomSettings>(DEFAULT_ROOM_SETTINGS);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const activeTabConfig = COMMUNITY_TABS.find((tab) => tab.id === activeTab) ?? COMMUNITY_TABS[0];
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadRoomSettings() {
+      try {
+        const response = await fetch('/api/community/settings', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as RoomSettings;
+        if (typeof payload.roomName === 'string' && typeof payload.isOpen === 'boolean') {
+          setRoomSettings(payload);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          console.warn('Community room settings could not be refreshed.');
+        }
+      }
+    }
+
+    void loadRoomSettings();
+    return () => controller.abort();
+  }, []);
 
   function selectTab(tab: CommunityTabId, index?: number) {
     setActiveTab(tab);
@@ -141,45 +180,63 @@ export default function CommunityHub() {
           {activeTab === 'vote' && <FeaturedVote />}
 
           {activeTab === 'talk' && (
-            <section className="grid gap-6 lg:grid-cols-[1fr_0.75fr] lg:items-center">
-              <div className="rounded-[1.75rem] border border-cyan-300/20 bg-cyan-300/[0.06] p-6 sm:p-8">
-                <MessageCircle aria-hidden="true" className="h-8 w-8 text-cyan-200" />
-                <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">Community room</p>
-                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">Join the conversation</h2>
-                <p className="mt-4 max-w-xl text-sm leading-7 text-gray-400">
-                  Trade feedback, talk through the latest tracks, and meet the producers, fans, and AI music creators helping shape each release.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {communityUrl ? (
-                    <a
-                      href={communityUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-cyan-200 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-black no-underline hover:bg-white"
-                    >
-                      Join the community <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                    </a>
-                  ) : (
-                    <span
-                      aria-disabled="true"
-                      className="inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-gray-400"
-                    >
-                      Invite opening soon
+            <section className="grid gap-6 lg:grid-cols-[1fr_0.75fr] lg:items-stretch">
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-cyan-300/20 bg-cyan-300/[0.06] p-6 sm:p-8">
+                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full border border-cyan-200/10" />
+                <div className="relative">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <MessageCircle aria-hidden="true" className="h-8 w-8 text-cyan-200" />
+                    <span className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] ${roomSettings.isOpen && roomSettings.inviteUrl ? 'border-emerald-200/25 bg-emerald-200/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-gray-400'}`}>
+                      {roomSettings.isOpen && roomSettings.inviteUrl ? `${roomSettings.platform} room open` : 'Invite opening soon'}
                     </span>
+                  </div>
+                  <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">Community room</p>
+                  <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">{roomSettings.roomName}</h2>
+                  <p className="mt-4 max-w-xl text-sm leading-7 text-gray-400">
+                    Trade feedback, talk through the latest tracks, and meet the producers, fans, and AI music creators helping shape each release.
+                  </p>
+                  {roomSettings.announcement && (
+                    <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm leading-6 text-gray-200">
+                      <span className="mr-2 font-black uppercase tracking-[0.14em] text-cyan-200">Now</span>
+                      {roomSettings.announcement}
+                    </div>
                   )}
-                  <Link
-                    href="/#library"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white no-underline hover:border-cyan-200/40"
-                  >
-                    Listen first <Headphones aria-hidden="true" className="h-4 w-4" />
-                  </Link>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {roomSettings.isOpen && roomSettings.inviteUrl ? (
+                      <a
+                        href={roomSettings.inviteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-cyan-200 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-black no-underline hover:bg-white"
+                      >
+                        Join on {roomSettings.platform} <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <span
+                        aria-disabled="true"
+                        className="inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-gray-400"
+                      >
+                        Invite opening soon
+                      </span>
+                    )}
+                    <Link
+                      href="/#library"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white no-underline hover:border-cyan-200/40"
+                    >
+                      Listen first <Headphones aria-hidden="true" className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-3">
-                {['Track reactions without the feed noise', 'Focused release conversations', 'Creator and fan support in one room'].map((item, index) => (
-                  <div key={item} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm font-semibold text-gray-300">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] font-mono text-xs text-cyan-200">
+              <div className="grid content-start gap-3 rounded-[1.75rem] border border-white/10 bg-black/20 p-4 sm:p-5">
+                <div className="px-1 pb-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200/70">Built for real conversation</p>
+                  <h3 className="mt-2 text-xl font-black uppercase tracking-tight text-white">One room. Every release.</h3>
+                </div>
+                {['React to tracks while they are fresh', 'Follow focused release conversations', 'Support creators and meet other fans'].map((item, index) => (
+                  <div key={item} className="flex min-h-16 items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm font-semibold text-gray-300">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-200/10 font-mono text-xs text-cyan-200">
                       0{index + 1}
                     </span>
                     {item}
