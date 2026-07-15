@@ -23,6 +23,7 @@ Create `.env.local` with the deployment credentials used by the app:
 - `DATABASE_URL` — MongoDB connection string.
 - `ADMIN_SECRET` — admin password/session secret (at least 16 characters).
 - `COMMUNITY_VISITOR_SECRET` — a separate, random visitor-cookie signing secret (at least 32 characters; never reuse `ADMIN_SECRET`).
+- `COMMUNITY_ROOM_ENABLED` — optional server-only gate; set to `true` only when the public community room is ready to open.
 - `BLOB_READ_WRITE_TOKEN` — Vercel Blob token for admin uploads.
 
 Before deploying community voting or rewards changes, apply and verify the required MongoDB indexes:

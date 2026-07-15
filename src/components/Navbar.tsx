@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -18,6 +18,21 @@ const LINKS = [
 
 export default function Navbar({ activeLink }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        requestAnimationFrame(() => menuButtonRef.current?.focus());
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [menuOpen]);
 
   return (
     <header className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-[#050505]/90 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-5">
@@ -59,6 +74,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
 
       {/* Mobile hamburger */}
       <button
+        ref={menuButtonRef}
         type="button"
         className="flex h-11 w-11 flex-col items-center justify-center gap-[5px] rounded-xl transition-colors hover:bg-white/5 md:hidden"
         onClick={() => setMenuOpen((v) => !v)}

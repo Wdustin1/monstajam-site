@@ -8,7 +8,7 @@ import CommunityRewards from '@/components/CommunityRewards';
 
 const COMMUNITY_TABS = [
   { id: 'vote', label: 'Vote', eyebrow: 'Live now' },
-  { id: 'talk', label: 'Talk', eyebrow: 'Community' },
+  { id: 'talk', label: 'Talk', eyebrow: 'Coming soon' },
   { id: 'rewards', label: 'Rewards', eyebrow: 'Your credits' },
   { id: 'access', label: 'Access', eyebrow: 'Coming soon' },
 ] as const;
@@ -126,7 +126,7 @@ export default function CommunityHub() {
               Vote on the music. Build the community.
             </h1>
             <p className="mt-5 max-w-3xl text-sm leading-7 text-gray-300 sm:text-base">
-              MonstaJam is a home base where fans and AI music creators can vote on songs, cover art, remixes, artist spotlights, and upcoming releases—then join the conversation around every decision.
+              MonstaJam is a home base where fans and AI music creators can vote on songs, cover art, remixes, artist spotlights, and upcoming releases—with community conversations coming soon.
             </p>
             <a
               href="#community-tabs"
@@ -211,11 +211,13 @@ export default function CommunityHub() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <MessageCircle aria-hidden="true" className="h-8 w-8 text-cyan-200" />
                     <span className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] ${roomSettings.isOpen && roomSettings.inviteUrl ? 'border-emerald-200/25 bg-emerald-200/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-gray-400'}`}>
-                      {roomSettings.isOpen && roomSettings.inviteUrl ? `${roomSettings.platform} room open` : 'Invite opening soon'}
+                      {roomSettings.isOpen && roomSettings.inviteUrl ? `${roomSettings.platform} room open` : 'Coming soon'}
                     </span>
                   </div>
                   <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">Community room</p>
-                  <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">{roomSettings.roomName}</h2>
+                  <h2 data-coming-soon-heading className="mt-2 text-2xl leading-tight font-black uppercase tracking-tight text-white min-[360px]:text-3xl sm:text-4xl">
+                    {roomSettings.isOpen && roomSettings.inviteUrl ? roomSettings.roomName : 'Community conversations are coming soon'}
+                  </h2>
                   <p className="mt-4 max-w-xl text-sm leading-7 text-gray-400">
                     Trade feedback, talk through the latest tracks, and meet the producers, fans, and AI music creators helping shape each release.
                   </p>
@@ -240,7 +242,7 @@ export default function CommunityHub() {
                         aria-disabled="true"
                         className="inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-gray-400"
                       >
-                        Invite opening soon
+                        Community coming soon
                       </span>
                     )}
                     <Link
@@ -256,7 +258,7 @@ export default function CommunityHub() {
               <div className="grid content-start gap-3 rounded-[1.75rem] border border-white/10 bg-black/20 p-4 sm:p-5">
                 <div className="px-1 pb-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-fuchsia-200/70">Built for real conversation</p>
-                  <h3 className="mt-2 text-xl font-black uppercase tracking-tight text-white">One room. Every release.</h3>
+                  <h3 className="mt-2 text-xl font-black uppercase tracking-tight text-white">A room for every release.</h3>
                 </div>
                 {['React to tracks while they are fresh', 'Follow focused release conversations', 'Support creators and meet other fans'].map((item, index) => (
                   <div key={item} className="flex min-h-16 items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm font-semibold text-gray-300">

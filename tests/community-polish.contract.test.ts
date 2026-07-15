@@ -20,7 +20,7 @@ test('community hub is a focused fan surface instead of an internal roadmap dash
     'handleTabKeyDown',
     "activeTab === 'vote' && <FeaturedVote />",
     "activeTab === 'rewards' && <CommunityRewards />",
-    'One room. Every release.',
+    'Community conversations are coming soon',
     'Premium listening is on the way',
   ]) {
     assert.ok(hub.includes(anchor), `CommunityHub should include ${anchor}`);
@@ -34,6 +34,7 @@ test('community hub is a focused fan surface instead of an internal roadmap dash
     'Admin managed',
     'backstage',
     'preview the premium',
+    'then join the conversation around every decision',
   ]) {
     assert.equal(hub.includes(stale), false, `CommunityHub should remove internal/roadmap surface: ${stale}`);
   }
@@ -107,6 +108,25 @@ test('rewards surface uses returned activity and distinguishes loading, error, a
     'No rewards yet. Cast your first vote to start the activity log.',
   ]) {
     assert.ok(rewards.includes(anchor), `CommunityRewards should render ${anchor}`);
+  }
+});
+
+test('community coming-soon heading fits narrow phone layouts', () => {
+  assert.ok(
+    hub.includes('data-coming-soon-heading className="mt-2 text-2xl leading-tight'),
+    'Coming-soon heading should use a narrow-phone-safe size and line height',
+  );
+});
+
+test('mobile navigation closes on Escape and returns focus to its trigger', () => {
+  for (const anchor of [
+    'useEffect',
+    'menuButtonRef',
+    "event.key === 'Escape'",
+    'setMenuOpen(false)',
+    'menuButtonRef.current?.focus()',
+  ]) {
+    assert.ok(navbar.includes(anchor), `Navbar should include ${anchor}`);
   }
 });
 

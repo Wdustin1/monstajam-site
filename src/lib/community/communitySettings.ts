@@ -67,6 +67,10 @@ function safeEnvironmentInviteUrl() {
 }
 
 export async function getPublicCommunitySettings(): Promise<PublicCommunitySettings> {
+  if (process.env.COMMUNITY_ROOM_ENABLED !== 'true') {
+    return closedDefaultSettings();
+  }
+
   const stored = await prisma.communitySettings.findUnique({ where: { id: 'primary' } });
 
   if (!stored) {

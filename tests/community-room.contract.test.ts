@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   CommunitySettingsSchema,
+  getPublicCommunitySettings,
   normalizeStoredCommunitySettings,
 } from '../src/lib/community/communitySettings';
 
@@ -47,6 +48,7 @@ test('community room settings validate safe links and expose public/admin helper
     'saveCommunitySettings',
     'prisma.communitySettings.upsert',
     "id: 'primary'",
+    "process.env.COMMUNITY_ROOM_ENABLED !== 'true'",
   ]) {
     assert.ok(source.includes(anchor), `community settings helper should include ${anchor}`);
   }
@@ -101,6 +103,24 @@ test('persisted room settings fail closed when Mongo contains unsafe or malforme
   assert.equal(valid.isOpen, true);
 });
 
+test('public room stays closed until the deployment gate is explicitly enabled', async () => {
+  const previous = process.env.COMMUNITY_ROOM_ENABLED;
+  delete process.env.COMMUNITY_ROOM_ENABLED;
+
+  try {
+    assert.deepEqual(await getPublicCommunitySettings(), {
+      platform: 'WhatsApp',
+      roomName: 'MonstaJam Community',
+      inviteUrl: null,
+      announcement: null,
+      isOpen: false,
+    });
+  } finally {
+    if (previous === undefined) delete process.env.COMMUNITY_ROOM_ENABLED;
+    else process.env.COMMUNITY_ROOM_ENABLED = previous;
+  }
+});
+
 test('community room settings APIs separate public read from protected writes', () => {
   assert.ok(existsSync(publicRoutePath), 'public community settings route should exist');
   assert.ok(existsSync(adminRoutePath), 'admin community settings route should exist');
@@ -128,6 +148,7 @@ test('backstage can manage the room and the public Talk tab consumes it', () => 
     'Room name',
     'Invite URL',
     'Open the room to fans',
+    'Public Talk stays Coming Soon until COMMUNITY_ROOM_ENABLED is enabled for the deployment.',
   ]) {
     assert.ok(admin.includes(anchor), `community admin should include ${anchor}`);
   }
@@ -139,7 +160,7 @@ test('backstage can manage the room and the public Talk tab consumes it', () => 
     'roomSettings',
     'roomSettings.announcement',
     'Join on',
-    'Invite opening soon',
+    'Community coming soon',
   ]) {
     assert.ok(hub.includes(anchor), `CommunityHub should include ${anchor}`);
   }

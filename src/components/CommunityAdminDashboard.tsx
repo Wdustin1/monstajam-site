@@ -318,13 +318,16 @@ export default function CommunityAdminDashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-white">Community room</h2>
-                    <p className="mt-1 text-sm text-slate-400">Connect the Talk tab to the fan room without a redeploy.</p>
+                    <p className="mt-1 text-sm text-slate-400">Prepare a future fan-room invite and announcement.</p>
                   </div>
                   <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${roomSettings.isOpen ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : 'border-slate-300/20 bg-slate-300/10 text-slate-300'}`}>
                     {roomSettings.isOpen ? 'Open' : 'Invite pending'}
                   </span>
                 </div>
               </div>
+              <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                Public Talk stays Coming Soon until COMMUNITY_ROOM_ENABLED is enabled for the deployment.
+              </p>
               <form onSubmit={saveRoomSettings} className="mt-5 grid gap-4 lg:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold text-slate-300">
                   Platform
