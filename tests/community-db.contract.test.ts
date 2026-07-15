@@ -8,6 +8,7 @@ const schemaPath = join(root, 'prisma/schema.prisma');
 const helperPath = join(root, 'src/lib/community/featuredVote.ts');
 const campaignHelperPath = join(root, 'src/lib/community/voteCampaigns.ts');
 const routePath = join(root, 'src/app/api/community/featured-vote/route.ts');
+const kickoffRolloutPath = join(root, 'scripts/community-kickoff-campaign.ts');
 const packagePath = join(root, 'package.json');
 
 test('Prisma schema defines the community hub persistence layer', () => {
@@ -87,6 +88,31 @@ test('Managed vote campaign helper supports admin-created active polls', () => {
   for (const anchor of requiredManagedCampaignAnchors) {
     assert.ok(source.includes(anchor), `managed vote campaign helper should include ${anchor}`);
   }
+});
+
+test('default campaign initialization is create-only and never rewrites a legacy campaign with votes', () => {
+  const source = readFileSync(campaignHelperPath, 'utf8');
+  const defaultStart = source.indexOf('export async function ensureDefaultFeaturedVoteCampaign');
+  const defaultEnd = source.indexOf('export async function getVoteCampaignWithOptionsAndVotes', defaultStart);
+  const defaultInitializer = source.slice(defaultStart, defaultEnd);
+  const publicStart = source.indexOf('export async function getActiveVoteCampaignForPublic');
+  const publicEnd = source.indexOf('export async function createManagedVoteCampaign', publicStart);
+  const publicSelector = source.slice(publicStart, publicEnd);
+  const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { scripts?: Record<string, string> };
+
+  for (const anchor of [
+    'update: {}',
+    'options: {',
+    'create: FEATURED_VOTE_OPTIONS.map',
+  ]) {
+    assert.ok(defaultInitializer.includes(anchor), `default initializer should include ${anchor}`);
+  }
+
+  assert.equal(defaultInitializer.includes('prisma.voteOption.upsert'), false, 'existing campaign options must never be upserted by fallback initialization');
+  assert.ok(publicSelector.includes('seeded.status !== VoteCampaignStatus.ACTIVE'), 'a closed legacy campaign must not be reactivated automatically');
+  assert.equal(publicSelector.includes('prisma.voteCampaign.update'), false, 'public fallback must never mutate an existing campaign');
+  assert.equal(existsSync(kickoffRolloutPath), false, 'the completed one-time semantic rewrite script must not remain runnable');
+  assert.equal(pkg.scripts?.['db:community-kickoff'], undefined, 'the completed semantic rewrite command must be removed');
 });
 
 test('Featured vote API exposes GET and POST handlers against the active campaign', () => {

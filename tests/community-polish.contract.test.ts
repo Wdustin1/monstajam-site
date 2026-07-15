@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -11,8 +11,6 @@ const rewards = readFileSync(join(root, 'src/components/CommunityRewards.tsx'), 
 const navbar = readFileSync(join(root, 'src/components/Navbar.tsx'), 'utf8');
 const footer = readFileSync(join(root, 'src/components/Footer.tsx'), 'utf8');
 const globals = readFileSync(join(root, 'src/app/globals.css'), 'utf8');
-const kickoffRolloutPath = join(root, 'scripts/community-kickoff-campaign.ts');
-const packagePath = join(root, 'package.json');
 
 test('community hub is a focused fan surface instead of an internal roadmap dashboard', () => {
   for (const anchor of [
@@ -62,25 +60,6 @@ test('community voting copy explains the client intent in concrete language', ()
   for (const vagueCopy of ['What should MonstaJam push next?', 'next push', 'shaping what MonstaJam should push next']) {
     assert.equal(publicVoteSources.includes(vagueCopy), false, `public voting copy should remove vague phrase: ${vagueCopy}`);
   }
-});
-
-test('kickoff campaign rollout refuses destructive edits after voting starts', () => {
-  assert.ok(existsSync(kickoffRolloutPath), 'community kickoff rollout script should exist');
-  const rollout = readFileSync(kickoffRolloutPath, 'utf8');
-  const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { scripts?: Record<string, string> };
-
-  for (const anchor of [
-    'FEATURED_VOTE_CAMPAIGN',
-    'FEATURED_VOTE_OPTIONS',
-    'prisma.vote.count',
-    'assert.equal(voteCount, 0',
-    'prisma.$transaction',
-    'tx.voteOption.update',
-  ]) {
-    assert.ok(rollout.includes(anchor), `kickoff rollout should include ${anchor}`);
-  }
-
-  assert.equal(pkg.scripts?.['db:community-kickoff'], 'tsx scripts/community-kickoff-campaign.ts');
 });
 
 test('featured vote is compact, result-aware, and rolls back failed optimistic votes', () => {

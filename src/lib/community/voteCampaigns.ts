@@ -91,44 +91,24 @@ async function closeOtherActiveCampaigns(exceptCampaignId?: string) {
 }
 
 export async function ensureDefaultFeaturedVoteCampaign() {
-  const campaign = await prisma.voteCampaign.upsert({
+  return prisma.voteCampaign.upsert({
     where: { slug: FEATURED_VOTE_SLUG },
-    update: {
-      title: FEATURED_VOTE_CAMPAIGN.title,
-      question: FEATURED_VOTE_CAMPAIGN.question,
-      description: FEATURED_VOTE_CAMPAIGN.description,
-    },
+    update: {},
     create: {
       slug: FEATURED_VOTE_CAMPAIGN.slug,
       title: FEATURED_VOTE_CAMPAIGN.title,
       question: FEATURED_VOTE_CAMPAIGN.question,
       description: FEATURED_VOTE_CAMPAIGN.description,
       status: VoteCampaignStatus.ACTIVE,
+      options: {
+        create: FEATURED_VOTE_OPTIONS.map((option) => ({
+          label: option.label,
+          description: option.description,
+          sortOrder: option.sortOrder,
+        })),
+      },
     },
   });
-
-  for (const option of FEATURED_VOTE_OPTIONS) {
-    await prisma.voteOption.upsert({
-      where: {
-        campaignId_label: {
-          campaignId: campaign.id,
-          label: option.label,
-        },
-      },
-      update: {
-        description: option.description,
-        sortOrder: option.sortOrder,
-      },
-      create: {
-        campaignId: campaign.id,
-        label: option.label,
-        description: option.description,
-        sortOrder: option.sortOrder,
-      },
-    });
-  }
-
-  return campaign;
 }
 
 export async function getVoteCampaignWithOptionsAndVotes(campaignId: string) {
@@ -156,11 +136,9 @@ export async function getActiveVoteCampaignForPublic() {
   }
 
   const seeded = await ensureDefaultFeaturedVoteCampaign();
-  await closeOtherActiveCampaigns(seeded.id);
-  await prisma.voteCampaign.update({
-    where: { id: seeded.id },
-    data: { status: VoteCampaignStatus.ACTIVE },
-  });
+  if (seeded.status !== VoteCampaignStatus.ACTIVE) {
+    throw new Error('No active vote campaign is available. Create or activate a new campaign in community admin.');
+  }
 
   campaign = await getVoteCampaignWithOptionsAndVotes(seeded.id);
   return campaign;
