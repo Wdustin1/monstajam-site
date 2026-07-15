@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { getCommunityRoomAdminStatus } from '@/lib/community/adminRoomStatus';
 
 type CampaignStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
 
@@ -46,6 +47,7 @@ type RoomSettings = {
   inviteUrl: string | null;
   announcement: string | null;
   isOpen: boolean;
+  publicEnabled: boolean;
 };
 
 const DEFAULT_ROOM_SETTINGS: RoomSettings = {
@@ -54,6 +56,7 @@ const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   inviteUrl: null,
   announcement: null,
   isOpen: false,
+  publicEnabled: false,
 };
 
 const DEFAULT_OPTIONS = 'Song\nCover art\nRemix\nFuture release';
@@ -98,6 +101,7 @@ export default function CommunityAdminDashboard() {
   const [saving, setSaving] = useState(false);
   const [roomSettings, setRoomSettings] = useState<RoomSettings>(DEFAULT_ROOM_SETTINGS);
   const [roomSaving, setRoomSaving] = useState(false);
+  const roomStatus = getCommunityRoomAdminStatus(roomSettings);
   const [form, setForm] = useState({
     title: 'New fan vote',
     question: 'Which song should MonstaJam feature next?',
@@ -162,9 +166,11 @@ export default function CommunityAdminDashboard() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...roomSettings,
+          platform: roomSettings.platform,
+          roomName: roomSettings.roomName,
           inviteUrl: roomSettings.inviteUrl ?? '',
           announcement: roomSettings.announcement ?? '',
+          isOpen: roomSettings.isOpen,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -172,8 +178,12 @@ export default function CommunityAdminDashboard() {
         throw new Error(payload.error || 'Community room settings failed to save.');
       }
 
+      const savedRoomStatus = getCommunityRoomAdminStatus({
+        isOpen: Boolean(payload.isOpen),
+        publicEnabled: Boolean(payload.publicEnabled),
+      });
       setRoomSettings(payload as RoomSettings);
-      setActionMessage(payload.isOpen ? 'Community room is open to fans.' : 'Community room settings saved.');
+      setActionMessage(savedRoomStatus.saveMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Community room settings failed to save.');
     } finally {
@@ -280,7 +290,7 @@ export default function CommunityAdminDashboard() {
               Community hub admin
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Run fan votes, connect the live community room, archive old polls, and read participation without opening Mongo manually.
+              Run fan votes, prepare the future community room, archive old polls, and read participation without opening Mongo manually.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -320,13 +330,15 @@ export default function CommunityAdminDashboard() {
                     <h2 className="text-xl font-semibold text-white">Community room</h2>
                     <p className="mt-1 text-sm text-slate-400">Prepare a future fan-room invite and announcement.</p>
                   </div>
-                  <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${roomSettings.isOpen ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : 'border-slate-300/20 bg-slate-300/10 text-slate-300'}`}>
-                    {roomSettings.isOpen ? 'Open' : 'Invite pending'}
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${roomStatus.isLive ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : roomStatus.label === 'Prepared' ? 'border-amber-300/30 bg-amber-300/10 text-amber-100' : 'border-slate-300/20 bg-slate-300/10 text-slate-300'}`}>
+                    {roomStatus.label}
                   </span>
                 </div>
               </div>
               <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-100">
-                Public Talk stays Coming Soon until COMMUNITY_ROOM_ENABLED is enabled for the deployment.
+                {roomSettings.publicEnabled
+                  ? 'The deployment gate is enabled. A ready room with a secure invite is public in Talk.'
+                  : 'Public Talk stays Coming Soon until COMMUNITY_ROOM_ENABLED is enabled for the deployment.'}
               </p>
               <form onSubmit={saveRoomSettings} className="mt-5 grid gap-4 lg:grid-cols-2">
                 <label className="grid gap-2 text-sm font-semibold text-slate-300">
@@ -384,7 +396,7 @@ export default function CommunityAdminDashboard() {
                     onChange={(event) => setRoomSettings((current) => ({ ...current, isOpen: event.target.checked }))}
                     className="h-5 w-5 accent-fuchsia-300"
                   />
-                  Open the room to fans
+                  Mark room ready to open
                   {!roomSettings.inviteUrl && <span className="font-normal text-slate-500">Add an invite URL first.</span>}
                 </label>
                 <div className="lg:col-span-2">

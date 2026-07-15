@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
 import {
   CommunitySettingsSchema,
-  getPublicCommunitySettings,
+  getCommunitySettingsForAdmin,
+  isCommunityRoomPublicEnabled,
   saveCommunitySettings,
 } from '@/lib/community/communitySettings';
 
@@ -14,8 +15,8 @@ export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return unauthorized();
 
   try {
-    const settings = await getPublicCommunitySettings();
-    return NextResponse.json(settings, {
+    const settings = await getCommunitySettingsForAdmin();
+    return NextResponse.json({ ...settings, publicEnabled: isCommunityRoomPublicEnabled() }, {
       headers: {
         'Cache-Control': 'no-store',
       },
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const settings = await saveCommunitySettings(parsed.data);
-    return NextResponse.json(settings, {
+    return NextResponse.json({ ...settings, publicEnabled: isCommunityRoomPublicEnabled() }, {
       headers: {
         'Cache-Control': 'no-store',
       },

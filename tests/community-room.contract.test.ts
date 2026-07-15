@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   CommunitySettingsSchema,
+  getCommunitySettingsForAdmin,
   getPublicCommunitySettings,
   normalizeStoredCommunitySettings,
 } from '../src/lib/community/communitySettings';
+import { getCommunityRoomAdminStatus } from '../src/lib/community/adminRoomStatus';
 
 const root = process.cwd();
 const schemaPath = join(root, 'prisma/schema.prisma');
@@ -48,7 +50,7 @@ test('community room settings validate safe links and expose public/admin helper
     'saveCommunitySettings',
     'prisma.communitySettings.upsert',
     "id: 'primary'",
-    "process.env.COMMUNITY_ROOM_ENABLED !== 'true'",
+    'isCommunityRoomPublicEnabled',
   ]) {
     assert.ok(source.includes(anchor), `community settings helper should include ${anchor}`);
   }
@@ -121,6 +123,67 @@ test('public room stays closed until the deployment gate is explicitly enabled',
   }
 });
 
+test('admin reads persisted room settings while the public deployment gate is disabled', async () => {
+  const previous = process.env.COMMUNITY_ROOM_ENABLED;
+  delete process.env.COMMUNITY_ROOM_ENABLED;
+  let reads = 0;
+  const readStoredSettings = async () => {
+    reads += 1;
+    return {
+      id: 'primary',
+      platform: 'Discord',
+      roomName: 'Prepared Room',
+      inviteUrl: 'https://discord.gg/monstajam',
+      announcement: 'Ready when approved.',
+      isOpen: true,
+    };
+  };
+
+  try {
+    const admin = await getCommunitySettingsForAdmin(readStoredSettings);
+    assert.deepEqual(admin, {
+      platform: 'Discord',
+      roomName: 'Prepared Room',
+      inviteUrl: 'https://discord.gg/monstajam',
+      announcement: 'Ready when approved.',
+      isOpen: true,
+    });
+    assert.equal(reads, 1);
+
+    const closedPublic = await getPublicCommunitySettings(readStoredSettings);
+    assert.equal(closedPublic.isOpen, false);
+    assert.equal(closedPublic.inviteUrl, null);
+    assert.equal(reads, 1, 'disabled public reads should not query persisted room settings');
+
+    process.env.COMMUNITY_ROOM_ENABLED = 'true';
+    const openPublic = await getPublicCommunitySettings(readStoredSettings);
+    assert.equal(openPublic.isOpen, true);
+    assert.equal(openPublic.roomName, 'Prepared Room');
+    assert.equal(reads, 2);
+  } finally {
+    if (previous === undefined) delete process.env.COMMUNITY_ROOM_ENABLED;
+    else process.env.COMMUNITY_ROOM_ENABLED = previous;
+  }
+});
+
+test('admin room status distinguishes prepared settings from a publicly live room', () => {
+  assert.deepEqual(getCommunityRoomAdminStatus({ isOpen: true, publicEnabled: false }), {
+    label: 'Prepared',
+    isLive: false,
+    saveMessage: 'Community room settings saved. Public Talk remains Coming Soon until the deployment gate is enabled.',
+  });
+  assert.deepEqual(getCommunityRoomAdminStatus({ isOpen: true, publicEnabled: true }), {
+    label: 'Live',
+    isLive: true,
+    saveMessage: 'Community room is open to fans.',
+  });
+  assert.deepEqual(getCommunityRoomAdminStatus({ isOpen: false, publicEnabled: false }), {
+    label: 'Invite pending',
+    isLive: false,
+    saveMessage: 'Community room settings saved.',
+  });
+});
+
 test('community room settings APIs separate public read from protected writes', () => {
   assert.ok(existsSync(publicRoutePath), 'public community settings route should exist');
   assert.ok(existsSync(adminRoutePath), 'admin community settings route should exist');
@@ -131,9 +194,19 @@ test('community room settings APIs separate public read from protected writes', 
     assert.ok(publicRoute.includes(anchor), `public settings route should include ${anchor}`);
   }
 
-  for (const anchor of ['export async function GET', 'export async function PUT', 'isAdminRequest', 'CommunitySettingsSchema.safeParse', 'saveCommunitySettings']) {
+  for (const anchor of [
+    'export async function GET',
+    'export async function PUT',
+    'isAdminRequest',
+    'CommunitySettingsSchema.safeParse',
+    'getCommunitySettingsForAdmin',
+    'isCommunityRoomPublicEnabled',
+    'publicEnabled',
+    'saveCommunitySettings',
+  ]) {
     assert.ok(adminRoute.includes(anchor), `admin settings route should include ${anchor}`);
   }
+  assert.equal(adminRoute.includes('getPublicCommunitySettings'), false, 'admin reads must not use the gated public getter');
   assert.ok(adminRoute.includes("{ error: 'Unauthorized' }"), 'admin settings route should reject unauthorized requests');
 });
 
@@ -147,7 +220,11 @@ test('backstage can manage the room and the public Talk tab consumes it', () => 
     'Save room settings',
     'Room name',
     'Invite URL',
-    'Open the room to fans',
+    'Mark room ready to open',
+    'getCommunityRoomAdminStatus',
+    'roomStatus.label',
+    'savedRoomStatus.saveMessage',
+    'payload.publicEnabled',
     'Public Talk stays Coming Soon until COMMUNITY_ROOM_ENABLED is enabled for the deployment.',
   ]) {
     assert.ok(admin.includes(anchor), `community admin should include ${anchor}`);

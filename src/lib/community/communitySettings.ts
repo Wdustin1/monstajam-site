@@ -66,12 +66,15 @@ function safeEnvironmentInviteUrl() {
   return parsed.success ? parsed.data : null;
 }
 
-export async function getPublicCommunitySettings(): Promise<PublicCommunitySettings> {
-  if (process.env.COMMUNITY_ROOM_ENABLED !== 'true') {
-    return closedDefaultSettings();
-  }
+type CommunitySettingsReader = () => Promise<unknown>;
 
-  const stored = await prisma.communitySettings.findUnique({ where: { id: 'primary' } });
+const readStoredCommunitySettings: CommunitySettingsReader = () =>
+  prisma.communitySettings.findUnique({ where: { id: 'primary' } });
+
+export async function getCommunitySettingsForAdmin(
+  readSettings: CommunitySettingsReader = readStoredCommunitySettings
+): Promise<PublicCommunitySettings> {
+  const stored = await readSettings();
 
   if (!stored) {
     const inviteUrl = safeEnvironmentInviteUrl();
@@ -85,6 +88,20 @@ export async function getPublicCommunitySettings(): Promise<PublicCommunitySetti
   }
 
   return normalizeStoredCommunitySettings(stored);
+}
+
+export function isCommunityRoomPublicEnabled() {
+  return process.env.COMMUNITY_ROOM_ENABLED === 'true';
+}
+
+export async function getPublicCommunitySettings(
+  readSettings: CommunitySettingsReader = readStoredCommunitySettings
+): Promise<PublicCommunitySettings> {
+  if (!isCommunityRoomPublicEnabled()) {
+    return closedDefaultSettings();
+  }
+
+  return getCommunitySettingsForAdmin(readSettings);
 }
 
 export async function saveCommunitySettings(input: unknown): Promise<PublicCommunitySettings> {
