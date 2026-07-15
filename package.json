@@ -12,6 +12,7 @@
     "test:community-db": "tsx --test tests/community-db.contract.test.ts",
     "test:community-admin": "tsx --test tests/community-admin.contract.test.ts",
     "test:community-rewards": "tsx --test tests/community-rewards.contract.test.ts",
+    "test:community-polish": "tsx --test tests/community-polish.contract.test.ts",
     "test:community-rewards-smoke": "tsx scripts/community-rewards-smoke.ts",
     "db:community-rewards": "tsx scripts/community-rewards-rollout.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts"

@@ -1,297 +1,214 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
+import Link from 'next/link';
+import { ArrowRight, Headphones, LockKeyhole, MessageCircle, Sparkles, Trophy } from 'lucide-react';
 import FeaturedVote from '@/components/FeaturedVote';
 import CommunityRewards from '@/components/CommunityRewards';
 
-const HUB_CARDS = [
-  {
-    eyebrow: '01',
-    id: 'vote-on-music',
-    title: 'Vote on Music',
-    status: 'Live loop',
-    body:
-      'Fans use lightweight votes to influence songs, covers, remixes, artists, and future releases. Start with one clear campaign and visible results.',
-    bullets: ['songs + covers', 'remixes', 'future drops'],
-    tab: 'vote',
-  },
-  {
-    eyebrow: '02',
-    id: 'community-chat',
-    title: 'Community Chat',
-    status: 'WhatsApp first',
-    body:
-      'Give fans, producers, and AI music creators a place to talk, share feedback, and support releases without getting buried in a feed.',
-    bullets: ['feedback', 'creator support', 'song discussion'],
-    tab: 'talk',
-  },
-  {
-    eyebrow: '03',
-    id: 'live-vote-campaigns',
-    title: 'Live Vote Campaigns',
-    status: 'Admin managed',
-    body:
-      'Rotate focused polls from backstage so participation stays simple: pick a track, choose a cover, rank remix ideas, or decide what gets pushed next.',
-    bullets: ['active polls', 'public results', 'campaign rotation'],
-    tab: 'vote',
-  },
-  {
-    eyebrow: '04',
-    id: 'rewards-credits',
-    title: 'Rewards / Credits',
-    status: 'Engagement loop',
-    body:
-      'The live credit loop starts with one browser-scoped reward: earn five credits for the first vote in each campaign. More actions only unlock when they are real.',
-    bullets: ['+5 first vote', 'once per campaign', 'more actions later'],
-    tab: 'rewards',
-  },
-  {
-    eyebrow: '05',
-    id: 'premium-token-access',
-    title: 'Premium / Token Access',
-    status: 'Coming Soon',
-    body:
-      'Coming Soon: private listening rooms, early demos, Q&A sessions, badges, VIP areas, subscriptions, and ETH / Monsta token access.',
-    bullets: ['VIP rooms', 'early demos', 'Monsta tokens'],
-    tab: 'access',
-  },
-];
-
-const HUB_ACTIONS = [
-  {
-    id: 'vote-track',
-    label: 'Vote on a track',
-    eyebrow: 'Fan action',
-    href: '/#library',
-    body: 'Start by listening through the library and picking what deserves the next push.',
-    tab: 'vote',
-  },
-  {
-    id: 'join-community',
-    label: 'Join the community',
-    eyebrow: 'Chat action',
-    href: process.env.NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL || '#community-chat',
-    body: 'Use the configured WhatsApp or community invite when it is ready; until then this opens the chat tab.',
-    tab: 'talk',
-  },
-  {
-    id: 'live-vote',
-    label: 'Vote in the live poll',
-    eyebrow: 'Fan action',
-    href: '#featured-vote',
-    body: 'Jump straight into the active campaign and help decide what MonstaJam pushes next.',
-    tab: 'vote',
-  },
-  {
-    id: 'earn-credits',
-    label: 'See live credit balance',
-    eyebrow: 'Rewards action',
-    href: '#rewards-credits',
-    body: 'Check the balance saved to this browser and the reward rules that are live today.',
-    tab: 'rewards',
-  },
-  {
-    id: 'premium-access',
-    label: 'Watch premium access',
-    eyebrow: 'Future action',
-    href: '#premium-token-access',
-    body: 'Preview the premium, subscription, VIP, and Monsta token access layer without overbuilding it yet.',
-    tab: 'access',
-  },
-];
-
 const COMMUNITY_TABS = [
-  {
-    id: 'vote',
-    label: 'Vote',
-    eyebrow: 'Live campaign',
-    heading: 'Vote on what MonstaJam should push next.',
-    body:
-      'The main community loop starts here: listen, pick a lane, and help choose which track, remix, cover, artist, or future release gets energy next.',
-  },
-  {
-    id: 'talk',
-    label: 'Talk',
-    eyebrow: 'Community chat',
-    heading: 'Bring the fans, producers, and AI music creators together.',
-    body:
-      'MonstaJam should feel like a home base, not a buried comment thread. The first chat path can point to WhatsApp or another invite, then grow into native community tools later.',
-  },
-  {
-    id: 'rewards',
-    label: 'Rewards',
-    eyebrow: 'Credits layer',
-    heading: 'Turn participation into credits and perks.',
-    body:
-      'The first real reward is live now: each browser earns five credits for its first vote in a campaign, without farming extra credits by switching picks.',
-  },
-  {
-    id: 'access',
-    label: 'Access',
-    eyebrow: 'Premium future',
-    heading: 'Set up the future VIP and token access layer.',
-    body:
-      'Keep the current page honest with coming-soon status while leaving a clean lane for subscriptions, listening rooms, drops, badges, and Monsta token access.',
-  },
+  { id: 'vote', label: 'Vote', eyebrow: 'Live now' },
+  { id: 'talk', label: 'Talk', eyebrow: 'Community' },
+  { id: 'rewards', label: 'Rewards', eyebrow: 'Your credits' },
+  { id: 'access', label: 'Access', eyebrow: 'Coming soon' },
 ] as const;
 
 type CommunityTabId = (typeof COMMUNITY_TABS)[number]['id'];
 
+const communityUrl = process.env.NEXT_PUBLIC_MONSTAJAM_COMMUNITY_URL;
+
 export default function CommunityHub() {
   const [activeTab, setActiveTab] = useState<CommunityTabId>('vote');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const activeTabConfig = COMMUNITY_TABS.find((tab) => tab.id === activeTab) ?? COMMUNITY_TABS[0];
-  const activeCards = HUB_CARDS.filter((card) => card.tab === activeTab);
-  const activeActions = HUB_ACTIONS.filter((action) => action.tab === activeTab);
+
+  function selectTab(tab: CommunityTabId, index?: number) {
+    setActiveTab(tab);
+    if (typeof index === 'number') {
+      requestAnimationFrame(() => tabRefs.current[index]?.focus());
+    }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % COMMUNITY_TABS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + COMMUNITY_TABS.length) % COMMUNITY_TABS.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = COMMUNITY_TABS.length - 1;
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectTab(COMMUNITY_TABS[nextIndex].id, nextIndex);
+  }
 
   return (
     <section
       id="community-hub"
       data-section-id="community-hub"
-      className="mx-auto max-w-7xl px-5 py-12 md:px-8 md:py-16"
+      className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 md:py-12 lg:px-8"
     >
-      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#08070d]/90">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-70"
-          style={{
-            background:
-              'radial-gradient(circle at 15% 10%, rgba(0,229,255,0.16), transparent 32%), radial-gradient(circle at 85% 0%, rgba(255,0,255,0.13), transparent 30%)',
-          }}
-        />
+      <header className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#080711] px-6 py-8 sm:px-8 md:py-12 lg:px-12">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(0,229,255,0.18),transparent_34%),radial-gradient(circle_at_92%_12%,rgba(255,0,170,0.14),transparent_30%)]" />
+        <div className="pointer-events-none absolute right-[-7rem] top-[-8rem] h-72 w-72 rounded-full border border-cyan-200/10" />
+        <div className="pointer-events-none absolute right-[-3rem] top-[-4rem] h-48 w-48 rounded-full border border-fuchsia-300/10" />
 
-        <div className="relative p-6 md:p-10 lg:p-12">
-          <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl space-y-4">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">
-                Community Hub
-              </div>
-              <h1 className="text-4xl font-black uppercase leading-tight tracking-tight text-white md:text-6xl">
-                Vote, talk, earn, and unlock what drops next.
-              </h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-gray-400 md:text-base">
-                MonstaJam can become the home base for fans, producers, and AI music creators who want to support each other instead of getting lost in a feed.
-              </p>
+        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] lg:items-end">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100 sm:text-xs">
+              <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+              MonstaJam Community
             </div>
+            <h1 className="mt-5 max-w-3xl text-4xl font-black uppercase leading-[0.94] tracking-[-0.045em] text-white sm:text-5xl md:text-7xl">
+              Shape the next drop.
+            </h1>
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-gray-300 sm:text-base">
+              Listen with the crowd, cast your vote, and earn credit for showing up. MonstaJam puts fans inside the release process—not at the end of it.
+            </p>
             <a
-              href="#featured-vote"
-              className="inline-flex w-fit items-center rounded-full border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-cyan-100 transition-colors hover:bg-cyan-300/20"
+              href="#community-tabs"
+              className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-cyan-200 px-5 py-3 text-xs font-black uppercase tracking-[0.17em] text-[#041014] no-underline transition hover:bg-white"
             >
-              Start with the live vote →
+              Enter the live vote
+              <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </a>
           </div>
 
-          <div data-section-id="community-tabs" className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <div className="space-y-4">
-              <div
-                role="tablist"
-                aria-label="Community Hub sections"
-                className="grid gap-2 rounded-3xl border border-white/10 bg-black/25 p-2"
-              >
-                {COMMUNITY_TABS.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      id={`community-tab-${tab.id}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-controls={`community-panel-${tab.id}`}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`rounded-2xl p-4 text-left transition-colors ${
-                        isActive
-                          ? 'border border-cyan-300/35 bg-cyan-300/12 text-white shadow-[0_0_24px_rgba(0,229,255,0.12)]'
-                          : 'border border-transparent text-gray-400 hover:border-white/10 hover:bg-white/[0.04] hover:text-white'
-                      }`}
-                    >
-                      <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200/80">
-                        {tab.eyebrow}
-                      </span>
-                      <span className="mt-1 block text-lg font-black uppercase tracking-tight">{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div data-section-id="community-actions" className="grid gap-3">
-                {activeActions.map((action) => (
-                  <a
-                    key={action.id}
-                    data-cta-id={action.id}
-                    href={action.href}
-                    className="group rounded-2xl border border-white/10 bg-white/[0.04] p-4 no-underline transition-colors hover:border-cyan-300/35 hover:bg-cyan-300/[0.07]"
-                  >
-                    <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200/80">
-                      {action.eyebrow}
-                    </span>
-                    <span className="mt-1 flex items-center justify-between gap-3 text-sm font-black uppercase tracking-tight text-white">
-                      {action.label}
-                      <span aria-hidden="true" className="text-cyan-200 transition-transform group-hover:translate-x-1">
-                        →
-                      </span>
-                    </span>
-                    <span className="mt-2 block text-xs leading-relaxed text-gray-500">{action.body}</span>
-                  </a>
-                ))}
-              </div>
+          <div
+            data-section-id="community-status-rail"
+            className="grid grid-cols-3 overflow-hidden rounded-3xl border border-white/10 bg-black/25"
+            aria-label="Community status"
+          >
+            <div className="p-4 sm:p-5">
+              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200/70">Campaign</span>
+              <span className="mt-2 block text-sm font-black uppercase text-white">Live</span>
             </div>
-
-            <div
-              id={`community-panel-${activeTabConfig.id}`}
-              role="tabpanel"
-              aria-labelledby={`community-tab-${activeTabConfig.id}`}
-              className="min-h-[560px] rounded-[1.75rem] border border-white/10 bg-black/25 p-5 md:p-6"
-            >
-              <div className="mb-5 space-y-3">
-                <span className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/80">
-                  {activeTabConfig.eyebrow}
-                </span>
-                <h2 className="text-2xl font-black uppercase tracking-tight text-white md:text-4xl">
-                  {activeTabConfig.heading}
-                </h2>
-                <p className="max-w-3xl text-sm leading-relaxed text-gray-400">{activeTabConfig.body}</p>
-              </div>
-
-              <div className="grid gap-4">
-                {activeTab === 'vote' && <FeaturedVote />}
-                {activeTab === 'rewards' && <CommunityRewards />}
-
-                {activeCards.map((card) => (
-                  <article
-                    key={card.title}
-                    id={card.id}
-                    className="scroll-mt-28 rounded-3xl border border-white/10 bg-black/30 p-5 transition-colors hover:border-cyan-300/30 md:p-6"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-xs font-black text-cyan-200">
-                        {card.eyebrow}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <h3 className="text-xl font-black uppercase tracking-tight text-white md:text-2xl">
-                            {card.title}
-                          </h3>
-                          <span className="w-fit rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-300">
-                            {card.status}
-                          </span>
-                        </div>
-                        <p className="text-sm leading-relaxed text-gray-400">{card.body}</p>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {card.bullets.map((bullet) => (
-                            <span
-                              key={bullet}
-                              className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-gray-300"
-                            >
-                              {bullet}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+            <div className="border-x border-white/10 p-4 sm:p-5">
+              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/70">First vote</span>
+              <span className="mt-2 block text-sm font-black uppercase text-white">+5 credits</span>
+            </div>
+            <div className="p-4 sm:p-5">
+              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-fuchsia-200/70">Results</span>
+              <span className="mt-2 block text-sm font-black uppercase text-white">Visible</span>
             </div>
           </div>
+        </div>
+      </header>
+
+      <div id="community-tabs" data-section-id="community-tabs" className="scroll-mt-28 pt-5 md:pt-7">
+        <div
+          role="tablist"
+          aria-label="Community sections"
+          aria-orientation="horizontal"
+          className="flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-[#080711]/95 p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {COMMUNITY_TABS.map((tab, index) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                ref={(element) => { tabRefs.current[index] = element; }}
+                id={`community-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                tabIndex={isActive ? 0 : -1}
+                aria-selected={isActive}
+                aria-controls={`community-panel-${tab.id}`}
+                onClick={() => selectTab(tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                className={`min-h-14 min-w-[132px] flex-1 rounded-xl px-4 py-3 text-left transition ${
+                  isActive
+                    ? 'bg-white text-black shadow-[0_10px_28px_rgba(0,0,0,0.28)]'
+                    : 'text-gray-400 hover:bg-white/[0.06] hover:text-white'
+                }`}
+              >
+                <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isActive ? 'text-black/55' : 'text-cyan-200/65'}`}>
+                  {tab.eyebrow}
+                </span>
+                <span className="mt-1 block text-sm font-black uppercase tracking-tight">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          id={`community-panel-${activeTabConfig.id}`}
+          data-community-panel={activeTabConfig.id}
+          role="tabpanel"
+          aria-labelledby={`community-tab-${activeTabConfig.id}`}
+          className="mt-4 rounded-[2rem] border border-white/10 bg-[#080711]/90 p-4 sm:p-6 md:p-8"
+        >
+          {activeTab === 'vote' && <FeaturedVote />}
+
+          {activeTab === 'talk' && (
+            <section className="grid gap-6 lg:grid-cols-[1fr_0.75fr] lg:items-center">
+              <div className="rounded-[1.75rem] border border-cyan-300/20 bg-cyan-300/[0.06] p-6 sm:p-8">
+                <MessageCircle aria-hidden="true" className="h-8 w-8 text-cyan-200" />
+                <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/75">Community room</p>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">Join the conversation</h2>
+                <p className="mt-4 max-w-xl text-sm leading-7 text-gray-400">
+                  Trade feedback, talk through the latest tracks, and meet the producers, fans, and AI music creators helping shape each release.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {communityUrl ? (
+                    <a
+                      href={communityUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-cyan-200 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-black no-underline hover:bg-white"
+                    >
+                      Join the community <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                    </a>
+                  ) : (
+                    <span
+                      aria-disabled="true"
+                      className="inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/[0.05] px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-gray-400"
+                    >
+                      Invite opening soon
+                    </span>
+                  )}
+                  <Link
+                    href="/#library"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-xs font-black uppercase tracking-[0.16em] text-white no-underline hover:border-cyan-200/40"
+                  >
+                    Listen first <Headphones aria-hidden="true" className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {['Track reactions without the feed noise', 'Focused release conversations', 'Creator and fan support in one room'].map((item, index) => (
+                  <div key={item} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm font-semibold text-gray-300">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] font-mono text-xs text-cyan-200">
+                      0{index + 1}
+                    </span>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'rewards' && <CommunityRewards />}
+
+          {activeTab === 'access' && (
+            <section className="relative overflow-hidden rounded-[1.75rem] border border-fuchsia-300/15 bg-[linear-gradient(135deg,rgba(255,0,170,0.09),rgba(0,229,255,0.04))] p-6 sm:p-8 md:p-10">
+              <div className="pointer-events-none absolute -right-10 -top-14 h-48 w-48 rounded-full border border-fuchsia-200/10" />
+              <LockKeyhole aria-hidden="true" className="h-8 w-8 text-fuchsia-200" />
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200/75">Next access layer</p>
+              <h2 className="mt-2 max-w-2xl text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">Premium listening is on the way</h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-400">
+                Private listening rooms, early demos, badges, Q&A sessions, and Monsta token access will appear here only when each experience is ready to use.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {['Early demos', 'Private rooms', 'VIP badges', 'Monsta access'].map((item) => (
+                  <span key={item} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs font-bold text-gray-300">
+                    <Trophy aria-hidden="true" className="h-3.5 w-3.5 text-amber-100" /> {item}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </section>

@@ -20,7 +20,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="w-full py-5 px-8 flex items-center justify-between z-50 fixed top-0 bg-[#050505]/90 backdrop-blur-md border-b border-white/5">
+    <header className="fixed top-0 z-50 flex w-full items-center justify-between border-b border-white/5 bg-[#050505]/90 px-4 py-4 backdrop-blur-md sm:px-8 sm:py-5">
 
       {/* Logo */}
       <Link href="/" className="flex items-center gap-3">
@@ -59,9 +59,11 @@ export default function Navbar({ activeLink }: NavbarProps) {
 
       {/* Mobile hamburger */}
       <button
-        className="md:hidden flex flex-col justify-center gap-[5px] p-2 w-9 h-9 rounded-lg hover:bg-white/5 transition-colors"
+        type="button"
+        className="flex h-11 w-11 flex-col items-center justify-center gap-[5px] rounded-xl transition-colors hover:bg-white/5 md:hidden"
         onClick={() => setMenuOpen((v) => !v)}
-        aria-label="Toggle menu"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        aria-controls="mobile-navigation"
         aria-expanded={menuOpen}
       >
         <span className={`block w-5 h-0.5 bg-white transition-all duration-300 origin-center ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
@@ -71,13 +73,10 @@ export default function Navbar({ activeLink }: NavbarProps) {
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div
-          className="absolute top-full left-0 right-0 flex flex-col py-4 md:hidden"
-          style={{
-            background: 'rgba(5,5,5,0.97)',
-            backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-          }}
+        <nav
+          id="mobile-navigation"
+          aria-label="Mobile navigation"
+          className="absolute left-0 right-0 top-full flex flex-col border-b border-white/[0.06] bg-[#050505]/[0.98] py-3 backdrop-blur-xl md:hidden"
         >
           {LINKS.map(({ label, href, key }) => {
             const isActive = activeLink === key;
@@ -94,7 +93,7 @@ export default function Navbar({ activeLink }: NavbarProps) {
               </Link>
             );
           })}
-        </div>
+        </nav>
       )}
     </header>
   );

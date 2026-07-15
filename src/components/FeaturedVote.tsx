@@ -1,41 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check, Coins, LoaderCircle, Radio } from 'lucide-react';
 import { getOrCreateCommunityVisitorId } from '@/lib/community/visitor';
 
 const STORAGE_KEY = 'monstajam-featured-vote';
 
 const VOTE_OPTIONS = [
-  {
-    id: 'fallback-song',
-    label: 'Song',
-    description: 'Which track should get the next push?',
-    voteCount: 0,
-  },
-  {
-    id: 'fallback-cover-art',
-    label: 'Cover art',
-    description: 'Which visual should represent the drop?',
-    voteCount: 0,
-  },
-  {
-    id: 'fallback-remix',
-    label: 'Remix',
-    description: 'Which remix idea deserves a lane?',
-    voteCount: 0,
-  },
-  {
-    id: 'fallback-artist',
-    label: 'Artist',
-    description: 'Which artist should MonstaJam spotlight?',
-    voteCount: 0,
-  },
-  {
-    id: 'fallback-future-release',
-    label: 'Future release',
-    description: 'What should the community help shape next?',
-    voteCount: 0,
-  },
+  { id: 'fallback-song', label: 'Song', description: 'Which track should get the next push?', voteCount: 0 },
+  { id: 'fallback-cover-art', label: 'Cover art', description: 'Which visual should represent the drop?', voteCount: 0 },
+  { id: 'fallback-remix', label: 'Remix', description: 'Which remix idea deserves a lane?', voteCount: 0 },
+  { id: 'fallback-artist', label: 'Artist', description: 'Which artist should MonstaJam spotlight?', voteCount: 0 },
+  { id: 'fallback-future-release', label: 'Future release', description: 'What should the community help shape next?', voteCount: 0 },
 ];
 
 type VoteOption = {
@@ -56,21 +32,13 @@ type FeaturedVotePayload = {
   };
   options: VoteOption[];
   selectedOptionId: string | null;
-  totals: {
-    votes: number;
-  };
-  rewards: {
-    creditsBalance: number;
-    voteReward: number;
-  };
+  totals: { votes: number };
+  rewards: { creditsBalance: number; voteReward: number };
 };
 
 export default function FeaturedVote() {
   const [visitorId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
+    if (typeof window === 'undefined') return null;
     return getOrCreateCommunityVisitorId();
   });
   const [campaignTitle, setCampaignTitle] = useState('Featured Vote');
@@ -85,24 +53,20 @@ export default function FeaturedVote() {
   const [statusText, setStatusText] = useState('Loading the live vote…');
 
   useEffect(() => {
-    if (!visitorId) {
-      return;
-    }
+    if (!visitorId) return;
 
     const currentVisitorId = visitorId;
     let isCancelled = false;
 
     async function loadFeaturedVote() {
       try {
-        const response = await fetch(`/api/community/featured-vote?visitorId=${encodeURIComponent(currentVisitorId)}`);
-        if (!response.ok) {
-          throw new Error('Failed to load featured vote');
-        }
+        const response = await fetch(`/api/community/featured-vote?visitorId=${encodeURIComponent(currentVisitorId)}`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Failed to load featured vote');
 
         const payload = (await response.json()) as FeaturedVotePayload;
-        if (isCancelled) {
-          return;
-        }
+        if (isCancelled) return;
 
         setCampaignTitle(payload.campaign.title);
         setCampaignQuestion(payload.campaign.question);
@@ -113,41 +77,34 @@ export default function FeaturedVote() {
         setCreditsBalance(payload.rewards.creditsBalance);
         setStatusText(
           payload.selectedOptionId
-            ? 'Vote saved on this device and synced to the database.'
-            : 'Choose one option to preview the vote flow.'
+            ? 'Vote saved on this device and counted in the live results.'
+            : 'Choose one option to cast your vote.'
         );
       } catch (error) {
         console.error(error);
         if (!isCancelled) {
           const savedLabel = localStorage.getItem(STORAGE_KEY);
-          setSelectedOptionId(
-            savedLabel ? VOTE_OPTIONS.find((option) => option.label === savedLabel)?.id ?? null : null
-          );
-          setStatusText('Vote is offline right now; your browser can still preview the selection.');
+          setSelectedOptionId(savedLabel ? VOTE_OPTIONS.find((option) => option.label === savedLabel)?.id ?? null : null);
+          setStatusText('The live vote is temporarily offline. Try again in a moment.');
         }
       } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
+        if (!isCancelled) setIsLoading(false);
       }
     }
 
     loadFeaturedVote();
-
-    return () => {
-      isCancelled = true;
-    };
+    return () => { isCancelled = true; };
   }, [visitorId]);
 
   async function handleVote(option: VoteOption) {
-    if (!visitorId || isLoading || isSaving) {
-      return;
-    }
+    if (!visitorId || isLoading || isSaving) return;
+
+    const previousSelectedOptionId = selectedOptionId;
+    const previousStoredLabel = localStorage.getItem(STORAGE_KEY);
 
     setIsSaving(true);
     setSelectedOptionId(option.id);
-    setStatusText('Saving vote…');
-    localStorage.setItem(STORAGE_KEY, option.label);
+    setStatusText('Saving your vote…');
 
     try {
       const response = await fetch('/api/community/featured-vote', {
@@ -155,10 +112,7 @@ export default function FeaturedVote() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorId, optionId: option.id }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save featured vote');
-      }
+      if (!response.ok) throw new Error('Failed to save featured vote');
 
       const payload = (await response.json()) as FeaturedVotePayload;
       setCampaignTitle(payload.campaign.title);
@@ -168,47 +122,48 @@ export default function FeaturedVote() {
       setSelectedOptionId(payload.selectedOptionId);
       setTotalVotes(payload.totals.votes);
       setCreditsBalance(payload.rewards.creditsBalance);
-      setStatusText('Vote saved and synced. Your first vote in each campaign earns +5 credits.');
+      localStorage.setItem(STORAGE_KEY, option.label);
+      setStatusText('Vote counted. Your first vote in each campaign earns +5 credits.');
     } catch (error) {
       console.error(error);
-      setStatusText('Could not sync yet. Your device selection is still saved for this preview.');
+      setSelectedOptionId(previousSelectedOptionId);
+      if (previousStoredLabel === null) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        localStorage.setItem(STORAGE_KEY, previousStoredLabel);
+      }
+      setStatusText('Your vote was not saved. Nothing changed—please try again.');
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <section
-      data-section-id="featured-vote"
-      className="rounded-[1.75rem] border border-cyan-300/25 bg-cyan-300/[0.06] p-5 md:p-6 shadow-[0_0_28px_rgba(0,229,255,0.08)]"
-    >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
-              {campaignTitle}
-            </span>
-            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
-              Database backed
-            </span>
-            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
-              {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
-            </span>
-            <span className="rounded-full border border-amber-200/25 bg-amber-200/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-100">
-              {creditsBalance} credits
-            </span>
-          </div>
-          <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
-            {campaignQuestion}
-          </h3>
-          <p className="text-sm leading-relaxed text-gray-400">
-            {campaignDescription} The active poll is controlled from the backstage community admin.
-          </p>
+    <section data-section-id="featured-vote" className="overflow-hidden rounded-[1.75rem] border border-cyan-300/20 bg-[#071016]">
+      <div className="border-b border-white/10 px-5 py-6 sm:px-7 sm:py-7">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">
+            <Radio aria-hidden="true" className="h-3.5 w-3.5" /> Live vote
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400">
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/25 bg-amber-200/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-100">
+            <Coins aria-hidden="true" className="h-3.5 w-3.5" /> {creditsBalance} credits
+          </span>
         </div>
+        <p className="mt-5 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/70">{campaignTitle}</p>
+        <h2 className="mt-2 max-w-4xl text-3xl font-black uppercase leading-[1.02] tracking-[-0.035em] text-white sm:text-4xl md:text-5xl">
+          {campaignQuestion}
+        </h2>
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-400">{campaignDescription}</p>
+      </div>
 
-        <div className="grid gap-2.5">
-          {options.map((option) => {
+      <div className="p-4 sm:p-6 md:p-7">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {options.map((option, index) => {
             const isSelected = selectedOptionId === option.id;
+            const votePercentage = totalVotes > 0 ? Math.round((option.voteCount / totalVotes) * 100) : 0;
 
             return (
               <button
@@ -217,33 +172,30 @@ export default function FeaturedVote() {
                 aria-pressed={isSelected}
                 disabled={isLoading || isSaving}
                 onClick={() => handleVote(option)}
-                className={`rounded-2xl border p-4 text-left transition-all disabled:cursor-wait disabled:opacity-75 ${
+                className={`group relative min-h-[132px] overflow-hidden rounded-2xl border p-4 text-left transition disabled:cursor-wait disabled:opacity-70 ${
+                  index === options.length - 1 && options.length % 2 === 1 ? 'sm:col-span-2' : ''
+                } ${
                   isSelected
-                    ? 'border-cyan-200 bg-cyan-200/15 shadow-[0_0_18px_rgba(0,229,255,0.18)]'
-                    : 'border-white/10 bg-black/25 hover:border-cyan-300/35 hover:bg-cyan-300/[0.07]'
+                    ? 'border-cyan-200/70 bg-cyan-200/15 shadow-[0_0_24px_rgba(0,229,255,0.12)]'
+                    : 'border-white/10 bg-black/25 hover:border-cyan-300/35 hover:bg-white/[0.04]'
                 }`}
               >
-                <span className="flex items-start justify-between gap-3">
-                  <span>
-                    <span className="block text-sm font-black uppercase tracking-tight text-white">
-                      {option.label}
-                    </span>
-                    <span className="mt-1 block text-xs leading-relaxed text-gray-500">
-                      {option.description}
-                    </span>
-                    <span className="mt-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/70">
-                      {option.voteCount} {option.voteCount === 1 ? 'vote' : 'votes'}
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 bottom-0 h-1 bg-white/[0.04]"
+                >
+                  <span className="block h-full bg-cyan-200/70 transition-[width]" style={{ width: `${votePercentage}%` }} />
+                </span>
+                <span className="flex h-full items-start justify-between gap-4">
+                  <span className="min-w-0">
+                    <span className="block text-base font-black uppercase tracking-tight text-white">{option.label}</span>
+                    <span className="mt-1.5 block max-w-md text-xs leading-5 text-gray-400">{option.description}</span>
+                    <span className="mt-4 block text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/70">
+                      {option.voteCount} {option.voteCount === 1 ? 'vote' : 'votes'} · {votePercentage}%
                     </span>
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
-                      isSelected
-                        ? 'border-cyan-100 bg-cyan-100 text-black'
-                        : 'border-white/20 text-transparent'
-                    }`}
-                  >
-                    ✓
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${isSelected ? 'border-cyan-100 bg-cyan-100 text-black' : 'border-white/20 text-transparent'}`}>
+                    <Check aria-hidden="true" className="h-4 w-4" />
                   </span>
                 </span>
               </button>
@@ -251,9 +203,18 @@ export default function FeaturedVote() {
           })}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-relaxed text-gray-400">
-          <span>{statusText}</span>
-          <span className="mt-1 block text-amber-100/80">+5 credits for the first vote in each campaign. Changing your pick does not earn more.</span>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-xs leading-5 text-gray-300"
+          >
+            {isSaving && <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin text-cyan-200" />}
+            {statusText}
+          </div>
+          <div className="rounded-xl border border-amber-200/20 bg-amber-200/[0.07] px-4 py-3 text-xs font-semibold leading-5 text-amber-100/90">
+            +5 for your first vote. Switching picks earns no extra credits.
+          </div>
         </div>
       </div>
     </section>

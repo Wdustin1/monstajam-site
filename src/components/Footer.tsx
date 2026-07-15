@@ -37,7 +37,7 @@ export default function Footer() {
           </div>
 
           {/* Social icons — only render when URLs are configured */}
-          {SOCIAL_LINKS.length > 0 ? (
+          {SOCIAL_LINKS.length > 0 && (
             <div className="flex items-center gap-4">
               {SOCIAL_LINKS.map((s) => (
                 <a key={s.label}
@@ -47,8 +47,6 @@ export default function Footer() {
                 </a>
               ))}
             </div>
-          ) : (
-            <p className="text-xs text-gray-700 italic">Social links coming soon</p>
           )}
         </div>
 
