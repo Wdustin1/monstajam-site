@@ -3,6 +3,7 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { PlayerProvider } from "@/context/PlayerContext";
 import PersistentPlayer from "@/components/PersistentPlayer";
+import AmbientMotionBackground from "@/components/AmbientMotionBackground";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -51,6 +52,8 @@ export default function RootLayout({
           `,
         }}
       >
+        <AmbientMotionBackground />
+
         {/* Background glow orbs */}
         <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
           <div className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-pink-600/20 rounded-full blur-[120px]" />
