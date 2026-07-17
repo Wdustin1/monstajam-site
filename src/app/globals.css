@@ -41,11 +41,12 @@ body {
 
 @media (max-width: 640px) {
   [data-ambient-motion] {
-    opacity: 0.32;
+    opacity: 0.42;
+    mix-blend-mode: normal;
   }
 
   [data-ambient-motion] video {
-    filter: brightness(0.86) saturate(1.05) contrast(0.96) blur(0.2px);
+    filter: brightness(0.95) saturate(1.22) contrast(1.12);
   }
 
   [data-ambient-motion-vignette] {

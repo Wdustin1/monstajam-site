@@ -39,8 +39,9 @@ test('ambient motion assets are present and remain lightweight enough for a back
 
 test('mobile motion stays clearly perceptible beneath the darker hero surface', () => {
   const css = readFileSync('src/app/globals.css', 'utf8');
-  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\]\s*\{[\s\S]*?opacity:\s*0\.32/);
-  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\] video\s*\{[\s\S]*?brightness\(0\.86\)/);
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\]\s*\{[\s\S]*?opacity:\s*0\.42/);
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\]\s*\{[\s\S]*?mix-blend-mode:\s*normal/);
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\] video\s*\{[\s\S]*?brightness\(0\.95\)[\s\S]*?saturate\(1\.22\)[\s\S]*?contrast\(1\.12\)/);
   assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion-vignette\][\s\S]*?transparent 28%/);
 });
 
