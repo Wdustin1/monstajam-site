@@ -1,28 +1,40 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
 import VinylRecord from './VinylRecord';
 import { PlayerTrack } from '@/context/PlayerContext';
+import { proxyCoverUrl } from '@/lib/proxy-cover';
 
 export default function Hero({
   trackCount = 0,
   artistCount = 1,
   videoCount = 0,
   featuredTrack = null,
+  showcaseTracks = [],
 }: {
   trackCount?: number;
   artistCount?: number;
   videoCount?: number;
   featuredTrack?: PlayerTrack | null;
+  showcaseTracks?: PlayerTrack[];
 }) {
-  const trackTitle = featuredTrack?.title ?? 'Featured cut';
-  const trackArtist = featuredTrack?.artist ?? 'Monsta Jam Productions';
-  const bpm = featuredTrack?.bpm ? `${featuredTrack.bpm} BPM` : 'Private press';
+  const vaultTracks = showcaseTracks.length > 0
+    ? showcaseTracks.slice(0, 3)
+    : featuredTrack
+      ? [featuredTrack]
+      : [];
+  const [activeTrackIndex, setActiveTrackIndex] = useState(0);
+  const activeTrack = vaultTracks[activeTrackIndex] ?? featuredTrack;
+  const trackTitle = activeTrack?.title ?? 'Featured cut';
+  const trackArtist = activeTrack?.artist ?? 'Monsta Jam Productions';
+  const bpm = activeTrack?.bpm ? `${activeTrack.bpm} BPM` : 'Private press';
+  const activeCover = proxyCoverUrl(activeTrack?.coverUrl) || '/monstajam-record-label.png';
 
   return (
     <section
       data-mobile-layout="home-hero"
-      data-design-concept="cinematic-record-launch"
+      data-design-concept="catalog-vault"
       aria-labelledby="record-launch-title"
       className="relative mx-auto flex min-h-[calc(100svh-6rem)] w-full max-w-[1500px] flex-col overflow-hidden px-4 pb-8 pt-5 sm:px-6 md:px-8 md:pb-14 md:pt-8"
     >
@@ -43,19 +55,19 @@ export default function Hero({
       <header className="relative z-20 mx-auto flex w-full max-w-5xl flex-col items-center text-center">
         <div className="mb-3 flex items-center gap-3 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100/80 sm:text-xs">
           <span className="h-px w-8 bg-cyan-300/50" />
-          Monsta Jam private press
+          MonstaJam independent archive
           <span className="h-px w-8 bg-cyan-300/50" />
         </div>
         <h1 id="record-launch-title" className="max-w-4xl text-balance text-[clamp(2.2rem,10vw,6.5rem)] font-black uppercase leading-[0.82] tracking-[-0.065em] text-white">
-          Cold World
-          <span className="block bg-gradient-to-r from-cyan-200 via-white to-fuchsia-200 bg-clip-text text-transparent">Volume II</span>
+          THE VAULT
+          <span className="block bg-gradient-to-r from-cyan-200 via-white to-fuchsia-200 bg-clip-text text-transparent">IS OPEN</span>
         </h1>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/55 sm:text-xs">
-          <span>MJ-016</span>
+          <span>{trackCount} catalog cuts</span>
           <span aria-hidden="true" className="text-fuchsia-300/70">◆</span>
-          <span>Tyler J</span>
+          <span>{artistCount} {artistCount === 1 ? 'artist' : 'artists'}</span>
           <span aria-hidden="true" className="text-cyan-300/70">◆</span>
-          <span>Produced by Monsta Jam</span>
+          <span>Unreleased + independent</span>
         </div>
       </header>
 
@@ -64,26 +76,50 @@ export default function Hero({
         className="relative z-10 mx-auto mt-2 h-[350px] w-full max-w-5xl flex-1 sm:mt-4 sm:h-[430px] lg:mt-0 lg:min-h-[470px]"
       >
         <div
-          data-hero-sleeve="cold-world-volume-2"
+          data-hero-sleeve="active-vault-pick"
           className="absolute left-1/2 top-5 z-[4] h-[176px] w-[176px] -translate-x-1/2 -rotate-[5deg] sm:top-3 sm:h-[224px] sm:w-[224px] lg:left-[20%] lg:top-20 lg:h-[290px] lg:w-[290px] lg:-translate-x-0"
         >
           <div aria-hidden="true" className="absolute -right-5 top-3 h-[90%] w-12 rounded-full border border-white/10 bg-[radial-gradient(circle_at_center,#111_0_11%,#050505_12%_54%,#222_55%_56%,#050505_57%)] shadow-[18px_10px_34px_rgba(0,0,0,0.65)]" />
           <div className="relative h-full w-full overflow-hidden border border-white/20 bg-[#07090e] p-2 shadow-[-18px_28px_70px_rgba(0,0,0,0.75),0_0_42px_rgba(91,113,255,0.2)]">
             <Image
-              src="/releases/cold-world-volume-2-cover.jpg"
-              alt="Tyler J Cold World Volume 2 album sleeve"
+              key={activeCover}
+              src={activeCover}
+              alt={`${trackArtist} ${trackTitle} catalog artwork`}
               fill
               priority
               sizes="(max-width: 639px) 176px, (max-width: 1023px) 224px, 290px"
               className="object-cover p-2"
             />
             <span aria-hidden="true" className="absolute inset-2 bg-[linear-gradient(115deg,transparent_20%,rgba(255,255,255,0.18)_40%,transparent_56%)] opacity-30 mix-blend-screen" />
-            <span className="absolute bottom-3 left-3 border border-white/15 bg-black/70 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/75 backdrop-blur-sm">MJ-016 · Limited press</span>
+            <span className="absolute bottom-3 left-3 border border-white/15 bg-black/70 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/75 backdrop-blur-sm">Vault pick {String(activeTrackIndex + 1).padStart(2, '0')}</span>
           </div>
         </div>
 
+        <div
+          data-hero-selector="catalog-picks"
+          aria-label="Featured catalog picks"
+          className="absolute right-0 top-7 z-30 flex flex-col gap-2 sm:right-4 sm:top-10 lg:right-auto lg:left-0 lg:top-28"
+        >
+          {vaultTracks.map((track, index) => {
+            const isActive = index === activeTrackIndex;
+            return (
+              <button
+                key={track.slug}
+                type="button"
+                aria-label={`Show ${track.title} by ${track.artist}`}
+                aria-pressed={isActive}
+                onClick={() => setActiveTrackIndex(index)}
+                className={`group flex min-h-11 min-w-11 items-center gap-3 border px-3 font-mono text-[10px] uppercase tracking-[0.16em] transition sm:min-w-40 ${isActive ? 'border-cyan-200/60 bg-cyan-200 text-black' : 'border-white/15 bg-black/55 text-white/65 backdrop-blur-md hover:border-fuchsia-200/45 hover:text-white'}`}
+              >
+                <span className="font-black">{String(index + 1).padStart(2, '0')}</span>
+                <span className="hidden max-w-28 truncate text-left sm:block">{track.title}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="cinematic-turntable-wrapper">
-          <VinylRecord featuredTrack={featuredTrack} />
+          <VinylRecord featuredTrack={activeTrack} />
         </div>
 
         <div className="absolute bottom-0 left-1/2 z-30 flex min-h-11 -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-cyan-200/25 bg-black/75 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_0_30px_rgba(0,229,255,0.16)] backdrop-blur-md sm:bottom-3 sm:text-xs lg:bottom-5">
