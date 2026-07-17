@@ -1,14 +1,13 @@
+import { normalizeAllowedCoverUrl } from './media-url';
+
 /**
- * Route Vercel Blob cover URLs through our /api/cover proxy.
- * Vercel Blob sometimes wraps responses in multipart/form-data which
- * breaks <img> tags. The proxy strips the wrapper and serves clean images.
+ * Keep local cover paths inside Next Image's explicit local allowlist and route
+ * trusted Vercel Blob covers through the same-origin SSRF-hardened proxy.
  */
-export function proxyCoverUrl(url: string | null | undefined): string {
+export function proxyCoverUrl(url: string | null | undefined) {
   if (!url) return '';
-  if (url.includes('blob.vercel-storage.com')) {
-    // Decode first to normalize any %-encoded chars, then encode for query param
-    const decoded = decodeURI(url);
-    return `/api/cover?url=${encodeURIComponent(decoded)}`;
-  }
-  return url;
+  const coverUrl = normalizeAllowedCoverUrl(url);
+  if (!coverUrl) return '';
+  if (coverUrl.startsWith('/')) return coverUrl;
+  return `/api/cover?url=${encodeURIComponent(coverUrl)}`;
 }

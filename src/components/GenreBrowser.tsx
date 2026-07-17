@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePlayer } from '@/context/PlayerContext';
+import { proxyCoverUrl } from '@/lib/proxy-cover';
 
 interface Track {
   id: string;
@@ -129,6 +130,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-10">
             {filtered.map((track) => {
               const isActive = currentTrack?.slug === track.slug;
+              const coverSrc = proxyCoverUrl(track.coverUrl);
               return (
                 <div
                   key={track.slug}
@@ -137,9 +139,9 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
                 >
                   {/* Cover */}
                   <div className={`relative w-full aspect-square ${track.color} flex items-center justify-center`}>
-                    {track.coverUrl ? (
+                    {coverSrc ? (
                       <Image
-                        src={track.coverUrl}
+                        src={coverSrc}
                         alt={track.title}
                         fill
                         className="object-cover"

@@ -108,8 +108,8 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
     'role="slider"',
     'aria-valuenow',
     'onKeyDown={handleSeekKeyDown}',
-    '-top-5',
-    'h-6 w-full',
+    '-top-10',
+    'h-11 w-full',
     'aria-pressed={shuffleOn}',
     'aria-pressed={repeatOn}',
   ]) assert.ok(player.includes(anchor), `player should include ${anchor}`);

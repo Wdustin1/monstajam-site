@@ -93,11 +93,14 @@ test('cover route proxies only cover URLs attached to published tracks', async (
   }));
   const trackDelegate = prisma.track as unknown as {
     findFirst: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<Array<{ coverUrl: string | null }>>;
   };
   const originalFindFirst = trackDelegate.findFirst;
+  const originalFindMany = trackDelegate.findMany;
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
   trackDelegate.findFirst = async () => null;
+  trackDelegate.findMany = async () => [];
   globalThis.fetch = async () => {
     fetchCalls += 1;
     throw new Error('fetch must not be called');
@@ -112,6 +115,38 @@ test('cover route proxies only cover URLs attached to published tracks', async (
     assert.equal(fetchCalls, 0);
   } finally {
     trackDelegate.findFirst = originalFindFirst;
+    trackDelegate.findMany = originalFindMany;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('cover route authorizes canonical equivalents saved before normalization', async () => {
+  const getCoverWithAvailableLimiter = createCoverHandler(async () => ({ allowed: true, retryAfterSeconds: 1 }));
+  const trackDelegate = prisma.track as unknown as {
+    findFirst: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<Array<{ coverUrl: string | null }>>;
+  };
+  const originalFindFirst = trackDelegate.findFirst;
+  const originalFindMany = trackDelegate.findMany;
+  const originalFetch = globalThis.fetch;
+  trackDelegate.findFirst = async () => null;
+  trackDelegate.findMany = async () => [{
+    coverUrl: ' https://STORE.public.blob.vercel-storage.com:443/covers/../cover.gif ',
+  }];
+  globalThis.fetch = async () => new Response(
+    new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00]),
+    { status: 200, headers: { 'Content-Type': 'image/gif', 'Content-Length': '10' } },
+  );
+
+  try {
+    const request = new NextRequest(
+      'https://monstajam.example/api/cover?url=https%3A%2F%2Fstore.public.blob.vercel-storage.com%2Fcover.gif',
+    );
+    const response = await getCoverWithAvailableLimiter(request);
+    assert.equal(response.status, 200);
+  } finally {
+    trackDelegate.findFirst = originalFindFirst;
+    trackDelegate.findMany = originalFindMany;
     globalThis.fetch = originalFetch;
   }
 });

@@ -20,10 +20,12 @@ test('the homepage uses the full interactive MonstaJam turntable', () => {
   assert.ok(existsSync(join(root, 'src/components/vinylRecordMotion.ts')));
 });
 
-test('the turntable follows real playback state instead of optimistic animation', () => {
+test('the turntable follows media-event playback state instead of optimistic animation', () => {
   assert.ok(playerContext.includes("audio.setAttribute('data-monstajam-player', 'true')"));
   assert.ok(playerContext.includes('const startAudio = useCallback'));
-  assert.ok(playerContext.includes('.then(() => setIsPlaying(true))'));
+  assert.ok(playerContext.includes("audio.addEventListener('play', handlePlay)"));
+  assert.ok(playerContext.includes("audio.addEventListener('pause', handlePause)"));
+  assert.equal(playerContext.includes('.then(() => setIsPlaying(true))'), false);
 });
 
 test('the larger deck keeps a bounded mobile wrapper and its full desktop dimensions', () => {

@@ -1,7 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
-
-const VERCEL_BLOB_ROOT = 'blob.vercel-storage.com';
+import { normalizeTrustedCoverSourceUrl } from './media-url';
 
 const blockedIpv4 = new BlockList();
 for (const [address, prefix] of [
@@ -44,26 +43,9 @@ export function isPublicIpAddress(address: string): boolean {
 }
 
 export function parseAllowedCoverUrl(value: string): URL {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error('Invalid cover URL');
-  }
-
-  const hostname = url.hostname.toLowerCase();
-  const trustedHostname =
-    hostname === VERCEL_BLOB_ROOT || hostname.endsWith(`.${VERCEL_BLOB_ROOT}`);
-
-  if (
-    url.protocol !== 'https:' ||
-    !trustedHostname ||
-    url.username ||
-    url.password ||
-    (url.port && url.port !== '443')
-  ) throw new Error('Invalid cover URL');
-
-  return url;
+  const canonicalUrl = normalizeTrustedCoverSourceUrl(value);
+  if (!canonicalUrl) throw new Error('Invalid cover URL');
+  return new URL(canonicalUrl);
 }
 
 export async function validateCoverUrlForFetch(value: string): Promise<URL> {

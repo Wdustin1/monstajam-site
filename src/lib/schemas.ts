@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isHttpMediaUrl, normalizeAllowedCoverUrl } from './media-url';
 
 // ── Video ──────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,15 @@ export const VideoUpdateSchema = VideoCreateSchema.partial();
 export type VideoCreateInput = z.infer<typeof VideoCreateSchema>;
 export type VideoUpdateInput = z.infer<typeof VideoUpdateSchema>;
 
-const urlOrEmpty = z.string().max(500).url().or(z.literal('')).optional();
+const urlOrEmpty = z.string().max(500).refine((value) => (
+  value === '' || isHttpMediaUrl(value)
+), 'Must be a valid HTTP(S) URL').optional();
+
+const coverUrlOrEmpty = z.string().max(500).refine((value) => (
+  value === '' || normalizeAllowedCoverUrl(value) !== null
+), 'Cover must be a local release image or trusted Vercel Blob URL').transform((value) => (
+  value === '' ? value : normalizeAllowedCoverUrl(value)!
+)).optional();
 
 const TrackBaseSchema = z.object({
   title:         z.string().min(1, 'Title is required').max(200),
@@ -31,7 +40,7 @@ const TrackBaseSchema = z.object({
   color:         z.string().max(200).optional(),
   story:         z.string().max(10000).optional().nullable(),
   audioUrl:      urlOrEmpty,
-  coverUrl:      urlOrEmpty,
+  coverUrl:      coverUrlOrEmpty,
   spotifyUrl:    urlOrEmpty,
   appleMusicUrl: urlOrEmpty,
   previewOnly:   z.boolean().optional(),  // true = 30-sec preview (default), false = full song

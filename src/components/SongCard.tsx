@@ -13,14 +13,15 @@ interface SongCardProps {
 
 // Album art with hover play overlay
 function AlbumArt({ title, color, coverUrl, onPlay, isActive }: { title: string; color: string; coverUrl?: string | null; onPlay: () => void; isActive: boolean }) {
+  const coverSrc = proxyCoverUrl(coverUrl);
   return (
     <div
       data-song-card-art
-      className={`group/art relative h-[88px] w-[88px] flex-shrink-0 overflow-hidden rounded-xl sm:mb-4 sm:h-auto sm:w-full sm:aspect-square ${!coverUrl ? color : ''}`}
+      className={`group/art relative h-[88px] w-[88px] flex-shrink-0 overflow-hidden rounded-xl sm:mb-4 sm:h-auto sm:w-full sm:aspect-square ${!coverSrc ? color : ''}`}
     >
-      {coverUrl ? (
+      {coverSrc ? (
         <Image
-          src={proxyCoverUrl(coverUrl)}
+          src={coverSrc}
           alt={`${title} cover art`}
           fill
           sizes="(max-width: 639px) 88px, (max-width: 1024px) 50vw, 25vw"

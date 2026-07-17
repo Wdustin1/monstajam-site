@@ -4,6 +4,7 @@ import { isAdminRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getRequestAddress } from '@/lib/rateLimit';
 import { consumeSharedRateLimit } from '@/lib/sharedRateLimit';
+import { normalizeTrustedCoverSourceUrl } from '@/lib/media-url';
 
 export const maxDuration = 30;
 
@@ -28,6 +29,25 @@ async function consumeCoverRateLimits(
     limit: 10_000,
     windowMs: 10 * 60 * 1000,
   });
+}
+
+async function isPublishedCoverUrl(sourceUrl: URL) {
+  const canonicalUrl = sourceUrl.toString();
+  const exactTrack = await prisma.track.findFirst({
+    where: { published: true, coverUrl: canonicalUrl },
+    select: { id: true },
+  });
+  if (exactTrack) return true;
+
+  // Compatibility path for records saved before cover URLs were canonicalized.
+  const legacyCandidates = await prisma.track.findMany({
+    where: { published: true },
+    select: { coverUrl: true },
+  });
+  return legacyCandidates.some(({ coverUrl }) => (
+    typeof coverUrl === 'string'
+    && normalizeTrustedCoverSourceUrl(coverUrl) === canonicalUrl
+  ));
 }
 
 export function createCoverHandler(consume: typeof consumeSharedRateLimit = consumeSharedRateLimit) {
@@ -64,11 +84,8 @@ export function createCoverHandler(consume: typeof consumeSharedRateLimit = cons
 
   if (!isAdmin) {
     try {
-      const publishedTrack = await prisma.track.findFirst({
-        where: { published: true, coverUrl: sourceUrl.toString() },
-        select: { id: true },
-      });
-      if (!publishedTrack) {
+      const publishedTrackUsesCover = await isPublishedCoverUrl(sourceUrl);
+      if (!publishedTrackUsesCover) {
         return NextResponse.json({ error: 'Cover not found' }, { status: 404 });
       }
     } catch (error) {

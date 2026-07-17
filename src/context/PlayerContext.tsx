@@ -1,6 +1,15 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import {
+  getNextTrack,
+  getPlaybackDuration,
+  getPlaybackProgress,
+  getPreviousTrack,
+  isPreviewTrack,
+  readPlayerSnapshot,
+  writePlayerSnapshot,
+} from '@/lib/player-comfort';
 
 export interface PlayerTrack {
   slug: string;
@@ -17,6 +26,7 @@ export interface PlayerTrack {
 
 interface PlayerContextValue {
   currentTrack: PlayerTrack | null;
+  queue: PlayerTrack[];
   isPlaying: boolean;
   progress: number;
   duration: number;
@@ -38,6 +48,7 @@ interface PlayerContextValue {
 
 const PlayerContext = createContext<PlayerContextValue>({
   currentTrack: null,
+  queue: [],
   isPlaying: false,
   progress: 0,
   duration: 0,
@@ -57,223 +68,392 @@ const PlayerContext = createContext<PlayerContextValue>({
   setQueue: () => {},
 });
 
+function getBrowserStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<PlayerTrack | null>(null);
+  const [queue, setQueueState] = useState<PlayerTrack[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolumeState] = useState(0.75);
-  const [, setQueueState] = useState<PlayerTrack[]>([]);
   const [shuffleOn, setShuffleOn] = useState(false);
   const [repeatOn, setRepeatOn] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrackRef = useRef<PlayerTrack | null>(null);
+  const queueRef = useRef<PlayerTrack[]>([]);
+  const currentTimeRef = useRef(0);
+  const volumeRef = useRef(0.75);
+  const shuffleOnRef = useRef(false);
+  const repeatOnRef = useRef(false);
+  const nextTrackRef = useRef<() => void>(() => {});
+  const pendingRestoreRef = useRef<(() => void) | null>(null);
+  const hasRestoredRef = useRef(false);
 
-  // Keep ref in sync for use in callbacks
-  currentTrackRef.current = currentTrack;
-
-  // Create audio element once
   useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    shuffleOnRef.current = shuffleOn;
+  }, [shuffleOn]);
+
+  useEffect(() => {
+    repeatOnRef.current = repeatOn;
+  }, [repeatOn]);
+
+  const persistSnapshot = useCallback(() => {
+    if (!hasRestoredRef.current) return;
+    const activeTrack = currentTrackRef.current;
+    if (!activeTrack) return;
+    const audioTime = audioRef.current?.currentTime;
+    const exactTime = typeof audioTime === 'number' && Number.isFinite(audioTime)
+      ? audioTime
+      : currentTimeRef.current;
+
+    writePlayerSnapshot(getBrowserStorage(), {
+      currentTrack: activeTrack,
+      queue: queueRef.current,
+      currentTime: Math.max(0, exactTime),
+      volume: volumeRef.current,
+      shuffleOn: shuffleOnRef.current,
+      repeatOn: repeatOnRef.current,
+    });
+  }, []);
+
+  const clearPendingRestore = useCallback((audio: HTMLAudioElement) => {
+    const pendingRestore = pendingRestoreRef.current;
+    if (!pendingRestore) return;
+    audio.removeEventListener('loadedmetadata', pendingRestore);
+    pendingRestoreRef.current = null;
+    hasRestoredRef.current = true;
+  }, []);
+
+  const startAudio = useCallback((audio: HTMLAudioElement) => {
+    void audio.play().catch(() => setIsPlaying(false));
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
     const audio = document.createElement('audio');
-    audio.volume = volume;
+    const restoredSnapshot = readPlayerSnapshot(getBrowserStorage());
+
+    audio.volume = restoredSnapshot?.volume ?? 0.75;
     audio.preload = 'auto';
     audio.setAttribute('playsinline', 'true');
     audio.setAttribute('data-monstajam-player', 'true');
     audio.style.display = 'none';
     document.body.appendChild(audio);
-
-    const PREVIEW_CAP = 45; // seconds
-
-    audio.addEventListener('timeupdate', () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        const allowFullPlayback = currentTrackRef.current?.genre === 'Full Songs';
-        if (!allowFullPlayback && audio.currentTime >= PREVIEW_CAP) {
-          audio.pause();
-          audio.dispatchEvent(new Event('ended'));
-          return;
-        }
-        setCurrentTime(audio.currentTime);
-        setProgress(audio.currentTime / audio.duration);
-      }
-    });
-
-    audio.addEventListener('loadedmetadata', () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    });
-
-    audio.addEventListener('ended', () => {
-      setIsPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
-      // Auto-advance handled via state update below
-    });
-
     audioRef.current = audio;
 
+    const handleTimeUpdate = () => {
+      if (!audio.duration || !Number.isFinite(audio.duration)) return;
+      const activeTrack = currentTrackRef.current;
+      const playbackDuration = getPlaybackDuration(activeTrack, audio.duration);
+
+      if (
+        isPreviewTrack(activeTrack)
+        && audio.duration > playbackDuration + 0.05
+        && audio.currentTime >= playbackDuration
+      ) {
+        audio.pause();
+        audio.dispatchEvent(new Event('ended'));
+        return;
+      }
+
+      currentTimeRef.current = audio.currentTime;
+      setDuration(playbackDuration);
+      setCurrentTime(audio.currentTime);
+      setProgress(getPlaybackProgress(activeTrack, audio.currentTime, audio.duration));
+    };
+
+    const handleLoadedMetadata = () => {
+      if (!audio.duration || !Number.isFinite(audio.duration)) return;
+      setDuration(getPlaybackDuration(currentTrackRef.current, audio.duration));
+    };
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEmptied = () => setIsPlaying(false);
+    const handleError = () => {
+      clearPendingRestore(audio);
+      setIsPlaying(false);
+    };
+
+    const handleEnded = () => {
+      audio.currentTime = 0;
+      currentTimeRef.current = 0;
+      setProgress(0);
+      setCurrentTime(0);
+      if (repeatOnRef.current) {
+        startAudio(audio);
+      } else {
+        nextTrackRef.current();
+      }
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('emptied', handleEmptied);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('ended', handleEnded);
+
+    if (restoredSnapshot) {
+      const restoredTrack = restoredSnapshot.currentTrack;
+      currentTrackRef.current = restoredTrack;
+      queueRef.current = restoredSnapshot.queue;
+      currentTimeRef.current = restoredSnapshot.currentTime;
+      volumeRef.current = restoredSnapshot.volume;
+      shuffleOnRef.current = restoredSnapshot.shuffleOn;
+      repeatOnRef.current = restoredSnapshot.repeatOn;
+
+      queueMicrotask(() => {
+        if (isCancelled) return;
+        setCurrentTrack(restoredTrack);
+        setQueueState(restoredSnapshot.queue);
+        setVolumeState(restoredSnapshot.volume);
+        setShuffleOn(restoredSnapshot.shuffleOn);
+        setRepeatOn(restoredSnapshot.repeatOn);
+        setDuration(getPlaybackDuration(restoredTrack, 0));
+      });
+
+      if (restoredTrack.audioUrl) {
+        const restorePosition = () => {
+          if (pendingRestoreRef.current !== restorePosition) return;
+          pendingRestoreRef.current = null;
+          if (currentTrackRef.current?.slug !== restoredTrack.slug) return;
+          const playbackDuration = getPlaybackDuration(restoredTrack, audio.duration);
+          const resumeTime = restoredSnapshot.currentTime >= playbackDuration - 1
+            ? 0
+            : Math.min(restoredSnapshot.currentTime, playbackDuration);
+          audio.currentTime = resumeTime;
+          currentTimeRef.current = resumeTime;
+          setCurrentTime(resumeTime);
+          setDuration(playbackDuration);
+          setProgress(getPlaybackProgress(restoredTrack, resumeTime, audio.duration));
+          hasRestoredRef.current = true;
+          persistSnapshot();
+        };
+        pendingRestoreRef.current = restorePosition;
+        audio.addEventListener('loadedmetadata', restorePosition, { once: true });
+        audio.src = restoredTrack.audioUrl;
+        audio.load();
+      } else {
+        hasRestoredRef.current = true;
+        persistSnapshot();
+      }
+    } else {
+      hasRestoredRef.current = true;
+    }
+
     return () => {
+      isCancelled = true;
+      clearPendingRestore(audio);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('emptied', handleEmptied);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('ended', handleEnded);
       audio.pause();
       audio.src = '';
       audio.load();
       audio.remove();
+      if (audioRef.current === audio) audioRef.current = null;
+      hasRestoredRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Auto-advance when track ends
-  const [trackEnded, setTrackEnded] = useState(false);
-  const startAudio = useCallback((audio: HTMLAudioElement) => {
-    setIsPlaying(false);
-    audio.play()
-      .then(() => setIsPlaying(true))
-      .catch((error) => {
-        console.warn('play() failed:', error);
-        setIsPlaying(false);
-      });
-  }, []);
+  }, [clearPendingRestore, persistSnapshot, startAudio]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleEnded = () => setTrackEnded(true);
-    audio.addEventListener('ended', handleEnded);
-    return () => audio.removeEventListener('ended', handleEnded);
-  }, []);
-
-  useEffect(() => {
-    if (trackEnded) {
-      setTrackEnded(false);
-      if (repeatOn) {
-        const audio = audioRef.current;
-        if (audio) { audio.currentTime = 0; startAudio(audio); }
-      } else {
-        nextTrackFn();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackEnded, repeatOn]);
-
-  // Reset state on track change
-  useEffect(() => {
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
-  }, [currentTrack?.slug]);
+    window.addEventListener('pagehide', persistSnapshot);
+    return () => window.removeEventListener('pagehide', persistSnapshot);
+  }, [persistSnapshot]);
 
   const play = useCallback((track: PlayerTrack) => {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (currentTrackRef.current?.slug !== track.slug) {
-      // New track
+      clearPendingRestore(audio);
+      currentTrackRef.current = track;
+      currentTimeRef.current = 0;
       setCurrentTrack(track);
+      setProgress(0);
+      setCurrentTime(0);
+      setDuration(getPlaybackDuration(track, 0));
+
       if (track.audioUrl) {
         audio.src = track.audioUrl;
         audio.load();
         startAudio(audio);
       } else {
-        // No audio URL — still update UI but can't play
-        audio.src = '';
         setIsPlaying(false);
+        audio.removeAttribute('src');
+        audio.load();
       }
-    } else {
-      // Same track — resume
-      if (track.audioUrl) {
-        startAudio(audio);
+      return;
+    }
+
+    if (!track.audioUrl) return;
+    if (!audio.src) {
+      clearPendingRestore(audio);
+      audio.src = track.audioUrl;
+      audio.load();
+    }
+    if (audio.duration && Number.isFinite(audio.duration)) {
+      const playbackDuration = getPlaybackDuration(track, audio.duration);
+      if (audio.currentTime >= playbackDuration - 0.05) {
+        audio.currentTime = 0;
+        currentTimeRef.current = 0;
+        setCurrentTime(0);
+        setProgress(0);
       }
     }
-  }, [startAudio]);
+    startAudio(audio);
+  }, [clearPendingRestore, startAudio]);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
-    setIsPlaying(false);
-  }, []);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      if (Number.isFinite(audio.currentTime)) {
+        currentTimeRef.current = audio.currentTime;
+        setCurrentTime(audio.currentTime);
+      }
+    }
+    persistSnapshot();
+  }, [persistSnapshot]);
 
   const toggle = useCallback((track: PlayerTrack) => {
     if (currentTrackRef.current?.slug === track.slug) {
       const audio = audioRef.current;
       if (!audio) return;
       if (audio.paused) {
-        if (track.audioUrl) { startAudio(audio); }
+        if (track.audioUrl) startAudio(audio);
       } else {
-        audio.pause(); setIsPlaying(false);
+        pause();
       }
-    } else {
-      play(track);
+      return;
     }
-  }, [play, startAudio]);
+    play(track);
+  }, [pause, play, startAudio]);
 
   const seek = useCallback((fraction: number) => {
     const audio = audioRef.current;
     if (!audio || !audio.duration) return;
-    const t = Math.max(0, Math.min(1, fraction)) * audio.duration;
+    const playbackDuration = getPlaybackDuration(currentTrackRef.current, audio.duration);
+    const t = Math.max(0, Math.min(1, fraction)) * playbackDuration;
     audio.currentTime = t;
+    currentTimeRef.current = t;
     setCurrentTime(t);
-    setProgress(fraction);
-  }, []);
+    setProgress(getPlaybackProgress(currentTrackRef.current, t, audio.duration));
+    persistSnapshot();
+  }, [persistSnapshot]);
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
+    volumeRef.current = clamped;
     setVolumeState(clamped);
     if (audioRef.current) audioRef.current.volume = clamped;
-  }, []);
+    persistSnapshot();
+  }, [persistSnapshot]);
 
   const setQueue = useCallback((tracks: PlayerTrack[]) => {
+    queueRef.current = tracks;
     setQueueState(tracks);
-  }, []);
+    persistSnapshot();
+  }, [persistSnapshot]);
 
   const nextTrackFn = useCallback(() => {
-    setQueueState(q => {
-      if (!q.length) return q;
-      const current = currentTrackRef.current;
-      let nextIdx: number;
-      if (shuffleOn) {
-        nextIdx = Math.floor(Math.random() * q.length);
-      } else {
-        const idx = current ? q.findIndex(t => t.slug === current.slug) : -1;
-        nextIdx = (idx + 1) % q.length;
-      }
-      // Play after state update
-      setTimeout(() => play(q[nextIdx]), 0);
-      return q;
-    });
-  }, [shuffleOn, play]);
+    const nextTrack = getNextTrack(
+      queueRef.current,
+      currentTrackRef.current?.slug,
+      shuffleOnRef.current,
+    );
+    if (nextTrack) play(nextTrack);
+  }, [play]);
 
   const prevTrack = useCallback(() => {
     const audio = audioRef.current;
-    // If > 3s in, restart current
     if (audio && audio.currentTime > 3) {
       audio.currentTime = 0;
+      currentTimeRef.current = 0;
       setCurrentTime(0);
       setProgress(0);
+      persistSnapshot();
       return;
     }
-    setQueueState(q => {
-      if (!q.length) return q;
-      const current = currentTrackRef.current;
-      const idx = current ? q.findIndex(t => t.slug === current.slug) : 0;
-      const prevIdx = (idx - 1 + q.length) % q.length;
-      setTimeout(() => play(q[prevIdx]), 0);
-      return q;
-    });
-  }, [play]);
 
-  const toggleShuffle = () => setShuffleOn(v => !v);
-  const toggleRepeat = () => setRepeatOn(v => !v);
+    const previousTrack = getPreviousTrack(queueRef.current, currentTrackRef.current?.slug);
+    if (previousTrack) {
+      play(previousTrack);
+    } else if (audio && currentTrackRef.current) {
+      audio.currentTime = 0;
+      currentTimeRef.current = 0;
+      setCurrentTime(0);
+      setProgress(0);
+      persistSnapshot();
+    }
+  }, [persistSnapshot, play]);
+
+  useEffect(() => {
+    nextTrackRef.current = nextTrackFn;
+  }, [nextTrackFn]);
+
+  const resumeCheckpoint = Math.floor(currentTime / 5);
+  useEffect(() => {
+    if (!currentTrack) return;
+    persistSnapshot();
+  }, [currentTrack, queue, resumeCheckpoint, volume, shuffleOn, repeatOn, persistSnapshot]);
+
+  const toggleShuffle = useCallback(() => {
+    const nextValue = !shuffleOnRef.current;
+    shuffleOnRef.current = nextValue;
+    setShuffleOn(nextValue);
+    persistSnapshot();
+  }, [persistSnapshot]);
+
+  const toggleRepeat = useCallback(() => {
+    const nextValue = !repeatOnRef.current;
+    repeatOnRef.current = nextValue;
+    setRepeatOn(nextValue);
+    persistSnapshot();
+  }, [persistSnapshot]);
 
   return (
     <PlayerContext.Provider value={{
       currentTrack,
+      queue,
+      shuffleOn,
+      repeatOn,
       isPlaying,
       progress,
       duration,
       currentTime,
       volume,
-      shuffleOn,
-      repeatOn,
       play,
       pause,
       toggle,

@@ -22,6 +22,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
     toggle(track);
   };
   const isCurrentTrack = currentTrack?.slug === track.slug;
+  const coverSrc = proxyCoverUrl(track.coverUrl);
 
   const titleColor = track.accentCyan ? 'text-[#00ffff]' : 'text-[#ff00ff]';
   const titleShadow = track.accentCyan
@@ -52,10 +53,10 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
             boxShadow: '-10px -10px 40px rgba(255,0,255,0.4), 10px 10px 40px rgba(0,255,255,0.4)',
           }}
         >
-          <div className={`w-full aspect-square rounded-[calc(1rem-4px)] overflow-hidden relative ${!track.coverUrl ? track.color : ''} flex items-center justify-center`}>
-            {track.coverUrl ? (
+          <div className={`w-full aspect-square rounded-[calc(1rem-4px)] overflow-hidden relative ${!coverSrc ? track.color : ''} flex items-center justify-center`}>
+            {coverSrc ? (
               <Image
-                src={proxyCoverUrl(track.coverUrl)}
+                src={coverSrc}
                 alt={`${track.title} cover art`}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
