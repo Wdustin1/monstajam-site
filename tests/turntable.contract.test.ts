@@ -29,9 +29,9 @@ test('the turntable follows media-event playback state instead of optimistic ani
 });
 
 test('the larger deck keeps a bounded mobile wrapper and its full desktop dimensions', () => {
-  assert.ok(hero.includes('width: 280px; height: 190px;'));
-  assert.ok(hero.includes('transform: scale(0.50);'));
-  assert.ok(hero.includes('width: 320px; height: 217px;'));
+  assert.ok(hero.includes('width: 300px; height: 204px;'));
+  assert.ok(hero.includes('transform: scale(0.536);'));
+  assert.ok(hero.includes('width: 350px; height: 238px;'));
   assert.ok(hero.includes('width: 560px; height: 380px;'));
-  assert.ok(hero.includes('@media (min-width: 1280px)'));
+  assert.ok(hero.includes('@media (min-width: 1024px)'));
 });

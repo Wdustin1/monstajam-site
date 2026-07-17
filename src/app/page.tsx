@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import type { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
-import AlbumReleaseBanner from '@/components/AlbumReleaseBanner';
 import Hero from '@/components/Hero';
 import ScrollIndicator from '@/components/ScrollIndicator';
 import MusicLibrary from '@/components/MusicLibrary';
@@ -45,7 +44,6 @@ export default async function Home() {
     <>
       <Navbar activeLink="home" />
       <main id="main-content" tabIndex={-1} className="flex-grow pt-24 hero-bg-gradient">
-        <AlbumReleaseBanner />
         <Hero trackCount={tracks.length} artistCount={artistCount} videoCount={videoCount} featuredTrack={featuredTrack} />
         <ScrollIndicator />
         <MusicLibrary tracks={tracks} />

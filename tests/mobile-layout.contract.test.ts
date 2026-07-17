@@ -21,17 +21,18 @@ test('the album release becomes a compact mobile-first card without changing the
   assert.ok(banner.includes('md:grid-cols-[116px_1fr_auto]'));
 });
 
-test('the mobile hero reaches the library faster while desktop keeps its immersive composition', () => {
+test('the mobile hero becomes a bounded cinematic record-launch composition', () => {
   assert.ok(hero.includes('data-mobile-layout="home-hero"'));
-  assert.ok(hero.includes('min-h-0'));
-  assert.ok(hero.includes('lg:min-h-[calc(100vh-260px)]'));
-  assert.ok(hero.includes('width: 280px; height: 190px;'));
-  assert.ok(hero.includes('transform: scale(0.50);'));
+  assert.ok(hero.includes('data-design-concept="cinematic-record-launch"'));
+  assert.ok(hero.includes('min-h-[calc(100svh-6rem)]'));
+  assert.ok(hero.includes('data-hero-stage="record-launch"'));
+  assert.ok(hero.includes('width: 300px; height: 204px;'));
+  assert.ok(hero.includes('transform: scale(0.536);'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
 });
 
-test('the mobile vinyl hands off directly to the library without stacked section padding', () => {
-  assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*pb-2[^"]*md:pb-16/);
+test('the mobile vinyl hands off to the library without excessive stacked section padding', () => {
+  assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*pb-8[^"]*md:pb-14/);
   assert.match(musicLibrary, /id="library"[\s\S]*className="[^"]*pt-3[^"]*md:pt-8/);
   assert.doesNotMatch(hero, /className="[^"]*\bpb-6\b/);
 });

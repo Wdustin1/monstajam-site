@@ -127,7 +127,7 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
   assert.ok(vinyl.includes('data-turntable-id="hero-turntable"'));
   assert.ok(vinyl.includes('width: TURNTABLE_WIDTH'));
   assert.ok(vinyl.includes('height: TURNTABLE_HEIGHT'));
-  assert.ok(hero.includes('transform: scale(0.50);'), 'the full-deck control should remain large on a 320px screen');
+  assert.ok(hero.includes('transform: scale(0.536);'), 'the full-deck control should remain large on a 320px screen');
   assert.ok(genreBrowser.includes('md:opacity-0'));
   assert.ok(genreBrowser.includes('group-focus-within:opacity-100'));
   assert.ok(genreBrowser.includes('min-h-11'), 'genre-card links should remain tap sized');

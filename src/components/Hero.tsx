@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import VinylRecord from './VinylRecord';
 import { PlayerTrack } from '@/context/PlayerContext';
 
@@ -14,154 +15,153 @@ export default function Hero({
   videoCount?: number;
   featuredTrack?: PlayerTrack | null;
 }) {
+  const trackTitle = featuredTrack?.title ?? 'Featured cut';
+  const trackArtist = featuredTrack?.artist ?? 'Monsta Jam Productions';
+  const bpm = featuredTrack?.bpm ? `${featuredTrack.bpm} BPM` : 'Private press';
+
   return (
     <section
       data-mobile-layout="home-hero"
-      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-2 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row lg:gap-8 xl:gap-12"
+      data-design-concept="cinematic-record-launch"
+      aria-labelledby="record-launch-title"
+      className="relative mx-auto flex min-h-[calc(100svh-6rem)] w-full max-w-[1500px] flex-col overflow-hidden px-4 pb-8 pt-5 sm:px-6 md:px-8 md:pb-14 md:pt-8"
     >
-      {/* Ambient glow blobs behind content */}
-      <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(255,0,255,0.12) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-      <div className="absolute top-1/4 right-0 w-96 h-96 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.10) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-
-      {/* ── Left: Text ── */}
-      <div className="z-10 flex w-full flex-col gap-4 md:gap-6 lg:w-[48%]">
-
-        <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
-          style={{ fontSize: 'clamp(2.5rem, 9vw, 5rem)' }}>
-          <span style={{
-            background: 'linear-gradient(90deg, #00ffff, #0088ff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 0 14px rgba(0,255,255,0.55))',
-          }}>
-            UNRELEASED.
-          </span>
-          <span style={{
-            background: 'linear-gradient(90deg, #ff44ff, #aa00ff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 0 14px rgba(255,0,255,0.55))',
-          }}>
-            EXCLUSIVE.
-          </span>
-          <span style={{
-            background: 'linear-gradient(90deg, #ffffff, #aaddff)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            filter: 'drop-shadow(0 0 12px rgba(100,200,255,0.5))',
-          }}>
-            YOURS.
-          </span>
-        </h1>
-
-        <p className="max-w-md text-base leading-relaxed text-gray-400 md:mt-2">
-          Discover the beats and tracks that never made it to the mainstream.
-          Curated for true fans — no algorithms, no gatekeepers.
-        </p>
-
-        <div className="mt-2 flex flex-wrap items-center gap-3 md:mt-4 md:gap-4">
-          {/* Explore Library — cyan glow */}
-          <button
-            onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex w-full items-center justify-center gap-2 rounded-full px-8 py-3.5 font-bold text-white transition-all hover:scale-105 min-[480px]:w-auto"
-            style={{
-              border: '2px solid #00e5ff',
-              background: 'rgba(0,229,255,0.07)',
-              boxShadow: '0 0 16px rgba(0,229,255,0.35), inset 0 0 12px rgba(0,229,255,0.08)',
-            }}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="#00e5ff" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" strokeWidth="2" />
-              <path d="M10 8l6 4-6 4V8z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="#00e5ff" stroke="none"/>
-            </svg>
-            Explore Library
-          </button>
-
-          {/* Keep the secondary action useful even before the first video is published. */}
-          <a
-            href={videoCount > 0 ? '/videos' : '/community'}
-            className="flex w-full items-center justify-center gap-2 rounded-full px-8 py-3.5 font-bold text-white no-underline transition-all hover:scale-105 min-[480px]:w-auto"
-            style={{
-              border: '1px solid rgba(255,0,255,0.4)',
-              background: 'rgba(255,0,255,0.05)',
-              boxShadow: '0 0 12px rgba(255,0,255,0.2)',
-            }}
-          >
-            {videoCount > 0 ? (
-              <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="2" y="4" width="20" height="16" rx="3" strokeWidth="2"/>
-                <path d="M10 9l5 3-5 3V9z" fill="#ff44ff" stroke="none"/>
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="#ff44ff" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-            <span style={{ color: '#ff99ff' }}>{videoCount > 0 ? 'Watch Videos' : 'Join Community'}</span>
-          </a>
-        </div>
-
-        {/* Social proof strip */}
-        <div className="mt-2 flex w-full items-center justify-between gap-3 border-t border-white/5 pt-5 md:gap-5 md:pt-6">
-          <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">{trackCount}</span>
-            <span className="text-gray-500 text-xs mt-0.5">Exclusive Tracks</span>
-          </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">{videoCount}</span>
-            <span className="text-gray-500 text-xs mt-0.5">Music Videos</span>
-          </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div className="flex flex-col">
-            <span className="text-white font-black text-lg leading-none">{artistCount}</span>
-            <span className="text-gray-500 text-xs mt-0.5">{artistCount === 1 ? 'Artist' : 'Artists'}</span>
-          </div>
-        </div>
+      <div
+        data-hero-type="monsta-jam"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-10 z-0 select-none text-center font-black uppercase leading-[0.68] tracking-[-0.085em] text-white/[0.055] sm:top-6 lg:top-0"
+        style={{ fontSize: 'clamp(5rem, 21vw, 18rem)' }}
+      >
+        <span className="block -translate-x-[2vw]">MONSTA</span>
+        <span className="block translate-x-[4vw] text-transparent [-webkit-text-stroke:1px_rgba(255,255,255,0.08)]">JAM</span>
       </div>
 
-      {/* ── Right: Vinyl ── */}
-      <div className="relative mt-2 flex w-full justify-center lg:mt-0 lg:w-[48%] lg:pl-0">
-        {/* Glow behind vinyl */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-72 h-72 rounded-full"
-            style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.15) 0%, transparent 70%)', filter: 'blur(30px)' }} />
+      <div aria-hidden="true" className="pointer-events-none absolute left-[7%] top-[26%] z-0 h-px w-[86%] bg-gradient-to-r from-transparent via-cyan-300/25 to-transparent" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-28 top-52 z-0 h-80 w-80 rounded-full bg-cyan-400/10 blur-[100px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-28 top-28 z-0 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-[110px]" />
+
+      <header className="relative z-20 mx-auto flex w-full max-w-5xl flex-col items-center text-center">
+        <div className="mb-3 flex items-center gap-3 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-100/80 sm:text-xs">
+          <span className="h-px w-8 bg-cyan-300/50" />
+          Monsta Jam private press
+          <span className="h-px w-8 bg-cyan-300/50" />
         </div>
-        {/* Scale wrapper: shrink vinyl on mobile uniformly (keeps it circular) */}
-        <div className="vinyl-scale-wrapper">
-          <style>{`
-            .vinyl-scale-wrapper {
-              width: 280px; height: 190px;
-              display: flex; align-items: center; justify-content: center;
-              overflow: visible;
-            }
-            .vinyl-scale-wrapper > * {
-              transform: scale(0.50);
-              transform-origin: center center;
-              flex-shrink: 0;
-            }
-            @media (min-width: 360px) {
-              .vinyl-scale-wrapper { width: 320px; height: 217px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.57); }
-            }
-            @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 403px; height: 274px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.72); }
-            }
-            @media (min-width: 640px) {
-              .vinyl-scale-wrapper { width: 487px; height: 335px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.87); }
-            }
-            @media (min-width: 1280px) {
-              .vinyl-scale-wrapper { width: 560px; height: 380px; }
-              .vinyl-scale-wrapper > * { transform: scale(1); }
-            }
-          `}</style>
+        <h1 id="record-launch-title" className="max-w-4xl text-balance text-[clamp(2.2rem,10vw,6.5rem)] font-black uppercase leading-[0.82] tracking-[-0.065em] text-white">
+          Cold World
+          <span className="block bg-gradient-to-r from-cyan-200 via-white to-fuchsia-200 bg-clip-text text-transparent">Volume II</span>
+        </h1>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/55 sm:text-xs">
+          <span>MJ-016</span>
+          <span aria-hidden="true" className="text-fuchsia-300/70">◆</span>
+          <span>Tyler J</span>
+          <span aria-hidden="true" className="text-cyan-300/70">◆</span>
+          <span>Produced by Monsta Jam</span>
+        </div>
+      </header>
+
+      <div
+        data-hero-stage="record-launch"
+        className="relative z-10 mx-auto mt-2 h-[350px] w-full max-w-5xl flex-1 sm:mt-4 sm:h-[430px] lg:mt-0 lg:min-h-[470px]"
+      >
+        <div
+          data-hero-sleeve="cold-world-volume-2"
+          className="absolute left-1/2 top-5 z-[4] h-[176px] w-[176px] -translate-x-1/2 -rotate-[5deg] sm:top-3 sm:h-[224px] sm:w-[224px] lg:left-[20%] lg:top-20 lg:h-[290px] lg:w-[290px] lg:-translate-x-0"
+        >
+          <div aria-hidden="true" className="absolute -right-5 top-3 h-[90%] w-12 rounded-full border border-white/10 bg-[radial-gradient(circle_at_center,#111_0_11%,#050505_12%_54%,#222_55%_56%,#050505_57%)] shadow-[18px_10px_34px_rgba(0,0,0,0.65)]" />
+          <div className="relative h-full w-full overflow-hidden border border-white/20 bg-[#07090e] p-2 shadow-[-18px_28px_70px_rgba(0,0,0,0.75),0_0_42px_rgba(91,113,255,0.2)]">
+            <Image
+              src="/releases/cold-world-volume-2-cover.jpg"
+              alt="Tyler J Cold World Volume 2 album sleeve"
+              fill
+              priority
+              sizes="(max-width: 639px) 176px, (max-width: 1023px) 224px, 290px"
+              className="object-cover p-2"
+            />
+            <span aria-hidden="true" className="absolute inset-2 bg-[linear-gradient(115deg,transparent_20%,rgba(255,255,255,0.18)_40%,transparent_56%)] opacity-30 mix-blend-screen" />
+            <span className="absolute bottom-3 left-3 border border-white/15 bg-black/70 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/75 backdrop-blur-sm">MJ-016 · Limited press</span>
+          </div>
+        </div>
+
+        <div className="cinematic-turntable-wrapper">
           <VinylRecord featuredTrack={featuredTrack} />
         </div>
+
+        <div className="absolute bottom-0 left-1/2 z-30 flex min-h-11 -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-cyan-200/25 bg-black/75 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_0_30px_rgba(0,229,255,0.16)] backdrop-blur-md sm:bottom-3 sm:text-xs lg:bottom-5">
+          <span aria-hidden="true" className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fuchsia-300 opacity-50" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-fuchsia-300" />
+          </span>
+          DROP THE NEEDLE
+        </div>
       </div>
+
+      <footer className="relative z-30 mx-auto mt-1 grid w-full max-w-5xl grid-cols-[1fr_auto] items-center gap-3 border-y border-white/10 bg-black/25 px-3 py-3 backdrop-blur-sm sm:grid-cols-[1.4fr_0.8fr_auto] sm:px-5">
+        <div className="min-w-0">
+          <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/45">Featured cut</p>
+          <p className="truncate text-sm font-black uppercase tracking-tight text-white sm:text-base">{trackTitle}</p>
+          <p className="truncate text-[11px] text-white/55">{trackArtist}</p>
+        </div>
+        <div className="hidden border-l border-white/10 pl-5 sm:block">
+          <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/45">Session data</p>
+          <p className="mt-1 font-mono text-xs uppercase text-cyan-100">{bpm} · {trackCount} cuts · {artistCount} {artistCount === 1 ? 'artist' : 'artists'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })}
+            className="inline-flex min-h-11 items-center justify-center border border-cyan-200/40 bg-cyan-200 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:-translate-y-0.5 hover:bg-white sm:px-5"
+          >
+            Browse crate
+          </button>
+          <a
+            href={videoCount > 0 ? '/videos' : '/community'}
+            aria-label={videoCount > 0 ? 'Watch Videos' : 'Join Community'}
+            className="hidden min-h-11 items-center justify-center border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white no-underline transition hover:border-fuchsia-300/50 hover:text-fuchsia-100 md:inline-flex"
+          >
+            {videoCount > 0 ? 'Watch Videos' : 'Join Community'}
+          </a>
+        </div>
+      </footer>
+
+      <style>{`
+        .cinematic-turntable-wrapper {
+          position: absolute;
+          left: 50%;
+          bottom: 35px;
+          z-index: 12;
+          width: 300px; height: 204px;
+          display: flex; align-items: center; justify-content: center;
+          transform: translateX(-50%);
+          overflow: visible;
+        }
+        .cinematic-turntable-wrapper > * {
+          transform: scale(0.536);
+          transform-origin: center center;
+          flex-shrink: 0;
+        }
+        @media (min-width: 360px) {
+          .cinematic-turntable-wrapper { width: 350px; height: 238px; }
+          .cinematic-turntable-wrapper > * { transform: scale(0.625); }
+        }
+        @media (min-width: 480px) {
+          .cinematic-turntable-wrapper { width: 430px; height: 292px; }
+          .cinematic-turntable-wrapper > * { transform: scale(0.768); }
+        }
+        @media (min-width: 640px) {
+          .cinematic-turntable-wrapper { width: 520px; height: 353px; }
+          .cinematic-turntable-wrapper > * { transform: scale(0.929); }
+        }
+        @media (min-width: 1024px) {
+          .cinematic-turntable-wrapper {
+            left: auto; right: 1%; bottom: 32px;
+            width: 560px; height: 380px;
+            transform: none;
+          }
+          .cinematic-turntable-wrapper > * { transform: scale(1); }
+        }
+        @media (min-width: 1280px) {
+          .cinematic-turntable-wrapper { right: 5%; }
+        }
+      `}</style>
     </section>
   );
 }
