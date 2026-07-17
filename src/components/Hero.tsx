@@ -16,8 +16,8 @@ export default function Hero({
 }) {
   return (
     <section
-      className="max-w-7xl mx-auto px-5 md:px-8 pt-8 md:pt-10 pb-10 md:pb-16 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 relative"
-      style={{ minHeight: 'calc(100vh - 260px)' }}
+      data-mobile-layout="home-hero"
+      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-6 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row"
     >
       {/* Ambient glow blobs behind content */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
@@ -26,7 +26,7 @@ export default function Hero({
         style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.10) 0%, transparent 70%)', filter: 'blur(40px)' }} />
 
       {/* ── Left: Text ── */}
-      <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10">
+      <div className="z-10 flex w-full flex-col gap-4 md:gap-6 lg:w-1/2">
 
         <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
           style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)' }}>
@@ -56,16 +56,16 @@ export default function Hero({
           </span>
         </h1>
 
-        <p className="text-base text-gray-400 max-w-md mt-2 leading-relaxed">
+        <p className="max-w-md text-base leading-relaxed text-gray-400 md:mt-2">
           Discover the beats and tracks that never made it to the mainstream.
           Curated for true fans — no algorithms, no gatekeepers.
         </p>
 
-        <div className="flex items-center gap-4 mt-4 flex-wrap">
+        <div className="mt-2 flex flex-wrap items-center gap-3 md:mt-4 md:gap-4">
           {/* Explore Library — cyan glow */}
           <button
             onClick={() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' })}
-            className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105"
+            className="flex w-full items-center justify-center gap-2 rounded-full px-8 py-3.5 font-bold text-white transition-all hover:scale-105 min-[480px]:w-auto"
             style={{
               border: '2px solid #00e5ff',
               background: 'rgba(0,229,255,0.07)',
@@ -82,7 +82,7 @@ export default function Hero({
           {/* Keep the secondary action useful even before the first video is published. */}
           <a
             href={videoCount > 0 ? '/videos' : '/community'}
-            className="px-8 py-3.5 rounded-full font-bold flex items-center gap-2 text-white transition-all hover:scale-105 no-underline"
+            className="flex w-full items-center justify-center gap-2 rounded-full px-8 py-3.5 font-bold text-white no-underline transition-all hover:scale-105 min-[480px]:w-auto"
             style={{
               border: '1px solid rgba(255,0,255,0.4)',
               background: 'rgba(255,0,255,0.05)',
@@ -104,7 +104,7 @@ export default function Hero({
         </div>
 
         {/* Social proof strip */}
-        <div className="flex items-center gap-5 mt-2 pt-6 border-t border-white/5">
+        <div className="mt-2 flex w-full items-center justify-between gap-3 border-t border-white/5 pt-5 md:gap-5 md:pt-6">
           <div className="flex flex-col">
             <span className="text-white font-black text-lg leading-none">{trackCount}</span>
             <span className="text-gray-500 text-xs mt-0.5">Exclusive Tracks</span>
@@ -133,18 +133,22 @@ export default function Hero({
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {
-              width: 315px; height: 260px;
+              width: 260px; height: 214px;
               display: flex; align-items: center; justify-content: center;
               overflow: visible;
             }
             .vinyl-scale-wrapper > * {
-              transform: scale(0.72);
+              transform: scale(0.58);
               transform-origin: center center;
               flex-shrink: 0;
             }
+            @media (min-width: 360px) {
+              .vinyl-scale-wrapper { width: 286px; height: 234px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.65); }
+            }
             @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 360px; height: 294px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.82); }
+              .vinyl-scale-wrapper { width: 320px; height: 260px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.72); }
             }
             @media (min-width: 640px) {
               .vinyl-scale-wrapper { width: 395px; height: 324px; }

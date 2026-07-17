@@ -160,10 +160,11 @@ export default function CommunityHub() {
 
       <div id="community-tabs" data-section-id="community-tabs" className="scroll-mt-28 pt-5 md:pt-7">
         <div
+          data-mobile-layout="community-tabs"
           role="tablist"
           aria-label="Community sections"
           aria-orientation="horizontal"
-          className="flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-[#080711]/95 p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#080711]/95 p-2 sm:flex sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden"
         >
           {COMMUNITY_TABS.map((tab, index) => {
             const isActive = activeTab === tab.id;
@@ -179,7 +180,7 @@ export default function CommunityHub() {
                 aria-controls={`community-panel-${tab.id}`}
                 onClick={() => selectTab(tab.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
-                className={`min-h-14 min-w-[132px] flex-1 rounded-xl px-4 py-3 text-left transition ${
+                className={`min-h-14 min-w-0 rounded-xl px-3 py-3 text-left transition sm:min-w-[132px] sm:flex-1 sm:px-4 ${
                   isActive
                     ? 'bg-white text-black shadow-[0_10px_28px_rgba(0,0,0,0.28)]'
                     : 'text-gray-400 hover:bg-white/[0.06] hover:text-white'
@@ -199,7 +200,7 @@ export default function CommunityHub() {
           data-community-panel={activeTabConfig.id}
           role="tabpanel"
           aria-labelledby={`community-tab-${activeTabConfig.id}`}
-          className="mt-4 rounded-[2rem] border border-white/10 bg-[#080711]/90 p-4 sm:p-6 md:p-8"
+          className="mt-3 rounded-[2rem] border border-white/10 bg-[#080711]/90 p-2 sm:mt-4 sm:p-6 md:p-8"
         >
           {activeTab === 'vote' && <FeaturedVote />}
 
