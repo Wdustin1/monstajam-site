@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         search: '',
       },
       {
+        pathname: '/monstajam-record-label.png',
+        search: '',
+      },
+      {
         pathname: '/releases/**',
         search: '',
       },

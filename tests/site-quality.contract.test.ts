@@ -31,8 +31,9 @@ test('global metadata and route shells provide a coherent accessible page contra
   }
   assert.ok(globals.includes('overflow-x: clip'), 'the document should prevent decorative 320px horizontal overflow');
   assert.ok(nextConfig.includes("pathname: '/monstajam-logo.png'"), 'the shared logo should remain eligible for image optimization');
+  assert.ok(nextConfig.includes("pathname: '/monstajam-record-label.png'"), 'the turntable label should be eligible for image optimization');
   assert.ok(nextConfig.includes("pathname: '/releases/**'"), 'release artwork should remain eligible for image optimization');
-  assert.equal(nextConfig.match(/search: ''/g)?.length, 2, 'static image patterns should reject query variants');
+  assert.equal(nextConfig.match(/search: ''/g)?.length, 3, 'static image patterns should reject query variants');
   assert.ok(!layout.includes("alternates: { canonical: '/' }"), 'the root layout must not canonicalize every route to the homepage');
   assert.ok(homePage.includes("alternates: { canonical: '/' }"));
 
@@ -123,11 +124,16 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
   assert.ok(songCard.includes('h-11 w-11'), 'song-card actions should expose 44px tap targets');
   assert.ok(trackDetail.includes('min-h-11'), 'track-detail navigation should expose a 44px tap target');
   assert.ok(videoGallery.includes('min-h-11'), 'video actions should expose 44px tap targets');
-  assert.ok(vinyl.includes('width: 66, height: 66'), 'scaled vinyl control should remain tap sized on a 320px screen');
+  assert.ok(vinyl.includes('data-turntable-id="hero-turntable"'));
+  assert.ok(vinyl.includes('width: TURNTABLE_WIDTH'));
+  assert.ok(vinyl.includes('height: TURNTABLE_HEIGHT'));
+  assert.ok(hero.includes('transform: scale(0.50);'), 'the full-deck control should remain large on a 320px screen');
   assert.ok(genreBrowser.includes('md:opacity-0'));
   assert.ok(genreBrowser.includes('group-focus-within:opacity-100'));
   assert.ok(genreBrowser.includes('min-h-11'), 'genre-card links should remain tap sized');
-  assert.ok(vinyl.includes("aria-label={`${isPlaying ? 'Pause' : 'Play'} ${displayTrack?.title ?? 'featured track'}`}"));
+  assert.ok(vinyl.includes('aria-label={ariaLabel}'));
+  assert.ok(vinyl.includes('disabled={!hasPlayableTrack}'));
+  assert.ok(vinyl.includes('onKeyDown={handleKeyStart}'));
 });
 
 test('admin feedback, destructive actions, and toggles expose accessible semantics', () => {

@@ -76,9 +76,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Create audio element once
   useEffect(() => {
-    const audio = new Audio();
+    const audio = document.createElement('audio');
     audio.volume = volume;
-    audio.preload = 'metadata';
+    audio.preload = 'auto';
+    audio.setAttribute('playsinline', 'true');
+    audio.setAttribute('data-monstajam-player', 'true');
+    audio.style.display = 'none';
+    document.body.appendChild(audio);
 
     const PREVIEW_CAP = 45; // seconds
 
@@ -113,12 +117,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       audio.pause();
       audio.src = '';
+      audio.load();
+      audio.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-advance when track ends
   const [trackEnded, setTrackEnded] = useState(false);
+  const startAudio = useCallback((audio: HTMLAudioElement) => {
+    setIsPlaying(false);
+    audio.play()
+      .then(() => setIsPlaying(true))
+      .catch((error) => {
+        console.warn('play() failed:', error);
+        setIsPlaying(false);
+      });
+  }, []);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -132,7 +148,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setTrackEnded(false);
       if (repeatOn) {
         const audio = audioRef.current;
-        if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); setIsPlaying(true); }
+        if (audio) { audio.currentTime = 0; startAudio(audio); }
       } else {
         nextTrackFn();
       }
@@ -156,8 +172,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(track);
       if (track.audioUrl) {
         audio.src = track.audioUrl;
-        audio.play().catch((e) => { console.warn('play() failed:', e); });
-        setIsPlaying(true);
+        audio.load();
+        startAudio(audio);
       } else {
         // No audio URL — still update UI but can't play
         audio.src = '';
@@ -166,11 +182,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } else {
       // Same track — resume
       if (track.audioUrl) {
-        audio.play().catch(() => {});
-        setIsPlaying(true);
+        startAudio(audio);
       }
     }
-  }, []);
+  }, [startAudio]);
 
   const pause = useCallback(() => {
     audioRef.current?.pause();
@@ -182,14 +197,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current;
       if (!audio) return;
       if (audio.paused) {
-        if (track.audioUrl) { audio.play().catch(() => {}); setIsPlaying(true); }
+        if (track.audioUrl) { startAudio(audio); }
       } else {
         audio.pause(); setIsPlaying(false);
       }
     } else {
       play(track);
     }
-  }, [play]);
+  }, [play, startAudio]);
 
   const seek = useCallback((fraction: number) => {
     const audio = audioRef.current;

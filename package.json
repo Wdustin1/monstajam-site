@@ -15,6 +15,7 @@
     "test:community-polish": "tsx --test tests/community-polish.contract.test.ts",
     "test:community-room": "tsx --test tests/community-room.contract.test.ts",
     "test:mobile-layout": "tsx --test tests/mobile-layout.contract.test.ts",
+    "test:turntable": "tsx --test tests/turntable.contract.test.ts tests/vinyl-record-motion.test.ts",
     "test:community-rewards-smoke": "tsx scripts/community-rewards-smoke.ts",
     "db:community-rewards": "tsx scripts/community-rewards-rollout.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts",

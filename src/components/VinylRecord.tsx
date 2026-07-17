@@ -1,400 +1,859 @@
 'use client';
 
 import { motion, useAnimation } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
+import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { usePlayer, PlayerTrack } from '@/context/PlayerContext';
+import {
+  getControlledTurntableTrack,
+  getTonearmRotation,
+} from './vinylRecordMotion';
 
 interface VinylRecordProps {
   featuredTrack?: PlayerTrack | null;
 }
 
-const DISC  = 360;
-const R     = DISC / 2;
-const LABEL = 104;
-
-// Tonearm pivot: right side at (535, 90)
-// ARM_LEN=185. At ANGLE_PLAY=-27°: needle lands ~191px from disc center = outer groove ✓
-// At ANGLE_REST=+20°: arm parked right, clear of disc
-const PIVOT_X    = 374;
-const PIVOT_Y    = 62;
-const ARM_LEN    = 128;
-const ANGLE_REST = 20;
-const ANGLE_PLAY = -27;
+const TURNTABLE_WIDTH = 560;
+const TURNTABLE_HEIGHT = 380;
+const PLATTER_SIZE = 342;
+const RECORD_SIZE = 312;
+const RECORD_LEFT = 56;
+const RECORD_TOP = 34;
+const LABEL_SIZE = 168;
+const PIVOT_X = 418;
+const PIVOT_Y = 84;
+const TONEARM_PIVOT_X = 58;
+const TONEARM_PIVOT_Y = 56;
 
 export default function VinylRecord({ featuredTrack }: VinylRecordProps) {
-  const { currentTrack, isPlaying, toggle, play } = usePlayer();
-  const displayTrack = currentTrack ?? featuredTrack ?? null;
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const { currentTrack, isPlaying, progress, toggle, play } = usePlayer();
   const [hovered, setHovered] = useState(false);
-  const discControls   = useAnimation();
+  const platterControls = useAnimation();
+  const {
+    displayTrack,
+    clickTrack,
+    isTurntablePlaying,
+  } = getControlledTurntableTrack({ currentTrack, featuredTrack, isPlaying });
+  const tonearmRotation = getTonearmRotation(isTurntablePlaying, progress);
+  const hasPlayableTrack = Boolean(clickTrack?.audioUrl);
 
-  // ── Spin ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (isPlaying) {
-      discControls.start({
+    if (isTurntablePlaying) {
+      platterControls.start({
         rotate: [0, 360],
-        transition: { duration: 6, repeat: Infinity, ease: 'linear' },
+        transition: { duration: 3.8, repeat: Infinity, ease: 'linear' },
       });
-    } else {
-      discControls.stop();
+      return;
     }
-  }, [isPlaying, discControls]);
 
-  // ── 3D tilt on mouse ──────────────────────────────────────────
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => setTilt({
-      x:  (window.innerHeight / 2 - e.pageY) / 70,
-      y: -(window.innerWidth  / 2 - e.pageX) / 70,
-    });
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
-
-  // Needle tip world coords (for sparks)
-  const toneAngle = isPlaying ? ANGLE_PLAY : ANGLE_REST;
-  const rad = (toneAngle * Math.PI) / 180;
-  const needleX = PIVOT_X + ARM_LEN * Math.sin(rad);
-  const needleY = PIVOT_Y + ARM_LEN * Math.cos(rad);
+    platterControls.stop();
+  }, [isTurntablePlaying, platterControls]);
 
   const handleToggle = () => {
-    if (currentTrack) toggle(currentTrack);
-    else if (featuredTrack) play(featuredTrack);
+    if (!clickTrack?.audioUrl) return;
+
+    if (currentTrack?.slug === clickTrack.slug) {
+      toggle(clickTrack);
+      return;
+    }
+
+    play(clickTrack);
   };
 
+  const handlePointerStart = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    handleToggle();
+  };
+
+  const handleKeyStart = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleToggle();
+  };
+
+  const ariaLabel = !clickTrack
+    ? 'Turntable'
+    : !clickTrack.audioUrl
+      ? `${clickTrack.title} has no audio available`
+      : isTurntablePlaying
+      ? `Pause ${clickTrack.title}`
+      : `Play ${clickTrack.title}`;
+
   return (
-    // Container: disc + space for tonearm pivot.
-    <div ref={containerRef} className="relative select-none"
-      style={{ width: DISC + 80, height: DISC }}
+    <button
+      type="button"
+      data-turntable-id="hero-turntable"
+      aria-label={ariaLabel}
+      disabled={!hasPlayableTrack}
+      onPointerDown={handlePointerStart}
+      onKeyDown={handleKeyStart}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-    >
-
-      {/* ── Outer glow halo ──────────────────────────────────────── */}
-      <motion.div className="absolute pointer-events-none" style={{
-        left: 0, top: 0, width: DISC, height: DISC,
-        borderRadius: '50%', zIndex: 0,
-        filter: 'blur(60px)',
-        background: 'radial-gradient(circle at center, transparent 28%, rgba(120,0,255,0.28) 48%, rgba(0,180,255,0.20) 68%, transparent 100%)',
+      className="group relative block select-none text-left outline-none disabled:cursor-default"
+      style={{
+        width: TURNTABLE_WIDTH,
+        height: TURNTABLE_HEIGHT,
+        border: 0,
+        padding: 0,
+        background: 'transparent',
+        cursor: hasPlayableTrack ? 'pointer' : 'default',
       }}
-        animate={{ scale: [1, 1.10, 1], opacity: [0.55, 0.9, 0.55] }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <span
+        className="absolute inset-[-36px] pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(circle at 29% 48%, rgba(0,229,255,0.20), transparent 38%), radial-gradient(circle at 88% 43%, rgba(255,0,170,0.22), transparent 34%)',
+          filter: 'blur(38px)',
+          opacity: isTurntablePlaying ? 0.95 : 0.62,
+          transition: 'opacity 500ms ease',
+        }}
       />
 
-      {/* ── Ambient sparkles ─────────────────────────────────────── */}
-      {[
-        { top: '5%',  left: '6%',  size: 3, delay: 0.0 },
-        { top: '11%', left: '58%', size: 2, delay: 0.5 },
-        { top: '79%', left: '63%', size: 3, delay: 1.0 },
-        { top: '87%', left: '7%',  size: 2, delay: 1.4 },
-        { top: '50%', left: '1%',  size: 2, delay: 0.8 },
-        { top: '92%', left: '43%', size: 2, delay: 0.3 },
-        { top: '2%',  left: '38%', size: 2, delay: 1.2 },
-      ].map((s, i) => (
-        <motion.div key={`sp-${i}`} className="absolute rounded-full bg-white pointer-events-none"
-          style={{ top: s.top, left: s.left, width: s.size, height: s.size, zIndex: 0 }}
-          animate={{ opacity: [0.1, 1, 0.1], scale: [0.6, 1.8, 0.6] }}
-          transition={{ duration: 2.8, repeat: Infinity, delay: s.delay, ease: 'easeInOut' }}
-        />
-      ))}
-
-      {/* ── 3D tilt wrapper (disc only — NOT button, to avoid pointer-event issues) */}
-      <div className="absolute" style={{
-        left: 0, top: 0, width: DISC, height: DISC,
-        zIndex: 10,
-        transformStyle: 'preserve-3d',
-        transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-        transition: 'transform 0.12s ease-out',
-      }}>
-        {/* ── Spinning vinyl disc ──────────────────────────────── */}
-        <motion.div
-          animate={discControls}
+      <span
+        className="absolute inset-0 overflow-hidden"
+        style={{
+          borderRadius: 28,
+          background:
+            'linear-gradient(145deg, #25272d 0%, #0a0b0f 42%, #171117 100%)',
+          border: '1px solid rgba(255,255,255,0.11)',
+          boxShadow:
+            '0 34px 70px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -22px 34px rgba(0,0,0,0.56)',
+        }}
+      >
+        <span
+          className="absolute inset-[12px]"
           style={{
-            position: 'absolute', inset: 0,
-            borderRadius: '50%',
-            cursor: 'default',
-            overflow: 'hidden',
-            background: '#080808',
+            borderRadius: 21,
+            background:
+              'radial-gradient(circle at 29% 28%, rgba(255,255,255,0.075), transparent 26%), radial-gradient(circle at 78% 22%, rgba(255,255,255,0.05), transparent 30%), linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.012) 38%, rgba(0,0,0,0.24)), repeating-linear-gradient(92deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 8px)',
+            border: '1px solid rgba(255,255,255,0.055)',
+          }}
+        />
+        <span
+          className="absolute left-0 top-10 h-[280px] w-[3px]"
+          style={{
+            background: 'linear-gradient(180deg, transparent, #00e5ff, transparent)',
+            boxShadow: '0 0 12px rgba(0,229,255,0.58)',
+            opacity: hovered || isTurntablePlaying ? 0.54 : 0.24,
+          }}
+        />
+        <span
+          className="absolute right-0 top-10 h-[280px] w-[3px]"
+          style={{
+            background: 'linear-gradient(180deg, transparent, #ff00aa, transparent)',
+            boxShadow: '0 0 12px rgba(255,0,170,0.58)',
+            opacity: hovered || isTurntablePlaying ? 0.54 : 0.24,
+          }}
+        />
+        {[
+          [24, 22],
+          [516, 22],
+          [24, 334],
+          [516, 334],
+        ].map(([left, top]) => (
+          <span
+            key={`${left}-${top}`}
+            className="absolute rounded-full"
+            style={{
+              left,
+              top,
+              width: 9,
+              height: 9,
+              background:
+                'radial-gradient(circle at 38% 30%, #aeb8c0, #333941 52%, #050608 100%)',
+              boxShadow:
+                'inset 0 0 0 1px rgba(255,255,255,0.16), 0 2px 5px rgba(0,0,0,0.65)',
+              opacity: 0.62,
+            }}
+          />
+        ))}
+        <span
+          className="absolute inset-0 opacity-[0.22]"
+          style={{
+            backgroundImage:
+              'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.038) 34%, transparent 36%), repeating-linear-gradient(0deg, transparent 0 9px, rgba(255,255,255,0.012) 10px)',
+            mixBlendMode: 'screen',
+          }}
+        />
+        <span
+          className="absolute left-8 right-8 top-[18px] h-px"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent)',
+            opacity: 0.72,
+          }}
+        />
+      </span>
+
+      <span
+        className="absolute rounded-full"
+        style={{
+          left: 38,
+          top: 18,
+          width: PLATTER_SIZE,
+          height: PLATTER_SIZE,
+          zIndex: 7,
+          background:
+            'radial-gradient(circle at 50% 50%, #050506 0 43%, #20222a 44% 46%, #070709 47% 50%, #d3dde4 50.6%, #58616a 52%, #08090b 53% 100%)',
+          boxShadow:
+            '0 30px 44px rgba(0,0,0,0.74), inset 0 0 0 2px rgba(255,255,255,0.12), inset 0 0 18px rgba(255,255,255,0.08)',
+        }}
+      />
+      <span
+        className="absolute rounded-full"
+        style={{
+          left: 40,
+          top: 20,
+          width: PLATTER_SIZE - 4,
+          height: PLATTER_SIZE - 4,
+          zIndex: 8,
+          background:
+            'repeating-conic-gradient(from 3deg, rgba(255,255,255,0.18) 0deg 1deg, rgba(255,255,255,0.02) 1deg 4deg)',
+          opacity: 0.09,
+          mixBlendMode: 'screen',
+        }}
+      />
+
+      <motion.span
+        className="absolute overflow-hidden rounded-full"
+        animate={platterControls}
+        style={{
+          left: RECORD_LEFT,
+          top: RECORD_TOP,
+          width: RECORD_SIZE,
+          height: RECORD_SIZE,
+          background: '#030304',
+          zIndex: 12,
+          boxShadow:
+            '0 18px 36px rgba(0,0,0,0.72), inset 0 0 0 1px rgba(255,255,255,0.14), inset 0 0 0 8px rgba(0,0,0,0.72)',
+        }}
+      >
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle at center, #121319 0 16%, #08090d 18% 42%, #040407 58%, #010102 100%)',
+          }}
+        />
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'repeating-radial-gradient(circle at center, transparent 0 3.4px, rgba(255,255,255,0.14) 3.7px 3.95px, rgba(0,0,0,0.48) 4.2px 4.6px, transparent 4.95px 7.2px)',
+            opacity: 0.44,
+          }}
+        />
+        <span
+          className="absolute inset-[9px] rounded-full"
+          style={{
+            background:
+              'repeating-radial-gradient(circle at center, transparent 0 10px, rgba(255,255,255,0.055) 10.8px 11.25px, rgba(0,0,0,0.38) 11.7px 12.25px, transparent 13px 24px)',
+            opacity: 0.64,
+          }}
+        />
+        <span
+          className="absolute inset-[14px] rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle at center, transparent 0 27%, rgba(255,255,255,0.075) 28.4% 29%, transparent 30.2% 39%, rgba(255,255,255,0.05) 40.4% 40.9%, transparent 42.1% 55.6%, rgba(255,255,255,0.06) 57.2% 57.8%, transparent 59% 68%, rgba(255,255,255,0.045) 70% 70.6%, transparent 71.8% 82%, rgba(0,0,0,0.42) 90%, rgba(0,0,0,0.78) 100%)',
+            opacity: 0.84,
+          }}
+        />
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle at center, transparent 0 25%, rgba(0,0,0,0.28) 26% 31%, transparent 32% 82%, rgba(0,0,0,0.48) 88%, rgba(0,0,0,0.9) 100%)',
+            boxShadow:
+              'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 0 0 5px rgba(0,0,0,0.75), inset 0 0 22px rgba(255,255,255,0.045)',
+            pointerEvents: 'none',
+          }}
+        />
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle at center, transparent 0 86%, rgba(255,255,255,0.13) 88%, rgba(55,58,67,0.46) 90%, rgba(0,0,0,0.9) 96%, rgba(255,255,255,0.08) 97%, rgba(0,0,0,0.96) 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 63,
+            top: 63,
+            width: RECORD_SIZE - 126,
+            height: RECORD_SIZE - 126,
+            boxShadow:
+              '0 0 0 1px rgba(255,255,255,0.08), 0 0 0 4px rgba(0,0,0,0.22), inset 0 0 0 1px rgba(255,255,255,0.045)',
+            pointerEvents: 'none',
+          }}
+        />
+        <span
+          className="absolute overflow-hidden rounded-full"
+          style={{
+            left: (RECORD_SIZE - LABEL_SIZE) / 2,
+            top: (RECORD_SIZE - LABEL_SIZE) / 2,
+            width: LABEL_SIZE,
+            height: LABEL_SIZE,
+            background: '#090912',
+            border: '1px solid rgba(255,255,255,0.16)',
+            boxShadow:
+              '0 0 0 2px rgba(255,0,170,0.25), 0 0 0 5px rgba(0,0,0,0.34), 0 0 18px rgba(0,229,255,0.24), inset 0 0 18px rgba(0,0,0,0.48)',
           }}
         >
-          {/* Groove base */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `repeating-radial-gradient(
-              circle at center,
-              #0a0a0a 0px,
-              #141414 1.5px,
-              #0a0a0a 3px,
-              #181818 4.5px,
-              #0a0a0a 6px
-            )`,
-          }} />
-
-          {/* Iridescent diffraction band */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `conic-gradient(
-              from 200deg at 42% 38%,
-              transparent 0%,
-              rgba(80,0,160,0.18)   8%,
-              rgba(0,120,255,0.22) 14%,
-              rgba(0,200,180,0.18) 20%,
-              rgba(80,0,160,0.14) 26%,
-              transparent          34%,
-              transparent          60%,
-              rgba(0,80,200,0.10)  68%,
-              rgba(120,0,200,0.14) 74%,
-              transparent          82%,
-              transparent          100%
-            )`,
-            mixBlendMode: 'screen',
-          }} />
-
-          {/* Second iridescent sweep */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `conic-gradient(
-              from 340deg at 58% 62%,
-              transparent 0%,
-              rgba(0,160,255,0.10) 10%,
-              rgba(80,0,180,0.16)  18%,
-              rgba(0,220,200,0.12) 24%,
-              transparent          34%,
-              transparent          100%
-            )`,
-            mixBlendMode: 'screen',
-          }} />
-
-          {/* Specular highlight top-left */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `radial-gradient(
-              ellipse 55% 28% at 28% 22%,
-              rgba(255,255,255,0.12) 0%,
-              rgba(255,255,255,0.04) 50%,
-              transparent 100%
-            )`,
-          }} />
-
-          {/* Specular bottom-right */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `radial-gradient(
-              ellipse 40% 20% at 75% 80%,
-              rgba(180,100,255,0.08) 0%,
-              transparent 100%
-            )`,
-          }} />
-
-          {/* Edge vignette */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            background: `radial-gradient(
-              circle at center,
-              transparent 55%,
-              rgba(0,0,0,0.55) 80%,
-              rgba(0,0,0,0.88) 100%
-            )`,
-          }} />
-
-          {/* Chrome rim */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            borderRadius: '50%',
-            boxShadow: `
-              inset 0 0 0 3px rgba(255,255,255,0.06),
-              inset 0 0 0 6px rgba(0,0,0,0.4),
-              0 0 40px rgba(0,0,0,0.9)
-            `,
-          }} />
-
-          {/* Lead-in zone near label */}
-          <div className="absolute pointer-events-none" style={{
-            width: LABEL + 48, height: LABEL + 48,
-            borderRadius: '50%',
-            top: R - (LABEL + 48) / 2,
-            left: R - (LABEL + 48) / 2,
-            background: 'radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 100%)',
-            boxShadow: `0 0 0 2px rgba(255,255,255,0.04)`,
-          }} />
-
-          {/* Center label */}
-          <div style={{
-            position: 'absolute',
-            width: LABEL, height: LABEL,
-            borderRadius: '50%',
-            top: R - LABEL / 2, left: R - LABEL / 2,
-            overflow: 'hidden',
-            boxShadow: `
-              0 0 0 3px rgba(255,255,255,0.09),
-              0 0 0 6px rgba(0,0,0,0.6),
-              0 0 30px rgba(0,0,0,0.95)
-            `,
-          }}>
-            <Image src="/monstajam-logo.png" alt="Monsta Jam Productions"
-              width={LABEL} height={LABEL}
-              style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
-              priority
-            />
-          </div>
-
-          {/* Spindle hole */}
-          <div style={{
-            position: 'absolute',
-            width: 11, height: 11, borderRadius: '50%',
-            top: R - 5.5, left: R - 5.5,
-            background: 'radial-gradient(circle, #020202, #111)',
-            boxShadow: 'inset 0 0 6px rgba(0,0,0,1)',
-            zIndex: 5,
-          }} />
-        </motion.div>
-
-        {/* Track badge */}
-        {isPlaying && displayTrack && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+          <Image
+            src="/monstajam-record-label.png"
+            alt="Monsta Jam Productions vinyl label"
+            width={LABEL_SIZE}
+            height={LABEL_SIZE}
+            priority
             style={{
-              position: 'absolute',
-              bottom: '13%', left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.80)',
-              border: '1px solid rgba(255,0,170,0.45)',
-              borderRadius: 20, padding: '3px 12px',
-              zIndex: 25, whiteSpace: 'nowrap',
-              backdropFilter: 'blur(8px)',
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit: 'cover',
             }}
-          >
-            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.92)', letterSpacing: '0.09em' }}>
-              {displayTrack.title.toUpperCase()}
-            </span>
-          </motion.div>
-        )}
-      </div>
+          />
+        </span>
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 139,
+            top: 139,
+            width: 34,
+            height: 34,
+            background:
+              'radial-gradient(circle at 37% 30%, rgba(255,255,255,0.16), rgba(0,0,0,0.1) 28%, rgba(0,0,0,0.74) 64%, rgba(0,0,0,0.9) 100%)',
+            boxShadow:
+              'inset 0 0 0 1px rgba(255,255,255,0.12), 0 3px 8px rgba(0,0,0,0.74)',
+          }}
+        />
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 149,
+            top: 149,
+            width: 14,
+            height: 14,
+            background:
+              'radial-gradient(circle at 38% 30%, #ffffff, #c5ccd4 22%, #252a30 54%, #030304 100%)',
+            boxShadow:
+              '0 1px 5px rgba(255,255,255,0.35), 0 6px 10px rgba(0,0,0,0.85)',
+          }}
+        />
+      </motion.span>
 
-      {/* ── Play / Pause ── OUTSIDE preserve-3d wrapper so pointer events work */}
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={!displayTrack}
-        aria-label={`${isPlaying ? 'Pause' : 'Play'} ${displayTrack?.title ?? 'featured track'}`}
-        onFocus={() => setHovered(true)}
-        onBlur={() => setHovered(false)}
+      <span
+        className="absolute rounded-full pointer-events-none"
         style={{
-          position: 'absolute',
-          top: R - 33, left: R - 33,
-          width: 66, height: 66, borderRadius: '50%',
-          background: isPlaying ? 'rgba(255,0,170,0.20)' : 'rgba(0,220,255,0.16)',
-          border: `2px solid ${isPlaying ? 'rgba(255,0,170,0.75)' : 'rgba(0,220,255,0.65)'}`,
-          boxShadow: isPlaying
-            ? '0 0 24px rgba(255,0,170,0.65), inset 0 0 12px rgba(255,0,170,0.18)'
-            : '0 0 24px rgba(0,220,255,0.50), inset 0 0 12px rgba(0,220,255,0.12)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', zIndex: 30,
-          backdropFilter: 'blur(6px)',
-          opacity: isPlaying || hovered ? 1 : 0.82,
-          transform: isPlaying || hovered ? 'scale(1)' : 'scale(0.94)',
-          transition: 'opacity 0.25s ease, transform 0.25s ease, box-shadow 0.3s ease, background 0.3s ease',
+          left: RECORD_LEFT,
+          top: RECORD_TOP,
+          width: RECORD_SIZE,
+          height: RECORD_SIZE,
+          zIndex: 16,
+          background:
+            'radial-gradient(ellipse at 30% 18%, rgba(255,255,255,0.14), transparent 28%), radial-gradient(ellipse at 62% 82%, rgba(255,255,255,0.045), transparent 34%), linear-gradient(124deg, transparent 0 33%, rgba(255,255,255,0.038) 43%, transparent 53%)',
+          opacity: hovered || isTurntablePlaying ? 0.42 : 0.28,
+          mixBlendMode: 'screen',
+          transition: 'opacity 400ms ease',
+        }}
+      />
+
+      <span
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          left: RECORD_LEFT,
+          top: RECORD_TOP,
+          width: RECORD_SIZE,
+          height: RECORD_SIZE,
+          zIndex: 17,
+          boxShadow:
+            'inset 0 0 0 1px rgba(255,255,255,0.12), inset 0 0 0 8px rgba(0,0,0,0.34), 0 10px 20px rgba(0,0,0,0.42)',
+        }}
+      />
+
+      <span
+        className="absolute rounded-full"
+        style={{
+          left: 78,
+          top: 318,
+          width: 48,
+          height: 48,
+          background:
+            'radial-gradient(circle at 38% 30%, #646a70, #181b20 52%, #020203 100%)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow:
+            '0 10px 18px rgba(0,0,0,0.54), inset 0 2px 5px rgba(255,255,255,0.11)',
         }}
       >
-        {isPlaying
-          ? <svg width="13" height="15" viewBox="0 0 14 16" fill="white"><rect x="1" y="0" width="4" height="16" rx="1.5"/><rect x="9" y="0" width="4" height="16" rx="1.5"/></svg>
-          : <svg width="13" height="15" viewBox="0 0 14 16" fill="white" style={{ marginLeft: 2 }}><path d="M1 0l13 8-13 8z"/></svg>
-        }
-      </button>
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 7,
+            top: 7,
+            width: 34,
+            height: 34,
+            background:
+              'repeating-conic-gradient(from 20deg, #373b40 0deg 5deg, #111215 5deg 10deg)',
+            border: '1px solid rgba(255,255,255,0.14)',
+          }}
+        />
+      </span>
+      <span
+        className="absolute rounded-full"
+        style={{
+          left: 57,
+          top: 336,
+          width: 7,
+          height: 7,
+          background: isTurntablePlaying ? '#00e5ff' : 'rgba(255,255,255,0.45)',
+          boxShadow: isTurntablePlaying
+            ? '0 0 9px #00e5ff, 0 0 22px rgba(0,229,255,0.95)'
+            : '0 0 8px rgba(255,255,255,0.25)',
+        }}
+      />
 
-      {/* ── Tonearm ──────────────────────────────────────────────── */}
-      {/* Tonearm — pure CSS transition, no FM arc-direction bug */}
-      <div
+      <span
+        className="absolute"
+        style={{
+          left: PIVOT_X - 62,
+          top: PIVOT_Y - 62,
+          width: 124,
+          height: 124,
+          zIndex: 24,
+        }}
+      >
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle at 38% 32%, rgba(255,255,255,0.16), rgba(36,38,43,0.95) 35%, rgba(9,10,13,0.97) 63%, rgba(1,1,2,0.98) 100%)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow:
+              '0 20px 30px rgba(0,0,0,0.62), inset 0 0 0 8px rgba(0,0,0,0.45), inset 0 2px 6px rgba(255,255,255,0.11)',
+          }}
+        />
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 38,
+            top: 38,
+            width: 48,
+            height: 48,
+            background:
+              'radial-gradient(circle at 36% 30%, #e2edf4, #77838c 26%, #252a30 58%, #030304 100%)',
+            border: '1px solid rgba(255,255,255,0.16)',
+            boxShadow:
+              '0 12px 18px rgba(0,0,0,0.6), inset 0 1px 3px rgba(255,255,255,0.32)',
+          }}
+        />
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: 52,
+            top: 52,
+            width: 20,
+            height: 20,
+            background:
+              'radial-gradient(circle at 38% 30%, #101216, #030304 65%)',
+            boxShadow:
+              'inset 0 0 0 2px rgba(255,255,255,0.14), 0 5px 12px rgba(0,0,0,0.68)',
+          }}
+        />
+      </span>
+
+      <span
         className="absolute pointer-events-none"
         style={{
-          top:  PIVOT_Y,
-          left: PIVOT_X - 5,
-          width: 10,
-          height: ARM_LEN,
-          transformOrigin: '50% 0%',
-          zIndex: 40,
-          transform: `rotate(${isPlaying ? ANGLE_REST : ANGLE_PLAY}deg)`,
-          transition: 'transform 1.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          left: 485,
+          top: 244,
+          width: 42,
+          height: 52,
+          zIndex: 22,
         }}
       >
-        {/* Shaft */}
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0,
-          width: 10, height: ARM_LEN - 40,
-          background: 'linear-gradient(to right, #0e0e0e, #505050, #3a3a3a, #0e0e0e)',
-          borderRadius: 5,
-          boxShadow: '3px 0 12px rgba(0,0,0,0.7), -1px 0 4px rgba(255,255,255,0.04)',
-        }} />
-        {/* Headshell */}
-        <div style={{
-          position: 'absolute',
-          top: ARM_LEN - 50,
-          left: -8,
-          width: 26, height: 46,
-          background: 'linear-gradient(160deg, #1a1a1a 0%, #070707 100%)',
-          borderRadius: '3px 3px 10px 10px',
-          boxShadow: '4px 4px 14px rgba(0,0,0,0.75)',
-          borderBottom: '2px solid rgba(0,240,255,0.6)',
-        }} />
-        {/* LED */}
-        <div style={{
-          position: 'absolute',
-          top: ARM_LEN - 44,
-          left: 12,
-          width: 6, height: 6, borderRadius: '50%',
-          background: isPlaying ? '#00F0FF' : '#1c1c1c',
-          boxShadow: isPlaying ? '0 0 8px #00F0FF, 0 0 20px rgba(0,240,255,0.7)' : 'none',
-          transition: 'background 0.4s, box-shadow 0.4s',
-        }} />
-        {/* Stylus */}
-        <div style={{
-          position: 'absolute',
-          top: ARM_LEN - 6,
-          left: 2,
-          width: 2, height: 14,
-          background: 'linear-gradient(to bottom, #606060, #222)',
-          borderRadius: 1,
-        }} />
-      </div>
-
-      {/* Pivot base cap */}
-      <div className="absolute pointer-events-none" style={{
-        top:  PIVOT_Y - 28,
-        left: PIVOT_X - 28,
-        width: 56, height: 56, borderRadius: '50%',
-        background: 'radial-gradient(circle at 38% 32%, #3a3a3a, #080808)',
-        border: '2px solid rgba(255,255,255,0.06)',
-        boxShadow: '0 10px 28px rgba(0,0,0,0.9), inset 0 2px 4px rgba(255,255,255,0.06)',
-        zIndex: 45,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          position: 'absolute',
-          bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-          marginBottom: 2,
-          width: 18, height: 26, borderRadius: 3,
-          background: 'linear-gradient(to right, #1c1c1c, #444, #1c1c1c)',
-          border: '1px solid #080808',
-        }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#040404', boxShadow: 'inset 0 0 6px black' }} />
-      </div>
-
-      {/* ── Needle sparks when playing ────────────────────────────── */}
-      {isPlaying && [
-        { dx: -3, dy: 2,  rot: 50,  delay: 0    },
-        { dx:  3, dy: 5,  rot: 70,  delay: 0.13 },
-        { dx:  0, dy: -3, rot: 30,  delay: 0.26 },
-      ].map((s, i) => (
-        <motion.div key={`spark-${i}`} className="absolute pointer-events-none" style={{
-          top: needleY + s.dy, left: needleX + s.dx,
-          width: 2, height: 10,
-          background: 'linear-gradient(to bottom, #ffe844, rgba(255,100,0,0))',
-          rotate: s.rot, zIndex: 50, borderRadius: 2,
-        }}
-          animate={{ opacity: [0, 1, 0], scaleY: [0.5, 1.7, 0.5], y: [0, 5, 0] }}
-          transition={{ duration: 0.32, repeat: Infinity, delay: s.delay, ease: 'easeOut' }}
+        <span
+          className="absolute left-[18px] top-[8px] h-[35px] w-[7px] rounded-full"
+          style={{
+            background:
+              'linear-gradient(90deg, #111318, #757d85 48%, #15171b)',
+            boxShadow:
+              '0 8px 12px rgba(0,0,0,0.45), inset 1px 0 2px rgba(255,255,255,0.18)',
+          }}
         />
-      ))}
-    </div>
+        <span
+          className="absolute left-[8px] top-[30px] h-[13px] w-[27px] rounded-[5px]"
+          style={{
+            background:
+              'linear-gradient(180deg, #252933, #06070a)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            boxShadow: '0 8px 12px rgba(0,0,0,0.52)',
+          }}
+        />
+      </span>
+
+      <span
+        className="absolute"
+        style={{
+          right: 36,
+          top: 142,
+          width: 84,
+          height: 166,
+          borderRadius: 18,
+          zIndex: 18,
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01) 35%, rgba(0,0,0,0.25)), rgba(0,0,0,0.16)',
+          border: '1px solid rgba(255,255,255,0.045)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -10px 18px rgba(0,0,0,0.28)',
+        }}
+      />
+
+      <span
+        className="absolute flex items-center justify-center gap-2"
+        style={{
+          left: 386,
+          top: 278,
+          width: 88,
+          height: 34,
+          borderRadius: 999,
+          zIndex: 26,
+          background: !hasPlayableTrack
+            ? 'linear-gradient(180deg, rgba(28,31,36,0.96), rgba(4,5,7,0.96))'
+            : isTurntablePlaying
+            ? 'linear-gradient(180deg, rgba(255,42,170,0.34), rgba(32,4,22,0.96))'
+            : 'linear-gradient(180deg, rgba(16,36,42,0.98), rgba(3,7,10,0.96))',
+          border: !hasPlayableTrack
+            ? '1px solid rgba(255,255,255,0.16)'
+            : isTurntablePlaying
+            ? '1px solid rgba(255,105,200,0.55)'
+            : '1px solid rgba(0,229,255,0.46)',
+          boxShadow: !hasPlayableTrack
+            ? '0 10px 18px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -8px 14px rgba(0,0,0,0.52)'
+            : isTurntablePlaying
+            ? '0 10px 18px rgba(0,0,0,0.48), 0 0 18px rgba(255,0,170,0.34), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -8px 14px rgba(0,0,0,0.4)'
+            : '0 10px 18px rgba(0,0,0,0.48), 0 0 16px rgba(0,229,255,0.24), inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -8px 14px rgba(0,0,0,0.5)',
+        }}
+      >
+        <span
+          className="flex items-center justify-center rounded-full"
+          style={{
+            width: 17,
+            height: 17,
+            background: !hasPlayableTrack
+              ? 'radial-gradient(circle at 38% 30%, #8b929a, #353a42 48%, #050608 100%)'
+              : isTurntablePlaying
+              ? 'radial-gradient(circle at 38% 30%, #ffd8f3, #ff2aa9 45%, #260414 100%)'
+              : 'radial-gradient(circle at 38% 30%, #d9fbff, #00d8ff 45%, #04161b 100%)',
+            color: '#050608',
+            boxShadow: !hasPlayableTrack
+              ? 'inset 0 1px 2px rgba(255,255,255,0.28)'
+              : isTurntablePlaying
+              ? '0 0 10px rgba(255,0,170,0.7), inset 0 1px 2px rgba(255,255,255,0.55)'
+              : '0 0 10px rgba(0,229,255,0.68), inset 0 1px 2px rgba(255,255,255,0.55)',
+            flex: '0 0 auto',
+          }}
+        >
+          {isTurntablePlaying ? <Pause size={10} strokeWidth={3} /> : <Play size={10} fill="currentColor" strokeWidth={3} />}
+        </span>
+        <span
+          style={{
+            color: !hasPlayableTrack ? 'rgba(255,255,255,0.52)' : isTurntablePlaying ? '#ffd7ef' : '#c9fbff',
+            fontSize: 9,
+            fontWeight: 900,
+            lineHeight: 1,
+            letterSpacing: '0.08em',
+            textShadow: !hasPlayableTrack
+              ? 'none'
+              : isTurntablePlaying
+              ? '0 0 7px rgba(255,0,170,0.62)'
+              : '0 0 7px rgba(0,229,255,0.62)',
+          }}
+        >
+          {!hasPlayableTrack ? 'NO AUDIO' : isTurntablePlaying ? 'PAUSE' : 'START'}
+        </span>
+      </span>
+
+      <motion.span
+        className="absolute pointer-events-none"
+        initial={false}
+        animate={{
+          rotate: tonearmRotation,
+          y: isTurntablePlaying ? 0 : -3,
+        }}
+        transition={{
+          rotate: { duration: isTurntablePlaying ? 1.25 : 0.9, ease: [0.16, 1, 0.3, 1] },
+          y: { duration: 0.35, ease: 'easeOut', delay: isTurntablePlaying ? 0.58 : 0 },
+        }}
+        style={{
+          left: PIVOT_X - TONEARM_PIVOT_X,
+          top: PIVOT_Y - TONEARM_PIVOT_Y,
+          width: 190,
+          height: 264,
+          transformOrigin: `${TONEARM_PIVOT_X}px ${TONEARM_PIVOT_Y}px`,
+          zIndex: 30,
+        }}
+      >
+        <svg
+          width="190"
+          height="264"
+          viewBox="0 0 190 264"
+          aria-hidden="true"
+          style={{ overflow: 'visible', filter: 'drop-shadow(8px 14px 12px rgba(0,0,0,0.6))' }}
+        >
+          <defs>
+            <linearGradient id="armTubeChrome" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#f9fdff" />
+              <stop offset="20%" stopColor="#c4ced6" />
+              <stop offset="44%" stopColor="#57616b" />
+              <stop offset="58%" stopColor="#171b20" />
+              <stop offset="78%" stopColor="#e7f1f7" />
+              <stop offset="100%" stopColor="#5c6670" />
+            </linearGradient>
+            <linearGradient id="armTubeHighlight" x1="0" x2="1">
+              <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+              <stop offset="48%" stopColor="rgba(255,255,255,0.9)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+            <linearGradient id="counterweightChrome" x1="0" x2="1">
+              <stop offset="0%" stopColor="#22262d" />
+              <stop offset="22%" stopColor="#aab5bd" />
+              <stop offset="43%" stopColor="#39414a" />
+              <stop offset="65%" stopColor="#111318" />
+              <stop offset="100%" stopColor="#737e87" />
+            </linearGradient>
+            <linearGradient id="headshellBody" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#3c424b" />
+              <stop offset="52%" stopColor="#11151b" />
+              <stop offset="100%" stopColor="#030405" />
+            </linearGradient>
+            <linearGradient id="cartridgeBody" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#262a31" />
+              <stop offset="100%" stopColor="#050608" />
+            </linearGradient>
+          </defs>
+
+          <path
+            d="M23 55 H52"
+            fill="none"
+            stroke="rgba(0,0,0,0.62)"
+            strokeWidth="14"
+            strokeLinecap="round"
+          />
+          <path
+            d="M23 55 H52"
+            fill="none"
+            stroke="url(#counterweightChrome)"
+            strokeWidth="9"
+            strokeLinecap="round"
+          />
+          <ellipse
+            cx="20"
+            cy="55"
+            rx="19"
+            ry="17"
+            fill="url(#counterweightChrome)"
+            stroke="rgba(255,255,255,0.20)"
+            strokeWidth="1.2"
+          />
+          <path
+            d="M11 39 V71 M18 38 V72 M25 40 V70"
+            stroke="rgba(255,255,255,0.16)"
+            strokeWidth="1"
+          />
+
+          <path
+            d="M58 56 C76 73 96 101 105 132 C114 166 108 194 122 216"
+            fill="none"
+            stroke="rgba(0,0,0,0.58)"
+            strokeWidth="13"
+            strokeLinecap="round"
+          />
+          <path
+            d="M58 56 C76 73 96 101 105 132 C114 166 108 194 122 216"
+            fill="none"
+            stroke="url(#armTubeChrome)"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
+          <path
+            d="M62 58 C79 76 97 102 105 133 C111 160 108 190 120 212"
+            fill="none"
+            stroke="url(#armTubeHighlight)"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            opacity="0.78"
+          />
+          <circle
+            cx="58"
+            cy="56"
+            r="17"
+            fill="#06070a"
+            stroke="rgba(255,255,255,0.25)"
+            strokeWidth="2"
+          />
+          <circle
+            cx="58"
+            cy="56"
+            r="8"
+            fill="url(#armTubeChrome)"
+            stroke="rgba(0,0,0,0.48)"
+            strokeWidth="1"
+          />
+          <path
+            d="M47 44 C54 39 64 39 70 45"
+            fill="none"
+            stroke="rgba(255,255,255,0.28)"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+          />
+
+          <g transform="translate(100 202) rotate(20)">
+            <path
+              d="M1 4 L43 1 C49 1 55 5 56 11 L60 29 C61 34 57 38 52 37 L6 30 C2 29 0 26 0 22 Z"
+              fill="rgba(0,0,0,0.52)"
+              transform="translate(3 5)"
+              opacity="0.75"
+            />
+            <path
+              d="M0 3 L42 0 C48 0 54 4 55 10 L59 28 C60 33 56 37 51 36 L5 29 C1 28 -1 25 -1 21 Z"
+              fill="url(#headshellBody)"
+              stroke="rgba(255,255,255,0.22)"
+              strokeWidth="1.2"
+            />
+            <path
+              d="M6 7 L46 5"
+              stroke="rgba(255,255,255,0.24)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+            <circle cx="15" cy="17" r="3.5" fill="#06070a" stroke="rgba(255,255,255,0.32)" />
+            <circle cx="31" cy="16" r="3.5" fill="#06070a" stroke="rgba(255,255,255,0.32)" />
+            <rect
+              x="37"
+              y="24"
+              width="23"
+              height="14"
+              rx="3"
+              fill="url(#cartridgeBody)"
+              stroke="rgba(255,255,255,0.20)"
+            />
+            <path
+              d="M44 37 L56 47"
+              stroke="rgba(255,255,255,0.72)"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
+            <path
+              d="M55 46 L62 51"
+              stroke={isTurntablePlaying ? '#e8f8ff' : '#9aa0a7'}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              opacity={isTurntablePlaying ? 1 : 0.55}
+            />
+            <circle
+              cx="63"
+              cy="52"
+              r="1.8"
+              fill={isTurntablePlaying ? '#f4fbff' : '#7f858c'}
+              opacity={isTurntablePlaying ? 1 : 0.65}
+            />
+          </g>
+        </svg>
+      </motion.span>
+
+      <span
+        className="absolute rounded-full"
+        style={{
+          right: 54,
+          top: 154,
+          width: 36,
+          height: 36,
+          zIndex: 23,
+          background:
+            'conic-gradient(from 10deg, #1b1d22, #838b92, #17191d, #d8e1e7, #1b1d22)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          boxShadow: '0 8px 14px rgba(0,0,0,0.55)',
+        }}
+      >
+        <span
+          className="absolute inset-[8px] rounded-full"
+          style={{ background: '#070709', boxShadow: 'inset 0 0 5px rgba(0,0,0,0.8)' }}
+        />
+      </span>
+
+      <span
+        className="absolute flex items-center gap-2 overflow-hidden"
+        style={{
+          left: 380,
+          bottom: 26,
+          width: 142,
+          minHeight: 32,
+          padding: '7px 10px',
+          borderRadius: 8,
+          background:
+            'linear-gradient(180deg, rgba(4,8,10,0.92), rgba(0,0,0,0.78))',
+          border: '1px solid rgba(122,238,255,0.16)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -10px 16px rgba(0,0,0,0.46), 0 8px 16px rgba(0,0,0,0.34)',
+          backdropFilter: 'blur(10px)',
+          opacity: displayTrack ? 1 : 0.52,
+          zIndex: 20,
+        }}
+      >
+        <span
+          className="rounded-full"
+          style={{
+            width: 7,
+            height: 7,
+            background: isTurntablePlaying ? '#00e5ff' : 'rgba(255,255,255,0.24)',
+            boxShadow: isTurntablePlaying
+              ? '0 0 8px rgba(0,229,255,0.9), 0 0 14px rgba(255,0,170,0.32)'
+              : 'inset 0 0 0 1px rgba(255,255,255,0.1)',
+            flex: '0 0 auto',
+          }}
+        />
+        <span className="min-w-0">
+          <span
+            className="block truncate"
+            style={{
+              color: isTurntablePlaying ? '#b8fbff' : 'rgba(248,251,255,0.72)',
+              fontSize: 9,
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {displayTrack?.title ?? 'No featured track'}
+          </span>
+          <span
+            className="block truncate"
+            style={{
+              color: isTurntablePlaying ? '#ff83d4' : 'rgba(255,255,255,0.36)',
+              fontSize: 8,
+              fontWeight: 600,
+              lineHeight: 1.15,
+              marginTop: 2,
+            }}
+          >
+            {displayTrack?.artist ?? 'Upload audio to cue the deck'}
+          </span>
+        </span>
+      </span>
+
+      <span
+        className="absolute left-10 bottom-[-8px] h-4 w-28 rounded-full"
+        style={{ background: 'rgba(0,0,0,0.68)', filter: 'blur(8px)' }}
+      />
+      <span
+        className="absolute right-12 bottom-[-8px] h-4 w-32 rounded-full"
+        style={{ background: 'rgba(0,0,0,0.68)', filter: 'blur(8px)' }}
+      />
+    </button>
   );
 }

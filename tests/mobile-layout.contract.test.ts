@@ -25,8 +25,8 @@ test('the mobile hero reaches the library faster while desktop keeps its immersi
   assert.ok(hero.includes('data-mobile-layout="home-hero"'));
   assert.ok(hero.includes('min-h-0'));
   assert.ok(hero.includes('lg:min-h-[calc(100vh-260px)]'));
-  assert.ok(hero.includes('width: 260px; height: 214px;'));
-  assert.ok(hero.includes('transform: scale(0.58);'));
+  assert.ok(hero.includes('width: 280px; height: 190px;'));
+  assert.ok(hero.includes('transform: scale(0.50);'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
 });
 

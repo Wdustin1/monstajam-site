@@ -17,7 +17,7 @@ export default function Hero({
   return (
     <section
       data-mobile-layout="home-hero"
-      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-2 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row"
+      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-2 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row lg:gap-8 xl:gap-12"
     >
       {/* Ambient glow blobs behind content */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"
@@ -26,10 +26,10 @@ export default function Hero({
         style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.10) 0%, transparent 70%)', filter: 'blur(40px)' }} />
 
       {/* ── Left: Text ── */}
-      <div className="z-10 flex w-full flex-col gap-4 md:gap-6 lg:w-1/2">
+      <div className="z-10 flex w-full flex-col gap-4 md:gap-6 lg:w-[48%]">
 
         <h1 className="font-black leading-none tracking-tight flex flex-col gap-1"
-          style={{ fontSize: 'clamp(2.5rem, 10vw, 5.5rem)' }}>
+          style={{ fontSize: 'clamp(2.5rem, 9vw, 5rem)' }}>
           <span style={{
             background: 'linear-gradient(90deg, #00ffff, #0088ff)',
             WebkitBackgroundClip: 'text',
@@ -123,7 +123,7 @@ export default function Hero({
       </div>
 
       {/* ── Right: Vinyl ── */}
-      <div className="w-full lg:w-1/2 flex justify-center lg:justify-end mt-2 lg:mt-0 relative lg:pl-8">
+      <div className="relative mt-2 flex w-full justify-center lg:mt-0 lg:w-[48%] lg:pl-0">
         {/* Glow behind vinyl */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-72 h-72 rounded-full"
@@ -133,29 +133,29 @@ export default function Hero({
         <div className="vinyl-scale-wrapper">
           <style>{`
             .vinyl-scale-wrapper {
-              width: 260px; height: 214px;
+              width: 280px; height: 190px;
               display: flex; align-items: center; justify-content: center;
               overflow: visible;
             }
             .vinyl-scale-wrapper > * {
-              transform: scale(0.58);
+              transform: scale(0.50);
               transform-origin: center center;
               flex-shrink: 0;
             }
             @media (min-width: 360px) {
-              .vinyl-scale-wrapper { width: 286px; height: 234px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.65); }
+              .vinyl-scale-wrapper { width: 320px; height: 217px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.57); }
             }
             @media (min-width: 480px) {
-              .vinyl-scale-wrapper { width: 320px; height: 260px; }
+              .vinyl-scale-wrapper { width: 403px; height: 274px; }
               .vinyl-scale-wrapper > * { transform: scale(0.72); }
             }
             @media (min-width: 640px) {
-              .vinyl-scale-wrapper { width: 395px; height: 324px; }
-              .vinyl-scale-wrapper > * { transform: scale(0.9); }
+              .vinyl-scale-wrapper { width: 487px; height: 335px; }
+              .vinyl-scale-wrapper > * { transform: scale(0.87); }
             }
-            @media (min-width: 1024px) {
-              .vinyl-scale-wrapper { width: 440px; height: 360px; }
+            @media (min-width: 1280px) {
+              .vinyl-scale-wrapper { width: 560px; height: 380px; }
               .vinyl-scale-wrapper > * { transform: scale(1); }
             }
           `}</style>
