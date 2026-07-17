@@ -37,6 +37,13 @@ test('ambient motion assets are present and remain lightweight enough for a back
   assert.ok(statSync(posterPath).size <= 250_000, 'poster should stay at or below 250 KB');
 });
 
+test('mobile motion stays clearly perceptible beneath the darker hero surface', () => {
+  const css = readFileSync('src/app/globals.css', 'utf8');
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\]\s*\{[\s\S]*?opacity:\s*0\.32/);
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion\] video\s*\{[\s\S]*?brightness\(0\.86\)/);
+  assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*?\[data-ambient-motion-vignette\][\s\S]*?transparent 28%/);
+});
+
 test('motion remains restrained and falls back to a static atmosphere for reduced motion', () => {
   const css = readFileSync('src/app/globals.css', 'utf8');
   assert.match(css, /\[data-ambient-motion\][\s\S]*opacity:\s*0\.1[02468]/);
