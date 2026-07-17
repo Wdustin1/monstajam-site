@@ -17,7 +17,7 @@ export default function Hero({
   return (
     <section
       data-mobile-layout="home-hero"
-      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-6 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row"
+      className="relative mx-auto flex min-h-0 max-w-7xl flex-col items-center justify-between gap-5 px-5 pb-2 pt-6 md:gap-12 md:px-8 md:pb-16 md:pt-10 lg:min-h-[calc(100vh-260px)] lg:flex-row"
     >
       {/* Ambient glow blobs behind content */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full pointer-events-none"

@@ -127,7 +127,7 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
   }, [filtered, setQueue]);
 
   return (
-    <section id="library" className="max-w-7xl mx-auto px-4 md:px-6 pt-8 pb-44 md:pb-40 flex flex-col gap-8 md:gap-10 z-10 relative">
+    <section id="library" className="relative z-10 mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-44 pt-3 md:gap-10 md:px-6 md:pb-40 md:pt-8">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <span className="w-8 h-[2px]" style={{ background: '#00e5ff', boxShadow: '0 0 8px #00e5ff' }} />

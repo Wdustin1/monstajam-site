@@ -11,6 +11,7 @@ const hero = read('src/components/Hero.tsx');
 const scrollIndicator = read('src/components/ScrollIndicator.tsx');
 const songCard = read('src/components/SongCard.tsx');
 const communityHub = read('src/components/CommunityHub.tsx');
+const musicLibrary = read('src/components/MusicLibrary.tsx');
 
 test('the album release becomes a compact mobile-first card without changing the desktop rail', () => {
   assert.ok(banner.includes('data-mobile-layout="release-banner"'));
@@ -27,6 +28,12 @@ test('the mobile hero reaches the library faster while desktop keeps its immersi
   assert.ok(hero.includes('width: 260px; height: 214px;'));
   assert.ok(hero.includes('transform: scale(0.58);'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
+});
+
+test('the mobile vinyl hands off directly to the library without stacked section padding', () => {
+  assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*pb-2[^"]*md:pb-16/);
+  assert.match(musicLibrary, /id="library"[\s\S]*className="[^"]*pt-3[^"]*md:pt-8/);
+  assert.doesNotMatch(hero, /className="[^"]*\bpb-6\b/);
 });
 
 test('homepage tracks use compact media rows on phones and return to cards at the small breakpoint', () => {
