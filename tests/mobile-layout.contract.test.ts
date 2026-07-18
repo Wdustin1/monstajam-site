@@ -21,20 +21,20 @@ test('the album release becomes a compact mobile-first card without changing the
   assert.ok(banner.includes('md:grid-cols-[116px_1fr_auto]'));
 });
 
-test('the mobile hero becomes a bounded cinematic catalog-vault composition', () => {
+test('the mobile hero becomes a bounded living catalog triptych', () => {
   assert.ok(hero.includes('data-mobile-layout="home-hero"'));
-  assert.ok(hero.includes('data-design-concept="catalog-vault"'));
+  assert.ok(hero.includes('data-design-concept="living-triptych"'));
   assert.ok(hero.includes('min-h-[calc(100svh-6rem)]'));
-  assert.ok(hero.includes('data-hero-stage="record-launch"'));
-  assert.ok(hero.includes('width: 300px; height: 204px;'));
-  assert.ok(hero.includes('transform: scale(0.536);'));
+  assert.ok(hero.includes('data-hero-stage="catalog-triptych"'));
+  assert.ok(hero.includes('grid-template-rows'));
+  assert.ok(hero.includes('grid-template-columns'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
 });
 
-test('the mobile vinyl hands off to the library without excessive stacked section padding', () => {
-  assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*pb-8[^"]*md:pb-14/);
+test('the mobile triptych hands off directly to the library without stacked hero padding', () => {
+  assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*h-\[calc\(100svh-6rem\)\][^"]*overflow-hidden/);
   assert.match(musicLibrary, /id="library"[\s\S]*className="[^"]*pt-3[^"]*md:pt-8/);
-  assert.doesNotMatch(hero, /className="[^"]*\bpb-6\b/);
+  assert.doesNotMatch(hero, /className="[^"]*\bpb-(6|8|14)\b/);
 });
 
 test('homepage tracks use compact media rows on phones and return to cards at the small breakpoint', () => {

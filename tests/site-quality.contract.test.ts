@@ -68,9 +68,10 @@ test('global metadata and route shells provide a coherent accessible page contra
   }
 });
 
-test('homepage calls to action and current release copy match live content', () => {
-  assert.ok(hero.includes("videoCount > 0 ? 'Watch Videos' : 'Join Community'"));
-  assert.ok(hero.includes("videoCount > 0 ? '/videos' : '/community'"));
+test('homepage catalog action and live counts match the rendered content', () => {
+  assert.ok(hero.includes('href="#library"'));
+  assert.ok(hero.includes('Browse all {trackCount}'));
+  assert.ok(hero.includes('{videoCount} visual records'));
   assert.equal(hero.includes('{trackCount}+'), false, 'exact track count should not be inflated');
 
   const banner = read('src/components/AlbumReleaseBanner.tsx');
@@ -127,7 +128,9 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
   assert.ok(vinyl.includes('data-turntable-id="hero-turntable"'));
   assert.ok(vinyl.includes('width: TURNTABLE_WIDTH'));
   assert.ok(vinyl.includes('height: TURNTABLE_HEIGHT'));
-  assert.ok(hero.includes('transform: scale(0.536);'), 'the full-deck control should remain large on a 320px screen');
+  assert.ok(hero.includes('data-release-panel'), 'the catalog artwork should be the primary playback control');
+  assert.ok(hero.includes('aria-label={`${isTrackPlaying ? \'Pause\' : \'Play\'} ${track.title} by ${track.artist}`}'));
+  assert.ok(hero.includes('min-h-11'), 'release panels and catalog actions should remain tap sized');
   assert.ok(genreBrowser.includes('md:opacity-0'));
   assert.ok(genreBrowser.includes('group-focus-within:opacity-100'));
   assert.ok(genreBrowser.includes('min-h-11'), 'genre-card links should remain tap sized');

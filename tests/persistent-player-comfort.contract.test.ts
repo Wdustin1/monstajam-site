@@ -15,10 +15,20 @@ test('persistent player names preview playback truthfully', () => {
   assert.doesNotMatch(playerSource, /const previewLabel = isPreviewTrack\(currentTrack\) \? '45 sec preview'/);
 });
 
-test('persistent player supports compact and expanded modes', () => {
+test('persistent player supports compact and expanded modes without covering a newly selected release', () => {
+  assert.match(playerSource, /const \[isCompact, setIsCompact\] = useState\(true\)/);
   assert.match(playerSource, /data-player-mode={isCompact \? 'compact' : 'expanded'}/);
   assert.match(playerSource, /aria-label="Minimize player"/);
   assert.match(playerSource, /aria-label="Expand player"/);
+});
+
+test('persistent player stays out of the living triptych and returns after the hero leaves view', () => {
+  assert.match(playerSource, /data-design-concept="living-triptych"/);
+  assert.match(playerSource, /getBoundingClientRect\(\)/);
+  assert.match(playerSource, /window\.addEventListener\('scroll', updateHeroVisibility/);
+  assert.match(playerSource, /new MutationObserver\(updateHeroVisibility\)/);
+  assert.match(playerSource, /setHeroInView\(rect\.bottom > viewThreshold && rect\.top < window\.innerHeight - viewThreshold\)/);
+  assert.match(playerSource, /display: heroInView \? 'none' : undefined/);
 });
 
 test('persistent player exposes an accessible Up Next queue', () => {

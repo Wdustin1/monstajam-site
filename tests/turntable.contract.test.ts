@@ -10,7 +10,7 @@ const hero = read('src/components/Hero.tsx');
 const player = read('src/components/VinylRecord.tsx');
 const playerContext = read('src/context/PlayerContext.tsx');
 
-test('the homepage uses the full interactive MonstaJam turntable', () => {
+test('the interactive MonstaJam turntable remains a complete reusable music control', () => {
   assert.ok(player.includes('data-turntable-id="hero-turntable"'));
   assert.ok(player.includes('/monstajam-record-label.png'));
   assert.ok(player.includes('getControlledTurntableTrack'));
@@ -28,10 +28,10 @@ test('the turntable follows media-event playback state instead of optimistic ani
   assert.equal(playerContext.includes('.then(() => setIsPlaying(true))'), false);
 });
 
-test('the larger deck keeps a bounded mobile wrapper and its full desktop dimensions', () => {
-  assert.ok(hero.includes('width: 300px; height: 204px;'));
-  assert.ok(hero.includes('transform: scale(0.536);'));
-  assert.ok(hero.includes('width: 350px; height: 238px;'));
-  assert.ok(hero.includes('width: 560px; height: 380px;'));
-  assert.ok(hero.includes('@media (min-width: 1024px)'));
+test('the homepage replaces the turntable wrapper with a responsive full-screen triptych', () => {
+  assert.equal(hero.includes('VinylRecord'), false);
+  assert.ok(hero.includes('data-hero-stage="catalog-triptych"'));
+  assert.ok(hero.includes('grid-template-rows: repeat(3'));
+  assert.ok(hero.includes('grid-template-columns: repeat(3'));
+  assert.ok(hero.includes('@media (min-width: 768px)'));
 });
