@@ -41,6 +41,13 @@ test('the approved MonstaJam lockup owns the space above a lowered turntable', (
   assert.ok(brandPosition >= 0 && brandPosition < turntablePosition);
 });
 
+test('branding stays above the mobile deck and moves into the desktop side space', () => {
+  assert.ok(hero.includes('data-brand-placement="mobile-above-desktop-side"'));
+  assert.ok(hero.includes('[data-hero-brand="monstajam-lockup"]'));
+  assert.ok(hero.includes('left: clamp(-410px, -27vw, -370px)'));
+  assert.ok(hero.includes('top: 104px'));
+});
+
 test('the cinematic world uses responsive authored media instead of release artwork', () => {
   assert.ok(hero.includes('data-cinematic-poster="true"'));
   assert.ok(hero.includes('data-cinematic-motion="true"'));

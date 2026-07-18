@@ -71,7 +71,11 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
         </div>
 
         <div className="relative my-auto flex min-h-0 flex-1 flex-col items-center justify-center">
-          <div data-hero-brand="monstajam-lockup" className="relative z-20 -mb-1">
+          <div
+            data-hero-brand="monstajam-lockup"
+            data-brand-placement="mobile-above-desktop-side"
+            className="relative z-20 -mb-1"
+          >
             <Image
               src="/monstajam-logo.png"
               alt="Monsta Jam Productions"
@@ -171,6 +175,11 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
         }
 
         @media (min-width: 1024px) {
+          [data-hero-brand="monstajam-lockup"] {
+            left: clamp(-410px, -27vw, -370px);
+            top: 104px;
+          }
+
           .cinematic-turntable-stage {
             transform: translateY(28px);
           }
