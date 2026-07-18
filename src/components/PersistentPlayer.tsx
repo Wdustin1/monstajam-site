@@ -64,7 +64,6 @@ export default function PersistentPlayer() {
   } = usePlayer();
   const [isCompact, setIsCompact] = useState(true);
   const [queueOpen, setQueueOpen] = useState(false);
-  const [heroInView, setHeroInView] = useState(false);
 
   const tickRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -93,28 +92,6 @@ export default function PersistentPlayer() {
     setQueueOpen(true);
   }, [closeQueue, queueOpen]);
 
-  useEffect(() => {
-    const updateHeroVisibility = () => {
-      const hero = document.querySelector('[data-design-concept="living-triptych"]');
-      if (!hero) {
-        setHeroInView(false);
-        return;
-      }
-      const rect = hero.getBoundingClientRect();
-      const viewThreshold = window.innerHeight * 0.15;
-      setHeroInView(rect.bottom > viewThreshold && rect.top < window.innerHeight - viewThreshold);
-    };
-    const mutationObserver = new MutationObserver(updateHeroVisibility);
-    updateHeroVisibility();
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('scroll', updateHeroVisibility, { passive: true });
-    window.addEventListener('resize', updateHeroVisibility);
-    return () => {
-      mutationObserver.disconnect();
-      window.removeEventListener('scroll', updateHeroVisibility);
-      window.removeEventListener('resize', updateHeroVisibility);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -202,7 +179,7 @@ export default function PersistentPlayer() {
       className={isCompact
         ? 'fixed bottom-3 left-3 right-3 z-50 sm:left-auto sm:w-[390px]'
         : 'fixed bottom-0 left-0 z-50 w-full'}
-      style={{ ...playerSurface, display: heroInView ? 'none' : undefined }}
+      style={playerSurface}
     >
       {isCompact ? (
         <div className="relative flex min-h-[68px] items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 pr-2">

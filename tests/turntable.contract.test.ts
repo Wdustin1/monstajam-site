@@ -28,10 +28,10 @@ test('the turntable follows media-event playback state instead of optimistic ani
   assert.equal(playerContext.includes('.then(() => setIsPlaying(true))'), false);
 });
 
-test('the homepage replaces the turntable wrapper with a responsive full-screen triptych', () => {
+test('the homepage replaces the turntable wrapper with responsive cinematic media', () => {
   assert.equal(hero.includes('VinylRecord'), false);
-  assert.ok(hero.includes('data-hero-stage="catalog-triptych"'));
-  assert.ok(hero.includes('grid-template-rows: repeat(3'));
-  assert.ok(hero.includes('grid-template-columns: repeat(3'));
-  assert.ok(hero.includes('@media (min-width: 768px)'));
+  assert.ok(hero.includes('data-hero-stage="cinematic-motion"'));
+  assert.ok(hero.includes('<video'));
+  assert.ok(hero.includes('motion-reduce:hidden'));
+  assert.ok(hero.includes('media="(max-width: 767px)"'));
 });

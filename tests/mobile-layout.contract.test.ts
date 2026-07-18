@@ -21,17 +21,18 @@ test('the album release becomes a compact mobile-first card without changing the
   assert.ok(banner.includes('md:grid-cols-[116px_1fr_auto]'));
 });
 
-test('the mobile hero becomes a bounded living catalog triptych', () => {
+test('the mobile hero becomes a bounded cinematic soundstage', () => {
   assert.ok(hero.includes('data-mobile-layout="home-hero"'));
-  assert.ok(hero.includes('data-design-concept="living-triptych"'));
-  assert.ok(hero.includes('min-h-[calc(100svh-6rem)]'));
-  assert.ok(hero.includes('data-hero-stage="catalog-triptych"'));
-  assert.ok(hero.includes('grid-template-rows'));
-  assert.ok(hero.includes('grid-template-columns'));
+  assert.ok(hero.includes('data-design-concept="cinematic-soundstage"'));
+  assert.ok(hero.includes('h-[calc(100svh-6rem)]'));
+  assert.ok(hero.includes('data-hero-stage="cinematic-motion"'));
+  assert.ok(hero.includes('media="(max-width: 767px)"'));
+  assert.ok(hero.includes('monstajam-cinematic-mobile.mp4'));
+  assert.ok(hero.includes('monstajam-cinematic-mobile.webp'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
 });
 
-test('the mobile triptych hands off directly to the library without stacked hero padding', () => {
+test('the mobile soundstage hands off directly to the library without stacked hero padding', () => {
   assert.match(hero, /data-mobile-layout="home-hero"[\s\S]*className="[^"]*h-\[calc\(100svh-6rem\)\][^"]*overflow-hidden/);
   assert.match(musicLibrary, /id="library"[\s\S]*className="[^"]*pt-3[^"]*md:pt-8/);
   assert.doesNotMatch(hero, /className="[^"]*\bpb-(6|8|14)\b/);

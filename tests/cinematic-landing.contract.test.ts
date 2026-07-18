@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -9,47 +9,63 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const home = read('src/app/page.tsx');
 const hero = read('src/components/Hero.tsx');
 
-test('the homepage opens as a full-viewport living catalog triptych', () => {
-  assert.ok(hero.includes('data-design-concept="living-triptych"'));
-  assert.ok(hero.includes('data-hero-stage="catalog-triptych"'));
-  assert.ok(hero.includes('data-release-panel'));
+const mediaAssets = [
+  'public/media/monstajam-cinematic-desktop.mp4',
+  'public/media/monstajam-cinematic-mobile.mp4',
+  'public/media/monstajam-cinematic-desktop.webp',
+  'public/media/monstajam-cinematic-mobile.webp',
+];
+
+test('the homepage opens as a full-viewport cinematic MonstaJam soundstage', () => {
+  assert.ok(hero.includes('data-design-concept="cinematic-soundstage"'));
+  assert.ok(hero.includes('data-hero-stage="cinematic-motion"'));
   assert.ok(hero.includes('data-hero-type="monsta-jam"'));
   assert.ok(hero.includes('MONSTA'));
   assert.ok(hero.includes('JAM'));
   assert.ok(hero.includes('Independent sound archive'));
-  assert.ok(hero.includes('Tap a release to listen'));
+  assert.ok(hero.includes('Enter the archive'));
   assert.equal(hero.includes('VinylRecord'), false);
-  assert.equal(hero.includes('data-hero-sleeve'), false);
+  assert.equal(hero.includes('data-release-panel'), false);
   assert.equal(home.includes('<AlbumReleaseBanner />'), false);
 });
 
-test('the hero presents several real catalog picks instead of hard-coding one album campaign', () => {
-  assert.ok(home.includes('const showcaseTracks'));
-  assert.ok(home.includes('showcaseTracks={showcaseTracks}'));
-  assert.ok(hero.includes('showcaseTracks?: PlayerTrack[]'));
-  assert.ok(hero.includes('setActiveTrackIndex'));
-  assert.ok(hero.includes('activeTrackIndex === index'));
-  assert.ok(hero.includes('aria-pressed={isActive}'));
-  assert.ok(hero.includes('proxyCoverUrl(track.coverUrl)'));
-  assert.ok(hero.includes('track.title'));
-  assert.ok(hero.includes('track.artist'));
-  assert.ok(hero.includes('toggle(track)'));
-  assert.equal(hero.includes('/releases/cold-world-volume-2-cover.jpg'), false);
+test('the cinematic world uses responsive authored media instead of release artwork', () => {
+  assert.ok(hero.includes('data-cinematic-poster="true"'));
+  assert.ok(hero.includes('data-cinematic-motion="true"'));
+  assert.ok(hero.includes('media="(max-width: 767px)"'));
+  assert.ok(hero.includes('/media/monstajam-cinematic-mobile.mp4'));
+  assert.ok(hero.includes('/media/monstajam-cinematic-desktop.mp4'));
+  assert.ok(hero.includes('/media/monstajam-cinematic-mobile.webp'));
+  assert.ok(hero.includes('/media/monstajam-cinematic-desktop.webp'));
+  assert.ok(hero.includes('autoPlay'));
+  assert.ok(hero.includes('muted'));
+  assert.ok(hero.includes('loop'));
+  assert.ok(hero.includes('playsInline'));
+  assert.ok(hero.includes('preload="metadata"'));
+
+  for (const path of mediaAssets) {
+    assert.ok(statSync(join(root, path)).size < 1_500_000, `${path} should stay below 1.5 MB`);
+  }
+});
+
+test('the cinematic first screen stays brand-first and almost UI free', () => {
+  assert.ok(home.includes('<Hero />'));
+  assert.ok(hero.includes('href="#library"'));
+  assert.ok(hero.includes('Originals / Unreleased / Sessions'));
+  assert.equal(hero.includes('trackCount'), false);
+  assert.equal(hero.includes('videoCount'), false);
+  assert.equal(hero.includes('showcaseTracks'), false);
+  assert.equal(hero.includes('PlayerTrack'), false);
+  assert.equal(hero.includes('usePlayer'), false);
+  assert.equal(hero.includes('<button'), false);
   assert.equal(hero.includes('Cold World'), false);
-  assert.equal(hero.includes('MJ-016'), false);
-});
-
-test('the first screen removes generic marketing filler and empty statistics', () => {
-  assert.equal(hero.includes('Discover the beats and tracks that never made it to the mainstream.'), false);
   assert.equal(hero.includes('Music Videos'), false);
-  assert.equal(hero.includes('UNRELEASED.'), false);
 });
 
-test('the triptych remains one-screen, touch-first, and motion respectful on phones', () => {
-  assert.ok(hero.includes('min-h-[calc(100svh-6rem)]'));
-  assert.ok(hero.includes('triptych-active-none'));
-  assert.ok(hero.includes('grid-template-rows'));
-  assert.ok(hero.includes('grid-template-columns'));
-  assert.ok(hero.includes('@media (prefers-reduced-motion: reduce)'));
+test('the soundstage remains one-screen, touch-safe, and motion respectful', () => {
+  assert.ok(hero.includes('h-[calc(100svh-6rem)]'));
+  assert.ok(hero.includes('motion-reduce:hidden'));
+  assert.ok(hero.includes('aria-hidden="true"'));
+  assert.ok(hero.includes('tabIndex={-1}'));
   assert.ok(hero.includes('min-h-11'));
 });

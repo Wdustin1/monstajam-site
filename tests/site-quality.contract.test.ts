@@ -68,11 +68,11 @@ test('global metadata and route shells provide a coherent accessible page contra
   }
 });
 
-test('homepage catalog action and live counts match the rendered content', () => {
+test('homepage catalog action stays direct without cluttering the cinematic opening with counts', () => {
   assert.ok(hero.includes('href="#library"'));
-  assert.ok(hero.includes('Browse all {trackCount}'));
-  assert.ok(hero.includes('{videoCount} visual records'));
-  assert.equal(hero.includes('{trackCount}+'), false, 'exact track count should not be inflated');
+  assert.ok(hero.includes('Enter the archive'));
+  assert.equal(hero.includes('trackCount'), false);
+  assert.equal(hero.includes('videoCount'), false);
 
   const banner = read('src/components/AlbumReleaseBanner.tsx');
   assert.ok(banner.includes('Latest album'));
@@ -128,9 +128,9 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
   assert.ok(vinyl.includes('data-turntable-id="hero-turntable"'));
   assert.ok(vinyl.includes('width: TURNTABLE_WIDTH'));
   assert.ok(vinyl.includes('height: TURNTABLE_HEIGHT'));
-  assert.ok(hero.includes('data-release-panel'), 'the catalog artwork should be the primary playback control');
-  assert.ok(hero.includes('aria-label={`${isTrackPlaying ? \'Pause\' : \'Play\'} ${track.title} by ${track.artist}`}'));
-  assert.ok(hero.includes('min-h-11'), 'release panels and catalog actions should remain tap sized');
+  assert.ok(hero.includes('data-cinematic-motion="true"'), 'the cinematic media should be decorative');
+  assert.ok(hero.includes('aria-hidden="true"'));
+  assert.ok(hero.includes('min-h-11'), 'the archive action should remain tap sized');
   assert.ok(genreBrowser.includes('md:opacity-0'));
   assert.ok(genreBrowser.includes('group-focus-within:opacity-100'));
   assert.ok(genreBrowser.includes('min-h-11'), 'genre-card links should remain tap sized');
