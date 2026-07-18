@@ -28,6 +28,19 @@ test('the homepage opens as a cinematic studio anchored by the established Monst
   assert.equal(home.includes('<AlbumReleaseBanner />'), false);
 });
 
+test('the approved MonstaJam lockup owns the space above a lowered turntable', () => {
+  assert.ok(hero.includes("import Image from 'next/image'"));
+  assert.ok(hero.includes('data-hero-brand="monstajam-lockup"'));
+  assert.ok(hero.includes('src="/monstajam-logo.png"'));
+  assert.ok(hero.includes('alt="Monsta Jam Productions"'));
+  assert.ok(hero.includes('data-turntable-stage="lowered"'));
+  assert.ok(hero.includes('cinematic-turntable-stage'));
+
+  const brandPosition = hero.indexOf('data-hero-brand="monstajam-lockup"');
+  const turntablePosition = hero.indexOf('data-turntable-stage="lowered"');
+  assert.ok(brandPosition >= 0 && brandPosition < turntablePosition);
+});
+
 test('the cinematic world uses responsive authored media instead of release artwork', () => {
   assert.ok(hero.includes('data-cinematic-poster="true"'));
   assert.ok(hero.includes('data-cinematic-motion="true"'));
@@ -70,4 +83,10 @@ test('the soundstage remains one-screen, touch-safe, and motion respectful', () 
   assert.ok(hero.includes('tabIndex={-1}'));
   assert.ok(hero.includes('min-h-11'));
   assert.ok(hero.includes('@media (min-width: 1024px)'));
+});
+
+test('short desktop viewports keep the lowered deck fully inside the soundstage', () => {
+  assert.ok(hero.includes('@media (min-width: 1024px) and (max-height: 800px)'));
+  assert.ok(hero.includes('transform: scale(0.82)'));
+  assert.ok(hero.includes('[data-hero-brand="monstajam-lockup"] img'));
 });

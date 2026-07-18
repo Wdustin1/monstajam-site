@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { PlayerTrack } from '@/context/PlayerContext';
 import VinylRecord from './VinylRecord';
 
@@ -70,6 +71,17 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
         </div>
 
         <div className="relative my-auto flex min-h-0 flex-1 flex-col items-center justify-center">
+          <div data-hero-brand="monstajam-lockup" className="relative z-20 -mb-1">
+            <Image
+              src="/monstajam-logo.png"
+              alt="Monsta Jam Productions"
+              width={256}
+              height={256}
+              priority
+              className="h-auto w-28 drop-shadow-[0_0_24px_rgba(236,72,153,0.28)] sm:w-32 lg:w-36"
+            />
+          </div>
+
           <div className="relative z-20 mb-1 text-center sm:mb-2">
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-white/85 sm:text-[11px]">
               DROP THE NEEDLE
@@ -77,8 +89,10 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
             <p className="mt-1 text-[10px] text-white/45 sm:text-[11px]">Press the deck to listen</p>
           </div>
 
-          <div className="cinematic-turntable-wrapper">
-            <VinylRecord featuredTrack={featuredTrack} />
+          <div data-turntable-stage="lowered" className="cinematic-turntable-stage">
+            <div className="cinematic-turntable-wrapper">
+              <VinylRecord featuredTrack={featuredTrack} />
+            </div>
           </div>
         </div>
 
@@ -97,6 +111,10 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
       </div>
 
       <style>{`
+        .cinematic-turntable-stage {
+          transform: translateY(16px);
+        }
+
         .cinematic-turntable-wrapper {
           position: relative;
           z-index: 12;
@@ -138,6 +156,10 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
         }
 
         @media (min-width: 640px) {
+          .cinematic-turntable-stage {
+            transform: translateY(22px);
+          }
+
           .cinematic-turntable-wrapper {
             width: 510px;
             height: 346px;
@@ -149,6 +171,10 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
         }
 
         @media (min-width: 1024px) {
+          .cinematic-turntable-stage {
+            transform: translateY(28px);
+          }
+
           .cinematic-turntable-wrapper {
             width: 560px;
             height: 380px;
@@ -156,6 +182,25 @@ export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerT
 
           .cinematic-turntable-wrapper > * {
             transform: scale(1);
+          }
+        }
+
+        @media (min-width: 1024px) and (max-height: 800px) {
+          [data-hero-brand="monstajam-lockup"] img {
+            width: 112px;
+          }
+
+          .cinematic-turntable-stage {
+            transform: translateY(12px);
+          }
+
+          .cinematic-turntable-wrapper {
+            width: 459px;
+            height: 312px;
+          }
+
+          .cinematic-turntable-wrapper > * {
+            transform: scale(0.82);
           }
         }
       `}</style>
