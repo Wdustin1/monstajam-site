@@ -129,6 +129,7 @@ test('audio and browse controls have names, state, keyboard semantics, and mobil
   assert.ok(vinyl.includes('width: TURNTABLE_WIDTH'));
   assert.ok(vinyl.includes('height: TURNTABLE_HEIGHT'));
   assert.ok(hero.includes('data-cinematic-motion="true"'), 'the cinematic media should be decorative');
+  assert.ok(hero.includes('<VinylRecord featuredTrack={featuredTrack} />'), 'the established turntable should remain the hero playback control');
   assert.ok(hero.includes('aria-hidden="true"'));
   assert.ok(hero.includes('min-h-11'), 'the archive action should remain tap sized');
   assert.ok(genreBrowser.includes('md:opacity-0'));

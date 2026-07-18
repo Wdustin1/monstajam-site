@@ -16,15 +16,14 @@ const mediaAssets = [
   'public/media/monstajam-cinematic-mobile.webp',
 ];
 
-test('the homepage opens as a full-viewport cinematic MonstaJam soundstage', () => {
+test('the homepage opens as a cinematic studio anchored by the established MonstaJam turntable', () => {
   assert.ok(hero.includes('data-design-concept="cinematic-soundstage"'));
   assert.ok(hero.includes('data-hero-stage="cinematic-motion"'));
-  assert.ok(hero.includes('data-hero-type="monsta-jam"'));
-  assert.ok(hero.includes('MONSTA'));
-  assert.ok(hero.includes('JAM'));
+  assert.ok(hero.includes("import VinylRecord from './VinylRecord'"));
+  assert.ok(hero.includes('<VinylRecord featuredTrack={featuredTrack} />'));
+  assert.ok(hero.includes('cinematic-turntable-wrapper'));
   assert.ok(hero.includes('Independent sound archive'));
   assert.ok(hero.includes('Enter the archive'));
-  assert.equal(hero.includes('VinylRecord'), false);
   assert.equal(hero.includes('data-release-panel'), false);
   assert.equal(home.includes('<AlbumReleaseBanner />'), false);
 });
@@ -49,15 +48,17 @@ test('the cinematic world uses responsive authored media instead of release artw
 });
 
 test('the cinematic first screen stays brand-first and almost UI free', () => {
-  assert.ok(home.includes('<Hero />'));
+  assert.ok(home.includes('const featuredTrack'));
+  assert.ok(home.includes('<Hero featuredTrack={featuredTrack} />'));
   assert.ok(hero.includes('href="#library"'));
+  assert.ok(hero.includes('DROP THE NEEDLE'));
   assert.ok(hero.includes('Originals / Unreleased / Sessions'));
   assert.equal(hero.includes('trackCount'), false);
   assert.equal(hero.includes('videoCount'), false);
   assert.equal(hero.includes('showcaseTracks'), false);
-  assert.equal(hero.includes('PlayerTrack'), false);
   assert.equal(hero.includes('usePlayer'), false);
-  assert.equal(hero.includes('<button'), false);
+  assert.equal(hero.includes('data-hero-type="monsta-jam"'), false);
+  assert.equal(hero.includes('-webkit-text-stroke'), false);
   assert.equal(hero.includes('Cold World'), false);
   assert.equal(hero.includes('Music Videos'), false);
 });
@@ -68,4 +69,5 @@ test('the soundstage remains one-screen, touch-safe, and motion respectful', () 
   assert.ok(hero.includes('aria-hidden="true"'));
   assert.ok(hero.includes('tabIndex={-1}'));
   assert.ok(hero.includes('min-h-11'));
+  assert.ok(hero.includes('@media (min-width: 1024px)'));
 });

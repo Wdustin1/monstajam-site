@@ -29,6 +29,8 @@ test('the mobile hero becomes a bounded cinematic soundstage', () => {
   assert.ok(hero.includes('media="(max-width: 767px)"'));
   assert.ok(hero.includes('monstajam-cinematic-mobile.mp4'));
   assert.ok(hero.includes('monstajam-cinematic-mobile.webp'));
+  assert.ok(hero.includes('cinematic-turntable-wrapper'));
+  assert.ok(hero.includes('transform: scale(0.643)'));
   assert.match(scrollIndicator, /className="[^"]*hidden[^"]*md:flex/);
 });
 

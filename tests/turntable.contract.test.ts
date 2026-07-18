@@ -28,10 +28,15 @@ test('the turntable follows media-event playback state instead of optimistic ani
   assert.equal(playerContext.includes('.then(() => setIsPlaying(true))'), false);
 });
 
-test('the homepage replaces the turntable wrapper with responsive cinematic media', () => {
-  assert.equal(hero.includes('VinylRecord'), false);
+test('the homepage places the interactive turntable inside the responsive cinematic studio', () => {
+  assert.ok(hero.includes("import VinylRecord from './VinylRecord'"));
+  assert.ok(hero.includes('<VinylRecord featuredTrack={featuredTrack} />'));
   assert.ok(hero.includes('data-hero-stage="cinematic-motion"'));
   assert.ok(hero.includes('<video'));
   assert.ok(hero.includes('motion-reduce:hidden'));
   assert.ok(hero.includes('media="(max-width: 767px)"'));
+  assert.ok(hero.includes('.cinematic-turntable-wrapper'));
+  assert.ok(hero.includes('transform: scale(0.643)'));
+  assert.ok(hero.includes('@media (min-width: 1024px)'));
+  assert.equal(hero.includes('data-release-panel'), false);
 });

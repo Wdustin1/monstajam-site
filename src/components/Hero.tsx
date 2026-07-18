@@ -1,4 +1,7 @@
-export default function Hero() {
+import type { PlayerTrack } from '@/context/PlayerContext';
+import VinylRecord from './VinylRecord';
+
+export default function Hero({ featuredTrack = null }: { featuredTrack?: PlayerTrack | null }) {
   return (
     <section
       data-mobile-layout="home-hero"
@@ -6,6 +9,8 @@ export default function Hero() {
       data-hero-stage="cinematic-motion"
       className="relative isolate h-[calc(100svh-6rem)] w-full overflow-hidden bg-black text-left"
     >
+      <h1 className="sr-only">Monsta Jam Productions</h1>
+
       <div
         data-cinematic-poster="true"
         aria-hidden="true"
@@ -36,19 +41,19 @@ export default function Hero() {
 
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.14)_0%,rgba(0,0,0,0.04)_42%,rgba(0,0,0,0.72)_100%)]"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.22)_0%,rgba(0,0,0,0.06)_38%,rgba(0,0,0,0.78)_100%)]"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 opacity-80"
+        className="absolute inset-0 opacity-85"
         style={{
-          background: 'radial-gradient(circle at 50% 42%, transparent 0%, rgba(0,0,0,0.08) 44%, rgba(0,0,0,0.68) 100%)',
+          background: 'radial-gradient(circle at 50% 48%, transparent 0%, rgba(0,0,0,0.08) 42%, rgba(0,0,0,0.72) 100%)',
         }}
       />
       <div
         data-cinematic-grain="true"
         aria-hidden="true"
-        className="absolute inset-0 opacity-[0.08] mix-blend-soft-light motion-reduce:hidden"
+        className="absolute inset-0 opacity-[0.07] mix-blend-soft-light motion-reduce:hidden"
         style={{
           backgroundImage: [
             'repeating-radial-gradient(circle at 17% 32%, rgba(255,255,255,0.55) 0 0.45px, transparent 0.6px 3px)',
@@ -64,24 +69,22 @@ export default function Hero() {
           <p className="text-right">Originals / Unreleased / Sessions</p>
         </div>
 
-        <div
-          data-hero-type="monsta-jam"
-          className="pointer-events-none my-auto flex select-none flex-col items-center justify-center text-center"
-        >
-          <p className="mb-4 font-mono text-[9px] font-bold uppercase tracking-[0.36em] text-white/60 sm:text-[10px]">
-            Built behind closed doors
-          </p>
-          <h1 className="flex flex-col items-center font-black uppercase leading-[0.72] tracking-[-0.085em] text-white [text-shadow:0_4px_36px_rgba(0,0,0,0.72)]">
-            <span className="text-[clamp(4.65rem,17vw,15rem)]">MONSTA</span>
-            <span className="mt-[0.14em] text-[clamp(6.2rem,22vw,19rem)] text-transparent [-webkit-text-stroke:1px_rgba(255,255,255,0.92)] sm:[-webkit-text-stroke:2px_rgba(255,255,255,0.92)]">
-              JAM
-            </span>
-          </h1>
+        <div className="relative my-auto flex min-h-0 flex-1 flex-col items-center justify-center">
+          <div className="relative z-20 mb-1 text-center sm:mb-2">
+            <p className="font-mono text-[10px] font-black uppercase tracking-[0.34em] text-white/85 sm:text-[11px]">
+              DROP THE NEEDLE
+            </p>
+            <p className="mt-1 text-[10px] text-white/45 sm:text-[11px]">Press the deck to listen</p>
+          </div>
+
+          <div className="cinematic-turntable-wrapper">
+            <VinylRecord featuredTrack={featuredTrack} />
+          </div>
         </div>
 
         <div className="flex items-end justify-between gap-6">
           <p className="hidden max-w-[18rem] text-[11px] leading-relaxed text-white/55 sm:block">
-            Music that never waited for permission.
+            Monsta Jam Productions · music that never waited for permission.
           </p>
           <a
             href="#library"
@@ -93,6 +96,69 @@ export default function Hero() {
         </div>
       </div>
 
+      <style>{`
+        .cinematic-turntable-wrapper {
+          position: relative;
+          z-index: 12;
+          width: 300px;
+          height: 204px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          overflow: visible;
+        }
+
+        .cinematic-turntable-wrapper > * {
+          transform: scale(0.536);
+          transform-origin: center center;
+          flex-shrink: 0;
+        }
+
+        @media (min-width: 360px) {
+          .cinematic-turntable-wrapper {
+            width: 360px;
+            height: 244px;
+          }
+
+          .cinematic-turntable-wrapper > * {
+            transform: scale(0.643);
+          }
+        }
+
+        @media (min-width: 480px) {
+          .cinematic-turntable-wrapper {
+            width: 430px;
+            height: 292px;
+          }
+
+          .cinematic-turntable-wrapper > * {
+            transform: scale(0.768);
+          }
+        }
+
+        @media (min-width: 640px) {
+          .cinematic-turntable-wrapper {
+            width: 510px;
+            height: 346px;
+          }
+
+          .cinematic-turntable-wrapper > * {
+            transform: scale(0.911);
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .cinematic-turntable-wrapper {
+            width: 560px;
+            height: 380px;
+          }
+
+          .cinematic-turntable-wrapper > * {
+            transform: scale(1);
+          }
+        }
+      `}</style>
     </section>
   );
 }

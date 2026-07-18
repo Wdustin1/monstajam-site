@@ -20,8 +20,14 @@ test('persistent player defaults to a compact control outside the cinematic hero
   assert.match(playerSource, /data-player-mode={isCompact \? 'compact' : 'expanded'}/);
   assert.match(playerSource, /aria-label="Minimize player"/);
   assert.match(playerSource, /aria-label="Expand player"/);
-  assert.doesNotMatch(playerSource, /living-triptych/);
-  assert.doesNotMatch(playerSource, /MutationObserver/);
+});
+
+test('persistent player yields to the cinematic turntable while the soundstage is visible', () => {
+  assert.match(playerSource, /data-design-concept="cinematic-soundstage"/);
+  assert.match(playerSource, /getBoundingClientRect\(\)/);
+  assert.match(playerSource, /new MutationObserver\(updateHeroVisibility\)/);
+  assert.match(playerSource, /window\.addEventListener\('scroll', updateHeroVisibility/);
+  assert.match(playerSource, /display: heroInView \? 'none' : undefined/);
 });
 
 test('persistent player exposes an accessible Up Next queue', () => {

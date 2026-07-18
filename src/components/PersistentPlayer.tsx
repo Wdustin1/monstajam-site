@@ -64,6 +64,7 @@ export default function PersistentPlayer() {
   } = usePlayer();
   const [isCompact, setIsCompact] = useState(true);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [heroInView, setHeroInView] = useState(false);
 
   const tickRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -133,6 +134,32 @@ export default function PersistentPlayer() {
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [closeQueue, queueOpen]);
 
+  useEffect(() => {
+    const updateHeroVisibility = () => {
+      const hero = document.querySelector<HTMLElement>('[data-design-concept="cinematic-soundstage"]');
+      if (!hero) {
+        setHeroInView(false);
+        return;
+      }
+
+      const { top, bottom } = hero.getBoundingClientRect();
+      setHeroInView(bottom > 0 && top < window.innerHeight);
+    };
+
+    updateHeroVisibility();
+    window.addEventListener('scroll', updateHeroVisibility, { passive: true });
+    window.addEventListener('resize', updateHeroVisibility);
+
+    const observer = new MutationObserver(updateHeroVisibility);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.removeEventListener('scroll', updateHeroVisibility);
+      window.removeEventListener('resize', updateHeroVisibility);
+      observer.disconnect();
+    };
+  }, []);
+
   if (!currentTrack) return null;
 
   const displayTrack = currentTrack;
@@ -179,7 +206,7 @@ export default function PersistentPlayer() {
       className={isCompact
         ? 'fixed bottom-3 left-3 right-3 z-50 sm:left-auto sm:w-[390px]'
         : 'fixed bottom-0 left-0 z-50 w-full'}
-      style={playerSurface}
+      style={{ ...playerSurface, display: heroInView ? 'none' : undefined }}
     >
       {isCompact ? (
         <div className="relative flex min-h-[68px] items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 pr-2">
