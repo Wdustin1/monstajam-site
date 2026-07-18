@@ -28,24 +28,13 @@ test('the homepage opens as a cinematic studio anchored by the established Monst
   assert.equal(home.includes('<AlbumReleaseBanner />'), false);
 });
 
-test('the approved MonstaJam lockup owns the space above a lowered turntable', () => {
-  assert.ok(hero.includes("import Image from 'next/image'"));
-  assert.ok(hero.includes('data-hero-brand="monstajam-lockup"'));
-  assert.ok(hero.includes('src="/monstajam-logo.png"'));
-  assert.ok(hero.includes('alt="Monsta Jam Productions"'));
+test('the record player is the only visual brand object in the cinematic hero', () => {
   assert.ok(hero.includes('data-turntable-stage="lowered"'));
   assert.ok(hero.includes('cinematic-turntable-stage'));
-
-  const brandPosition = hero.indexOf('data-hero-brand="monstajam-lockup"');
-  const turntablePosition = hero.indexOf('data-turntable-stage="lowered"');
-  assert.ok(brandPosition >= 0 && brandPosition < turntablePosition);
-});
-
-test('branding stays above the mobile deck and moves into the desktop side space', () => {
-  assert.ok(hero.includes('data-brand-placement="mobile-above-desktop-side"'));
-  assert.ok(hero.includes('[data-hero-brand="monstajam-lockup"]'));
-  assert.ok(hero.includes('left: clamp(-410px, -27vw, -370px)'));
-  assert.ok(hero.includes('top: 104px'));
+  assert.equal(hero.includes("import Image from 'next/image'"), false);
+  assert.equal(hero.includes('/monstajam-logo.png'), false);
+  assert.equal(hero.includes('data-hero-brand'), false);
+  assert.equal(hero.includes('data-brand-placement'), false);
 });
 
 test('the cinematic world uses responsive authored media instead of release artwork', () => {
@@ -95,5 +84,4 @@ test('the soundstage remains one-screen, touch-safe, and motion respectful', () 
 test('short desktop viewports keep the lowered deck fully inside the soundstage', () => {
   assert.ok(hero.includes('@media (min-width: 1024px) and (max-height: 800px)'));
   assert.ok(hero.includes('transform: scale(0.82)'));
-  assert.ok(hero.includes('[data-hero-brand="monstajam-lockup"] img'));
 });
