@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const canPreview = req.nextUrl.searchParams.get('preview') === 'true' && isAdminRequest(req);
+  const canPreview = req.nextUrl.searchParams.get('preview') === 'true' && await isAdminRequest(req);
   const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
   try {
     const track = await prisma.track.findUnique({
@@ -33,7 +33,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -106,7 +106,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

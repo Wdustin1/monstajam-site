@@ -1,13 +1,11 @@
 import { NextRequest } from 'next/server';
+import { getAdminIdentity, isAllowedMutationOrigin } from './auth-provider';
 
-/**
- * Validates the admin session cookie server-side.
- * Never exposes ADMIN_SECRET to the client.
- */
-export function isAdminRequest(req: NextRequest): boolean {
-  return isAdminSession(req.cookies.get('admin_session')?.value);
-}
+// Keep content authorization separate from identity storage. Tests can replace
+// this dependency without bypass flags or authentication fallbacks in production.
+export const adminAuthorization = { getIdentity: getAdminIdentity };
 
-export function isAdminSession(cookie: string | undefined): boolean {
-  return !!cookie && !!process.env.ADMIN_SECRET && cookie === process.env.ADMIN_SECRET;
+export async function isAdminRequest(req: NextRequest): Promise<boolean> {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isAllowedMutationOrigin(req)) return false;
+  return Boolean(await adminAuthorization.getIdentity(req.headers));
 }

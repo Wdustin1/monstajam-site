@@ -5,7 +5,8 @@
 'use strict';
 /* eslint-disable @typescript-eslint/no-require-imports -- Route dependencies must be isolated before importing TS modules. */
 const assert = require('node:assert/strict');
-const { test, beforeEach, after } = require('node:test');
+const { test, beforeEach, after, afterEach, mock } = require('node:test');
+const { mockNamedAdminSession } = require('./fixtures/admin-session.ts');
 const { NextRequest } = require('next/server');
 const nextPath = require.resolve('next/server');
 const previousNext = require.cache[nextPath].exports;
@@ -24,9 +25,7 @@ require.cache[storagePath] = { id: storagePath, filename: storagePath, loaded: t
   getPrivateAudio: () => { throw new Error('The test must not download media'); },
 } };
 const originalPrisma = globalThis.prisma;
-const oldSecret = process.env.ADMIN_SECRET;
 const secret = 'local-audio-contract-only';
-process.env.ADMIN_SECRET = secret;
 let records;
 let nextId;
 const matches = (row, where) => Object.entries(where).every(([key, value]) =>
@@ -56,7 +55,8 @@ const source = { originalUrl: 'https://fixture.private.blob.vercel-storage.com/m
 function routeRequest(authorized = true, finishOnRead = true) {
   return async (input, init = {}) => {
     const headers = new Headers(init.headers);
-    if (authorized) headers.set('cookie', `admin_session=${secret}`);
+    headers.set('origin', 'http://localhost');
+    if (authorized) headers.set('cookie', `monstajam_auth.session_token=${secret}`);
     const request = new NextRequest(new URL(input, 'http://localhost'), { ...init, headers });
     if (input === '/api/audio-assets') return POST(request);
     const id = input.split('/').at(-1);
@@ -70,12 +70,12 @@ function routeRequest(authorized = true, finishOnRead = true) {
 }
 const options = (request) => ({ request, wait: async () => {}, onAsset: () => {}, onProgress: () => {} });
 
-beforeEach(() => { records = []; nextId = 0; jobs = []; });
+beforeEach(() => { records = []; nextId = 0; jobs = []; mockNamedAdminSession(secret); });
+afterEach(() => mock.restoreAll());
 after(() => {
   require.cache[nextPath].exports = previousNext;
   if (oldStorage) require.cache[storagePath] = oldStorage; else delete require.cache[storagePath];
   globalThis.prisma = originalPrisma;
-  if (oldSecret === undefined) delete process.env.ADMIN_SECRET; else process.env.ADMIN_SECRET = oldSecret;
 });
 
 test('actual POST/GET contract prepares and polls a real ready asset status without exposing source paths', async () => {

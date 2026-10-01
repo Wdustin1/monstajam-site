@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { AdminSaveError, adminFetch, formChanged, readAdminResponse } from '@/lib/admin-save';
+import type { AdminIdentity } from '@/lib/admin-account-client';
 import { initialPlaybackMode, loadAdminAudioAsset, prepareAdminAudio, type AdminAudioAsset, type AudioPreparation, type PlaybackMode } from '@/lib/admin-audio';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAdminNavigationGuard } from './useAdminNavigationGuard';
@@ -409,7 +410,7 @@ function ConfirmDialog({
   );
 }
 
-export default function UploadDashboard() {
+export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminIdentity }) {
   const { pause: pausePublicPlayer, isPlaying: publicPlayerPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<AdminTab>('tracks');
   const [tracks, setTracks] = useState<PublishedTrack[]>([]);
@@ -993,8 +994,11 @@ export default function UploadDashboard() {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               Upload songs, prep releases, manage videos, and catch missing media before anything goes live.
             </p>
+            <p className="mt-2 text-xs text-slate-400">Signed in as {currentAdmin.email} · {currentAdmin.role === 'owner' ? 'Owner' : 'Admin'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <a href="/upload/account" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Your account</a>
+            {currentAdmin.role === 'owner' && <a href="/upload/admins" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Admin access</a>}
             <button
               type="button"
               onClick={reloadLibrary}

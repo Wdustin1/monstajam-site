@@ -45,6 +45,48 @@ Run `npm run test:cover-proxy` for source restrictions, unsafe-content rejection
 
 Run `npm run test:admin-save` for schema/API and response-handling regressions, and `npm run test:admin-editor` for the real React editor with simulated DOM, network failures, and Blob uploads. `npm run test:admin-save:fixture` starts the real dashboard/API on `http://127.0.0.1:3311` using in-memory data and a generated test password; its temporary control file can inject delay, failure, and session expiry for manual browser checks. None of these tests write to production.
 
+## Individual admin accounts
+
+Admins sign in at `/upload/login` with their own email and password. Better Auth stores password hashes, opaque sessions and account state in separate `auth_*` MongoDB collections alongside the existing catalog. There is no public signup. The old shared `ADMIN_SECRET` and `admin_session` cookie grant no access in this version.
+
+- The **owner** can invite/remove admins at `/upload/admins`. Each admin can manage the song/video catalog and change their own password at `/upload/account`. Only the owner can manage account access; owner access cannot be removed through the website.
+- Invitations and password resets produce one-use, one-hour links. The owner copies and shares them directly. **The application does not send invitation emails.** A new link replaces the previous one. Removed accounts require a fresh invitation and password setup.
+- Passwords must be 12–128 characters. Sessions expire server-side after seven days, with no client-side session cache. Removal invalidates sessions and links immediately; resetting a password revokes existing sessions. Changing a password signs out other sessions and invalidates older reset links.
+- Every private page and API checks the live account/session. Cross-origin mutations are rejected. Private responses are not cached; expired account access returns an explicit error so the content editor retains unsaved work.
+- Login attempts and activation probes have database-backed limits. Account invitations, link issuance, removals and completed resets are recorded in `auth_audit`; this is an access log, not a history of song edits. MFA and email delivery are not part of this release.
+
+### Environment and owner setup
+
+Configure `DATABASE_URL`, a fresh random `BETTER_AUTH_SECRET` of at least 32 characters, and the exact canonical `BETTER_AUTH_URL` (production: `https://www.monstajamproductions.com`). Local development may use `http://localhost:<port>`. Production requires HTTPS. Use separate databases, secrets and origins for preview deployments; never attach a test preview to the production database.
+
+The offline owner commands require database credentials from the environment, `OWNER_EMAIL`, and an exact database-name gate. `OWNER_NAME` is optional at initial setup. They default to a read-only check:
+
+```bash
+npm run admin:bootstrap -- --expect-database <exact-database-name>
+npm run admin:bootstrap -- --expect-database <exact-database-name> --apply --output <absolute-private-output-file>
+```
+
+The output must be a new file in an existing directory **outside the repository**. It is restricted to the current Windows principal (or mode 0600 on POSIX), and contains the owner's private setup link. Passwords and links are never printed to the console. The command creates indexes, including a unique owner constraint, and a pending owner account. Repeating bootstrap with the same owner is a no-op; it does not reset passwords or links. A different existing owner causes an error.
+
+For an expired setup link or forgotten owner password, run the explicit recovery command with the same environment and exact existing owner email:
+
+```bash
+npm run admin:recover-owner -- --expect-database <exact-database-name>
+npm run admin:recover-owner -- --expect-database <exact-database-name> --apply --output <new-absolute-private-output-file>
+```
+
+Recovery replaces the old link, without changing the owner's identity. Password operations use a per-account lock to prevent late password writes from overwriting newer credentials. A process crash can leave that lock in place; recovery intentionally refuses to clear it. An operator must first establish that the original request has ended before repairing such a lock. Do not clear a lock merely because a browser timed out.
+
+### Release and verification
+
+Before replacing shared-password authentication in production, obtain the actual owner email, verify the new flow against an isolated database, configure the production auth environment, bootstrap the owner and securely provide the setup file. Deploy the account release, complete owner activation, verify sign-in and an invitation, then retire the obsolete shared-password environment value. Do not switch production before the owner setup is ready. An application rollback requires its matching auth configuration; the catalog/audio migration does not need to be undone.
+
+Run `npm run test:admin-accounts`, the existing content/audio/editor suites, lint and build. After the build, `npm run test:admin-accounts:integration` checks signed cookies, server pages, RSC/prefetch, revocation, API guards and cache behavior on a local compiled server (port 3312). The regular HTTP tests inject a real Better Auth memory adapter through trusted Node test code and do not connect to a real database.
+
+`npm run test:admin-accounts:mongo` is an explicit network integration test. Supply a MongoDB connection through the environment. It rewrites the database path to a fresh random `monstajam_auth_test_*` database before opening a connection, then verifies real indexes, invitations, activation, resets, removal and reinvitation. It removes all fixture documents afterward. The application's database role cannot drop databases, so empty test collections/indexes remain. It never reads or changes the production catalog or production accounts. The manual content smoke script requires `ADMIN_SMOKE_BASE_URL`, `ADMIN_SMOKE_EMAIL` and `ADMIN_SMOKE_PASSWORD` and creates/deletes one temporary draft in its configured environment.
+
+For browser and cross-route integration checks, start `tsx scripts/tests/admin-accounts.mongo.fixture.ts --isolated-database` with a connection supplied through the environment. This also uses a fresh isolated database, serves localhost:3399 and prints a stop-file path. Run `node scripts/tests/admin-accounts.mongo.http.cjs --local-fixture` against it to verify the actual Next HTTP invitation/activation flow across separately loaded route modules. Create the printed stop file when finished; the parent process stops its own Next child and removes/verifies all fixture account documents. Test identities use `fixture.invalid` emails and a local-only password defined in the fixture source. Stop this server before `npm run build` on Windows because Prisma's native library cannot be regenerated while loaded by the dev server.
+
 ## Private originals and song previews
 
 - Upload the full song once. New tracks default to **45-second preview**. **Allow full-song playback** controls public access independently of genre and Published/Draft. Existing tracks without an explicit mode retain their former genre-based playback behavior until saved or migrated.

@@ -12,7 +12,7 @@ const baseHeaders = { 'Cache-Control': 'private, no-store', Vary: 'Cookie', 'X-C
 
 async function serve(req: NextRequest, slug: string, metadataOnly = false) {
   try {
-    const admin = isAdminRequest(req);
+    const admin = await isAdminRequest(req);
     const track = await prisma.track.findUnique({ where: { slug } });
     if (!track || (!track.published && !admin) || !track.audioAssetId) return new Response(null, { status: 404, headers: baseHeaders });
     // Explicit full audition is admin-only, even for a published preview track.

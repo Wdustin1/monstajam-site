@@ -12,10 +12,11 @@ type Track = {
 };
 
 const baseUrl = process.env.ADMIN_SMOKE_BASE_URL;
-const password = process.env.ADMIN_SECRET;
+const email = process.env.ADMIN_SMOKE_EMAIL;
+const password = process.env.ADMIN_SMOKE_PASSWORD;
 
-if (!baseUrl || !password) {
-  console.error('Set ADMIN_SMOKE_BASE_URL and ADMIN_SECRET before running admin smoke tests.');
+if (!baseUrl || !email || !password) {
+  console.error('Set ADMIN_SMOKE_BASE_URL, ADMIN_SMOKE_EMAIL, and ADMIN_SMOKE_PASSWORD before running admin smoke tests.');
   process.exit(1);
 }
 
@@ -38,8 +39,11 @@ function storeCookies(headers: Headers) {
 async function request(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (cookieJar.size) headers.set('Cookie', cookieHeader());
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(init.method ?? 'GET')) {
+    headers.set('Origin', new URL(baseUrl!).origin);
+  }
 
-  const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  const res = await fetch(`${baseUrl}${path}`, { ...init, headers, redirect: 'manual' });
   storeCookies(res.headers);
   return res;
 }
@@ -62,10 +66,10 @@ async function cleanup() {
 }
 
 async function main() {
-  await jsonRequest('/api/auth/login', {
+  await jsonRequest('/api/auth/sign-in/email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ email, password }),
   });
 
   const before = await jsonRequest<Track[]>('/api/tracks?all=true');
