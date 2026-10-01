@@ -45,6 +45,15 @@ Run `npm run test:cover-proxy` for source restrictions, unsafe-content rejection
 
 Run `npm run test:admin-save` for schema/API and response-handling regressions, and `npm run test:admin-editor` for the real React editor with simulated DOM, network failures, and Blob uploads. `npm run test:admin-save:fixture` starts the real dashboard/API on `http://127.0.0.1:3311` using in-memory data and a generated test password; its temporary control file can inject delay, failure, and session expiry for manual browser checks. None of these tests write to production.
 
+## Upload experience
+
+- Audio and artwork transfers show separate percentage progress. Audio preparation and the final save show their own status; a completed transfer does not imply that the track has been saved.
+- Selected audio can be played locally and selected artwork can be previewed before saving. Replacing or clearing a selection releases its browser object URL, and leaving the track editor stops its audio. Saved audio and artwork remain available until a successful save replaces them.
+- New tracks are checked for a conflicting title-derived URL in the loaded library and again through the authenticated `/api/admin/track-title` endpoint before any new files upload. Drafts also reserve their URLs. The final create request handles a concurrent duplicate with a useful conflict message. Edit the existing track or choose a distinct title; existing track URLs are not renamed.
+- Failed checks and saves retain the form and selected files. While the editor remains open, retries reuse successfully uploaded files and prepared audio. A page reload does not preserve local file selections or this retry cache.
+
+Upload regressions are included in `scripts/tests/admin-audio-editor.test.cjs`, `scripts/tests/selected-media-preview.test.cjs`, and `scripts/tests/track-title-api.test.ts`. The local admin-save fixture exercises title-check authorization, draft conflicts, and failed-check recovery without production data.
+
 ## Individual admin accounts
 
 Admins sign in at `/upload/login` with their own username and password. Better Auth stores password hashes, opaque sessions and account state in separate `auth_*` MongoDB collections alongside the existing catalog. There is no public signup. The old shared `ADMIN_SECRET` and `admin_session` cookie grant no access in this version.

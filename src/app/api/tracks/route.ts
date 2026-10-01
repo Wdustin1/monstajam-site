@@ -4,6 +4,16 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackCreateSchema } from '@/lib/schemas';
 import { toPublicTrack } from '@/lib/track-playback';
+import { TRACK_TITLE_CONFLICT, trackTitleError } from '@/lib/track-title';
+
+const adminHeaders = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
+
+function isSlugUniqueConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const target = error.meta?.target;
+  if (Array.isArray(target)) return target.includes('slug');
+  return typeof target === 'string' && ['slug', 'slug_1', 'tracks_slug_key', 'track_slug_key', 'tracks_slug_1'].includes(target.toLowerCase());
+}
 
 // GET /api/tracks — list tracks (published only; admin cookie required for drafts)
 export async function GET(req: NextRequest) {
@@ -37,21 +47,21 @@ export async function GET(req: NextRequest) {
 // POST /api/tracks — create a new track (admin only)
 export async function POST(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: adminHeaders });
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: adminHeaders });
   }
 
   const parsed = TrackCreateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 422 }
+      { status: 422, headers: adminHeaders }
     );
   }
 
@@ -69,7 +79,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: 'Validation failed',
         details: { audioUrl: ['Upload and process the audio before attaching it to this track.'] },
-      }, { status: 422 });
+      }, { status: 422, headers: adminHeaders });
     }
     if (trackInput.audioAssetId) {
       const asset = await prisma.audioAsset.findUnique({
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           error: 'Validation failed',
           details: { audioAssetId: ['Wait for audio processing to finish successfully before saving.'] },
-        }, { status: 422 });
+        }, { status: 422, headers: adminHeaders });
       }
       trackData.audioUrl = null;
     }
@@ -88,9 +98,12 @@ export async function POST(req: NextRequest) {
       data: trackData,
       include: { credits: true },
     });
-    return NextResponse.json(track, { status: 201 });
+    return NextResponse.json(track, { status: 201, headers: adminHeaders });
   } catch (err) {
+    if (isSlugUniqueConflict(err)) {
+      return NextResponse.json(trackTitleError(TRACK_TITLE_CONFLICT), { status: 409, headers: adminHeaders });
+    }
     console.error(err);
-    return NextResponse.json({ error: 'Failed to create track' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create track' }, { status: 500, headers: adminHeaders });
   }
 }

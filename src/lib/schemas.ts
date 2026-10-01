@@ -20,7 +20,7 @@ export type VideoUpdateInput = z.infer<typeof VideoUpdateSchema>;
 const urlOrEmpty = z.string().max(500).url().or(z.literal('')).optional();
 
 export const TrackCreateSchema = z.object({
-  title:         z.string().min(1, 'Title is required').max(200),
+  title:         z.string().trim().min(1, 'Title is required').max(200, 'Keep the title to 200 characters or fewer.'),
   subtitle:      z.string().max(200).optional(),
   artist:        z.string().min(1).max(200),
   slug:          z.string().min(1).max(200).regex(/^[a-z0-9-]+$/, 'slug must be lowercase alphanumeric with hyphens'),

@@ -17,6 +17,13 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 dom.window.scrollTo = () => {};
 dom.window.HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', ''); };
 dom.window.HTMLDialogElement.prototype.close = function close() { this.removeAttribute('open'); };
+dom.window.HTMLMediaElement.prototype.pause = function pause() {};
+dom.window.HTMLMediaElement.prototype.load = function load() {};
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
+let objectURLNumber = 0;
+URL.createObjectURL = () => `blob:local-editor-fixture-${++objectURLNumber}`;
+URL.revokeObjectURL = () => {};
 
 const React = require('react');
 const { act } = React;
@@ -81,6 +88,11 @@ async function fakeFetch(input, init = {}) {
     }
     if (input === '/api/tracks?all=true') return Response.json(structuredClone(network.tracks));
     if (input === '/api/videos?all=true') return Response.json(structuredClone(network.videos));
+    if (input.startsWith('/api/admin/track-title?')) {
+      const title = new URL(input, 'http://localhost').searchParams.get('title');
+      const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      return Response.json({ available: true, slug });
+    }
     throw new Error(`Unsupported fixture read ${input}`);
   }
   if (network.nextMutationGate) {
@@ -187,6 +199,8 @@ afterEach(async () => {
 after(() => {
   if (previousBlobModule) require.cache[blobModule] = previousBlobModule;
   else delete require.cache[blobModule];
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
   dom.window.close();
 });
 

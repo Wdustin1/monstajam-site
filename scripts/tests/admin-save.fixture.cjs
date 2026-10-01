@@ -54,6 +54,19 @@ async function smoke() {
   const asset = await request('/api/audio-assets/000000000000000000000004', { cookie });
   assert.equal(asset.status, 200);
   assert.equal((await asset.json()).previewStart, 12.5);
+  const titlePath = '/api/admin/track-title?title=Brand%20new%20fixture%20title';
+  assert.equal((await request(titlePath)).status, 401, 'Title lookup must require a named admin session');
+  const availableTitle = await request(titlePath, { cookie });
+  assert.equal(availableTitle.status, 200);
+  assert.deepEqual(await availableTitle.json(), { available: true, slug: 'brand-new-fixture-title' });
+  for (const title of ['ADMIN save LIVE!!', 'Admin save draft']) {
+    const collision = await request('/api/admin/track-title?title=' + encodeURIComponent(title), { cookie });
+    assert.equal(collision.status, 409, 'Published and draft URLs must both reserve their title-derived slug');
+    assert.ok((await collision.json()).details.title[0]);
+  }
+  await setControls({ failReadGeneration: 1 });
+  assert.equal((await request(titlePath, { cookie })).status, 503, 'Unavailable storage must never promise a free title');
+  assert.equal((await request(titlePath, { cookie })).status, 200, 'A failed title lookup must be retryable');
   let save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Fixture read-after-write success' } });
   assert.equal(save.status, 200);
   let read = await request('/api/tracks/admin-save-live', { cookie });
@@ -85,7 +98,7 @@ async function smoke() {
   assert.ok(cookie, 'Revoked fixture sessions must be replaced through a fresh sign-in');
   read = await request('/api/tracks/admin-save-live', { cookie });
   assert.equal((await read.json()).mood, 'Original fixture mood');
-  console.log('PASS normal login, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
+  console.log('PASS normal login, title availability/conflict/retry, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
 }
 
 async function main() {

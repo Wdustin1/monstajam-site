@@ -8,6 +8,8 @@ import { initialPlaybackMode, loadAdminAudioAsset, prepareAdminAudio, type Admin
 import { usePlayer } from '@/context/PlayerContext';
 import { useAdminNavigationGuard } from './useAdminNavigationGuard';
 import { useDiscardConfirmation } from './useDiscardConfirmation';
+import SelectedMediaPreview from './SelectedMediaPreview';
+import { slugifyTrackTitle, TRACK_TITLE_CONFLICT } from '@/lib/track-title';
 import {
   AlertTriangle,
   CheckCircle,
@@ -149,10 +151,6 @@ const emptyVideoForm = (): VideoFormState => ({
   duration: '',
   published: true,
 });
-
-function slugify(text: string) {
-  return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
 
 function extractYouTubeId(url: string): string | null {
   const patterns = [
@@ -425,6 +423,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const [submittingTrack, setSubmittingTrack] = useState(false);
   const [submittingVideo, setSubmittingVideo] = useState(false);
   const [uploadPhase, setUploadPhase] = useState('');
+  const [uploadTransfer, setUploadTransfer] = useState<{ label: string; percentage: number } | null>(null);
+  const uploadAttempt = useRef(0);
   const [toast, setToast] = useState<ToastState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
@@ -447,7 +447,10 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const [audioDetailsError, setAudioDetailsError] = useState<string | null>(null);
   const fullAudition = useRef<HTMLAudioElement>(null);
   const previewAudition = useRef<HTMLAudioElement>(null);
+  const selectedAudition = useRef<HTMLAudioElement>(null);
   const editingTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : undefined;
+  const newTrackSlug = slugifyTrackTitle(trackForm.title);
+  const conflictingTrack = !editingSlug && newTrackSlug ? tracks.find((track) => track.slug === newTrackSlug) : undefined;
   const canChoosePreviewStart = Boolean(trackForm.audioFile || (editingTrack?.audioAssetId && savedAudio && !audioDetailsLoading));
   const trackDirty = formChanged(trackForm, trackBaseline);
   const videoDirty = formChanged(videoForm, videoBaseline);
@@ -456,11 +459,14 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     if (!publicPlayerPlaying) return;
     fullAudition.current?.pause();
     previewAudition.current?.pause();
+    selectedAudition.current?.pause();
   }, [publicPlayerPlaying]);
 
-  function playAudition(kind: 'full' | 'preview') {
+  function playAudition(kind: 'full' | 'preview' | 'selected') {
     pausePublicPlayer();
-    (kind === 'full' ? previewAudition : fullAudition).current?.pause();
+    if (kind !== 'full') fullAudition.current?.pause();
+    if (kind !== 'preview') previewAudition.current?.pause();
+    if (kind !== 'selected') selectedAudition.current?.pause();
   }
 
   const navigationBlocked = useCallback(() => {
@@ -559,6 +565,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     ++audioDetailVersion.current;
     fullAudition.current?.pause();
     previewAudition.current?.pause();
+    selectedAudition.current?.pause();
     const empty = emptyTrackForm();
     setEditingSlug(null);
     setTrackForm(empty);
@@ -572,6 +579,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     setTrackSaveError(null);
     setTrackErrors({});
     setUploadPhase('');
+    setUploadTransfer(null);
   };
 
   const resetVideoForm = () => {
@@ -610,6 +618,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     if (!await mayDiscard(trackDirty) || operation.current) return;
     fullAudition.current?.pause();
     previewAudition.current?.pause();
+    selectedAudition.current?.pause();
     setEditingSlug(track.slug);
     setTrackErrors({});
     setUploadPhase('');
@@ -650,12 +659,14 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     if (editingVideoId === video.id) {
       fullAudition.current?.pause();
       previewAudition.current?.pause();
+      selectedAudition.current?.pause();
       setActiveTab('videos');
       return;
     }
     if (!await mayDiscard(videoDirty) || operation.current) return;
     fullAudition.current?.pause();
     previewAudition.current?.pause();
+    selectedAudition.current?.pause();
     setEditingVideoId(video.id);
     setVideoErrors({});
     const form: VideoFormState = {
@@ -681,14 +692,27 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       ? `monstajam/originals/${crypto.randomUUID()}-${safeName}`
       : `monstajam/covers/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     setUploadPhase(bucket === 'audio' ? 'Uploading your private original…' : 'Uploading cover art…');
-    const blob = await upload(path, file, {
-      access: bucket === 'audio' ? 'private' : 'public',
-      handleUploadUrl: '/api/upload',
-      contentType: file.type || 'application/octet-stream',
-      multipart: bucket === 'audio',
-    });
-    uploadedFiles.current[bucket] = { file, url: blob.url };
-    return blob.url;
+    const attempt = ++uploadAttempt.current;
+    const label = bucket === 'audio' ? 'Audio upload' : 'Artwork upload';
+    setUploadTransfer({ label, percentage: 0 });
+    try {
+      const blob = await upload(path, file, {
+        access: bucket === 'audio' ? 'private' : 'public',
+        handleUploadUrl: '/api/upload',
+        contentType: file.type || 'application/octet-stream',
+        multipart: bucket === 'audio',
+        onUploadProgress: ({ percentage }) => {
+          if (uploadAttempt.current !== attempt || !Number.isFinite(percentage)) return;
+          const value = Math.floor(Math.max(0, Math.min(100, percentage)));
+          setUploadTransfer((current) => current?.percentage === value ? current : { label, percentage: value });
+        },
+      });
+      uploadedFiles.current[bucket] = { file, url: blob.url };
+      return blob.url;
+    } finally {
+      // Ignore delayed SDK callbacks after this upload has finished or failed.
+      if (uploadAttempt.current === attempt) { ++uploadAttempt.current; setUploadTransfer(null); }
+    }
   }
 
   function validateTrackForm() {
@@ -697,6 +721,9 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     const hasAudio = Boolean(editingTrack?.audioUrl || editingTrack?.audioAssetId || trackForm.audioFile);
 
     if (!trackForm.title.trim()) errors.title = 'Track title is required.';
+    else if (trackForm.title.trim().length > 200) errors.title = 'Use a track title of 200 characters or fewer.';
+    else if (!editingSlug && !newTrackSlug) errors.title = 'Include at least one letter or number in the track title.';
+    else if (conflictingTrack) errors.title = TRACK_TITLE_CONFLICT;
     if (!trackForm.artist.trim()) errors.artist = 'Artist name is required.';
     if (trackForm.bpm && !Number.isInteger(Number(trackForm.bpm))) errors.bpm = 'BPM must be a whole number.';
     if (trackForm.bpm && (Number(trackForm.bpm) < 40 || Number(trackForm.bpm) > 300)) {
@@ -726,6 +753,19 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     setUploadPhase(editingSlug ? 'Saving track changes' : 'Preparing new track');
 
     try {
+      let checkedSlug = newTrackSlug;
+      if (!editingSlug) {
+        setUploadPhase('Checking track title…');
+        try {
+          const response = await adminFetch(`/api/admin/track-title?title=${encodeURIComponent(trackForm.title.trim())}`, { credentials: 'include', cache: 'no-store' });
+          const result = await readAdminResponse<{ slug: string; available: boolean }>(response);
+          if (result.available !== true || result.slug !== newTrackSlug) throw new Error('Incomplete title check');
+          checkedSlug = result.slug;
+        } catch (error) {
+          if (error instanceof AdminSaveError) throw error;
+          throw new AdminSaveError('The track title could not be checked. No new files were uploaded. Please retry.');
+        }
+      }
       let audioAssetId: string | undefined;
       let coverUrl: string | undefined;
       const previewStart = Number(trackForm.previewStart || 0);
@@ -742,6 +782,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         audioAssetId = asset.id;
       }
       if (trackForm.coverFile) coverUrl = await uploadFile(trackForm.coverFile, 'covers');
+      setUploadPhase('Saving track changes…');
 
       const payload: Record<string, unknown> = {
         title: trackForm.title.trim(),
@@ -773,7 +814,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               ...payload,
-              slug: slugify(trackForm.title),
+              slug: checkedSlug,
               number: tracks.reduce((max, track) => Math.max(max, track.number), 0) + 1,
             }),
           });
@@ -1038,6 +1079,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 if (id !== 'tracks') {
                   fullAudition.current?.pause();
                   previewAudition.current?.pause();
+                  selectedAudition.current?.pause();
                 }
                 setActiveTab(id);
               }}
@@ -1078,10 +1120,15 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label="Track title" required error={trackErrors.title}>
+                <Field label="Track title" required error={trackErrors.title ?? (conflictingTrack ? TRACK_TITLE_CONFLICT : undefined)}>
                   <TextInput
                     value={trackForm.title}
-                    onChange={(event) => setTrackForm((form) => ({ ...form, title: event.target.value }))}
+                    maxLength={200}
+                    onChange={(event) => {
+                      setTrackForm((form) => ({ ...form, title: event.target.value }));
+                      setTrackErrors((current) => { const next = { ...current }; delete next.title; return next; });
+                      setTrackSaveError(null);
+                    }}
                     placeholder="Cold World"
                   />
                 </Field>
@@ -1144,39 +1191,45 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label={editingSlug ? 'Replace audio file' : 'Audio file'} error={trackErrors.audio ?? trackErrors.audioAssetId ?? trackErrors.originalUrl ?? trackErrors.originalName}>
-                  <div className="rounded-md border border-dashed border-cyan-300/30 bg-cyan-300/[0.03] p-4">
-                    <div className="flex items-center gap-3 text-sm text-slate-300">
-                      <FileAudio className="h-5 w-5 text-cyan-300" />
-                      <span>{fileLabel(trackForm.audioFile, editingSlug ? 'Keep current audio unless replaced' : 'MP3 or WAV')}</span>
+                <div>
+                  <Field label={editingSlug ? 'Replace audio file' : 'Audio file'} error={trackErrors.audio ?? trackErrors.audioAssetId ?? trackErrors.originalUrl ?? trackErrors.originalName}>
+                    <div className="rounded-md border border-dashed border-cyan-300/30 bg-cyan-300/[0.03] p-4">
+                      <div className="flex items-center gap-3 text-sm text-slate-300">
+                        <FileAudio className="h-5 w-5 text-cyan-300" />
+                        <span>{fileLabel(trackForm.audioFile, editingSlug ? 'Keep current audio unless replaced' : 'MP3 or WAV')}</span>
+                      </div>
+                      <input
+                        key={`audio-${trackFormVersion}`}
+                        type="file"
+                        accept=".wav,.mp3,audio/*"
+                        className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                        onChange={(event) => {
+                          const audioFile = event.target.files?.[0] ?? null;
+                          setTrackForm((form) => ({ ...form, audioFile, previewStart: audioFile ? form.previewStart : String(savedAudio?.previewStart ?? 0) }));
+                        }}
+                      />
                     </div>
-                    <input
-                      key={`audio-${trackFormVersion}`}
-                      type="file"
-                      accept=".wav,.mp3,audio/*"
-                      className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
-                      onChange={(event) => {
-                        const audioFile = event.target.files?.[0] ?? null;
-                        setTrackForm((form) => ({ ...form, audioFile, previewStart: audioFile ? form.previewStart : String(savedAudio?.previewStart ?? 0) }));
-                      }}
-                    />
-                  </div>
-                </Field>
-                <Field label={editingSlug ? 'Replace cover art' : 'Cover art'}>
-                  <div className="rounded-md border border-dashed border-white/15 bg-white/[0.03] p-4">
-                    <div className="flex items-center gap-3 text-sm text-slate-300">
-                      <ImageIcon className="h-5 w-5 text-slate-300" />
-                      <span>{fileLabel(trackForm.coverFile, editingSlug ? 'Keep current cover unless replaced' : 'PNG or JPG')}</span>
+                  </Field>
+                  <SelectedMediaPreview kind="audio" file={trackForm.audioFile} audioRef={selectedAudition} onAudioPlay={() => playAudition('selected')} />
+                </div>
+                <div>
+                  <Field label={editingSlug ? 'Replace cover art' : 'Cover art'}>
+                    <div className="rounded-md border border-dashed border-white/15 bg-white/[0.03] p-4">
+                      <div className="flex items-center gap-3 text-sm text-slate-300">
+                        <ImageIcon className="h-5 w-5 text-slate-300" />
+                        <span>{fileLabel(trackForm.coverFile, editingSlug ? 'Keep current cover unless replaced' : 'PNG or JPG')}</span>
+                      </div>
+                      <input
+                        key={`cover-${trackFormVersion}`}
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                        onChange={(event) => setTrackForm((form) => ({ ...form, coverFile: event.target.files?.[0] ?? null }))}
+                      />
                     </div>
-                    <input
-                      key={`cover-${trackFormVersion}`}
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
-                      onChange={(event) => setTrackForm((form) => ({ ...form, coverFile: event.target.files?.[0] ?? null }))}
-                    />
-                  </div>
-                </Field>
+                  </Field>
+                  <SelectedMediaPreview kind="image" file={trackForm.coverFile} />
+                </div>
               </div>
 
               <div className="mt-5 space-y-4 rounded-md border border-white/10 bg-slate-950/40 p-4">
@@ -1246,7 +1299,11 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                   {submittingTrack ? 'Saving…' : trackSaveError ? 'Retry save' : editingSlug ? 'Save changes' : 'Add track'}
                 </button>
               </div>
-              {uploadPhase && <p className="mt-3 text-sm text-cyan-200">{uploadPhase}</p>}
+              {uploadPhase && <p role="status" className="mt-3 text-sm text-cyan-200">{uploadPhase}</p>}
+              {uploadTransfer && <div className="mt-2 text-sm text-cyan-200">
+                <p>{uploadTransfer.label}: {uploadTransfer.percentage}%</p>
+                <progress aria-label={uploadTransfer.label} aria-valuenow={uploadTransfer.percentage} aria-valuemin={0} aria-valuemax={100} value={uploadTransfer.percentage} max={100} className="mt-1 h-2 w-full accent-cyan-300" />
+              </div>}
               {trackDirty && <p className="mt-3 text-sm text-amber-200">Unsaved track changes</p>}
               {trackSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{trackSaveError} Your edits have been kept. <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></div>}
             </section>
