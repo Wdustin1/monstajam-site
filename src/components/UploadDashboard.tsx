@@ -1020,6 +1020,16 @@ export default function UploadDashboard() {
                         Delete
                       </button>
                     </div>
+                    <a
+                      href={`/upload/preview/${encodeURIComponent(track.slug)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 underline"
+                      aria-label={`Preview saved version of ${track.title} (opens in a new tab)`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Preview saved version
+                    </a>
                   </article>
                 ))}
               </div>

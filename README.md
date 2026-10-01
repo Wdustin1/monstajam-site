@@ -20,6 +20,15 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Draft track access
+
+- Public track pages and their metadata only return published tracks.
+- In the admin track library, **Preview saved version** opens `/upload/preview/[slug]` in a new tab. This requires an admin session and is excluded from search indexing.
+- The track detail API only includes a draft when both `?preview=true` and a valid admin session are supplied. Authenticated track responses must not be cached publicly.
+- Audio and artwork currently use public Blob storage. These checks hide draft records and stop public pages/API responses from revealing their file URLs; they do **not** revoke previously known direct file URLs. Confidential media requires private storage and migration of existing public files.
+
+Run the privacy regression checks with `npm run test:draft-privacy`. Run HTTP checks against an isolated local fixture server with `npm run test:draft-privacy:integration`; after `npm run build`, add `-- --production` to verify the compiled server and production cache headers. These checks use generated local login credentials and a read-only fixture database, never production data. Port 3310 must be free.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

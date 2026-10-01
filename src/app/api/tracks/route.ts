@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const genre = searchParams.get('genre');
   const all = searchParams.get('all') === 'true';
+  const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 
   // ?all=true requires admin session
   const showAll = all && isAdminRequest(req);
@@ -22,10 +23,10 @@ export async function GET(req: NextRequest) {
       include: { credits: true },
       orderBy: { number: 'asc' },
     });
-    return NextResponse.json(tracks);
+    return NextResponse.json(tracks, { headers });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: 'Failed to fetch tracks' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch tracks' }, { status: 500, headers });
   }
 }
 

@@ -9,15 +9,18 @@ import type { TrackWithCredits } from './MusicLibrary';
 interface TrackDetailProps {
   track: TrackWithCredits;
   allTracks?: TrackWithCredits[];
+  adminPreview?: boolean;
 }
 
-export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps) {
+export default function TrackDetail({ track, allTracks = [], adminPreview = false }: TrackDetailProps) {
   const [showLyrics, setShowLyrics] = useState(false);
   const { toggle, currentTrack, isPlaying, setQueue, play } = usePlayer();
 
   const handlePlay = () => {
-    // Set queue with all tracks so Next/Prev work
-    if (allTracks.length > 0) {
+    // A draft preview must not auto-advance into another track or a singleton loop.
+    if (adminPreview) {
+      setQueue([]);
+    } else if (allTracks.length > 0) {
       setQueue(allTracks);
     }
     toggle(track);
@@ -32,7 +35,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
   return (
     <main className="flex-grow container mx-auto px-5 md:px-8 pt-24 md:pt-28 pb-36 md:pb-40 z-10 flex flex-col lg:flex-row gap-8 lg:gap-24 items-start justify-center max-w-7xl">
       {/* Back link */}
-      <div className="absolute top-24 left-8 z-20 hidden lg:block">
+      {!adminPreview && <div className="absolute top-24 left-8 z-20 hidden lg:block">
         <Link
           href="/#library"
           className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
@@ -42,7 +45,7 @@ export default function TrackDetail({ track, allTracks = [] }: TrackDetailProps)
           </svg>
           Back to Library
         </Link>
-      </div>
+      </div>}
 
       {/* Left: Album Art */}
       <div className="w-full lg:w-1/2 max-w-xl mx-auto lg:mx-0 flex-shrink-0">

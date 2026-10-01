@@ -4,22 +4,26 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
 
-// GET /api/tracks/[slug]
+// GET /api/tracks/[slug] — drafts require an explicit authenticated preview
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  const canPreview = req.nextUrl.searchParams.get('preview') === 'true' && isAdminRequest(req);
+  const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
   try {
     const track = await prisma.track.findUnique({
       where: { slug },
       include: { credits: true },
     });
-    if (!track) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json(track);
+    if (!track || (!track.published && !canPreview)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404, headers });
+    }
+    return NextResponse.json(track, { headers });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: 'Failed to fetch track' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch track' }, { status: 500, headers });
   }
 }
 

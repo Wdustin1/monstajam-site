@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
-    "test:admin-smoke": "tsx scripts/admin-smoke.ts"
+    "test:admin-smoke": "tsx scripts/admin-smoke.ts",
+    "test:draft-privacy": "tsx --test scripts/tests/draft-privacy.test.ts",
+    "test:draft-privacy:integration": "node scripts/tests/draft-privacy.integration.cjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
