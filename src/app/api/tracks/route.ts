@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
   const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 
   // ?all=true requires admin session
-  const showAll = all && isAdminRequest(req);
+  const showAll = all && await isAdminRequest(req);
+  if (all && !showAll) {
+    return NextResponse.json({ error: 'Sign in to load the admin library.' }, { status: 401, headers });
+  }
 
   try {
     const tracks = await prisma.track.findMany({
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/tracks — create a new track (admin only)
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

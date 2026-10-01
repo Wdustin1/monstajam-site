@@ -1,3 +1,4 @@
+import { mockNamedAdminSession } from './fixtures/admin-session';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test';
@@ -9,7 +10,7 @@ let headAudio: typeof import('../../src/app/api/audio/[slug]/route').HEAD;
 const slug = 'private-original-track';
 const assetId = '507f1f77bcf86cd799439012';
 const secret = 'audio-stream-unit-test';
-const originalSecret = process.env.ADMIN_SECRET;
+
 const originalToken = process.env.AUDIO_READ_WRITE_TOKEN;
 const previewPath = 'monstajam/previews/test.mp3';
 const originalPath = 'monstajam/originals/test.wav';
@@ -46,7 +47,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  process.env.ADMIN_SECRET = secret;
+  mockNamedAdminSession(secret);
   process.env.AUDIO_READ_WRITE_TOKEN = 'vercel_blob_rw_fake_store_token';
   track = { slug, published: true, audioAssetId: assetId, playbackMode: 'preview', genre: 'Full Songs' };
   asset = { id: assetId, status: 'ready', originalPath, previewPath };
@@ -89,8 +90,8 @@ beforeEach(() => {
 
 afterEach(() => {
   mock.restoreAll();
-  if (originalSecret === undefined) delete process.env.ADMIN_SECRET;
-  else process.env.ADMIN_SECRET = originalSecret;
+
+
   if (originalToken === undefined) delete process.env.AUDIO_READ_WRITE_TOKEN;
   else process.env.AUDIO_READ_WRITE_TOKEN = originalToken;
 });
@@ -106,7 +107,7 @@ function serve(options: { query?: string; cookie?: string; range?: string; metho
   const { query = '', cookie, range, method = 'GET' } = options;
   const request = new NextRequest(`http://localhost/api/audio/${slug}${query}`, {
     method,
-    headers: { ...(cookie ? { Cookie: `admin_session=${cookie}` } : {}), ...(range ? { Range: range } : {}) },
+    headers: { ...(cookie ? { Cookie: `monstajam_auth.session_token=${cookie}` } : {}), ...(range ? { Range: range } : {}) },
   });
   return (method === 'HEAD' ? headAudio : getAudio)(request, { params: Promise.resolve({ slug }) });
 }

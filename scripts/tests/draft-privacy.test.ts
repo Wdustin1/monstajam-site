@@ -1,3 +1,4 @@
+import { mockNamedAdminSession } from './fixtures/admin-session';
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test';
 import type { PrismaClient } from '@prisma/client';
@@ -10,7 +11,7 @@ let publicTrackPage: typeof import('../../src/app/tracks/[slug]/page').default;
 let publicTrackMetadata: typeof import('../../src/app/tracks/[slug]/page').generateMetadata;
 
 const testSecret = 'local-track-preview-test';
-const originalSecret = process.env.ADMIN_SECRET;
+
 const fixture = {
   slug: 'unreleased-track',
   title: 'Unreleased track',
@@ -54,18 +55,18 @@ after(() => {
 
 beforeEach(() => {
   // No environment file is loaded and every database call is mocked.
-  process.env.ADMIN_SECRET = testSecret;
+  mockNamedAdminSession(testSecret);
 });
 
 afterEach(() => {
   mock.restoreAll();
-  if (originalSecret === undefined) delete process.env.ADMIN_SECRET;
-  else process.env.ADMIN_SECRET = originalSecret;
+
+
 });
 
 function request(query = '', cookie?: string) {
   return new NextRequest(`http://localhost/api/tracks/${fixture.slug}${query}`, {
-    headers: cookie ? { Cookie: `admin_session=${cookie}` } : undefined,
+    headers: cookie ? { Cookie: `monstajam_auth.session_token=${cookie}` } : undefined,
   });
 }
 
@@ -118,19 +119,22 @@ test('an admin can explicitly preview a draft without public caching', async () 
   assertPrivateResponse(response);
 });
 
-for (const secret of [undefined, '']) {
-  test(`draft preview is denied when ADMIN_SECRET is ${secret === undefined ? 'missing' : 'empty'}`, async () => {
-    mock.method(database.track, 'findUnique', async () => fixture);
-    if (secret === undefined) delete process.env.ADMIN_SECRET;
-    else process.env.ADMIN_SECRET = secret;
+test('draft preview is denied after the named admin session is revoked', async () => {
+  mock.method(database.track, 'findUnique', async () => fixture);
+  mockNamedAdminSession(testSecret, false);
+  const response = await getTrack('?preview=true', testSecret);
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: 'Not found' });
+  assertPrivateResponse(response);
+});
 
-    const response = await getTrack('?preview=true', testSecret);
-
-    assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { error: 'Not found' });
-    assertPrivateResponse(response);
-  });
-}
+test('the obsolete shared-password cookie cannot preview a draft', async () => {
+  mock.method(database.track, 'findUnique', async () => fixture);
+  const response = await getDetails(new NextRequest(`http://localhost/api/tracks/${fixture.slug}?preview=true`, {
+    headers: { Cookie: `admin_session=${testSecret}` },
+  }), { params: Promise.resolve({ slug: fixture.slug }) });
+  assert.equal(response.status, 404);
+});
 
 test('a missing track has the same response as an inaccessible draft', async () => {
   mock.method(database.track, 'findUnique', async () => null);
@@ -171,12 +175,17 @@ for (const scenario of [
     });
 
     const response = await listTracks(new NextRequest(`http://localhost/api/tracks${scenario.query}`, {
-      headers: scenario.cookie ? { Cookie: `admin_session=${scenario.cookie}` } : undefined,
+      headers: scenario.cookie ? { Cookie: `monstajam_auth.session_token=${scenario.cookie}` } : undefined,
     }));
 
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), scenario.showAll ? [published, fixture] : [published]);
-    assert.equal(findMany.mock.calls[0].arguments[0]?.where?.published, scenario.showAll ? undefined : true);
+    if (scenario.query === '?all=true' && !scenario.showAll) {
+      assert.equal(response.status, 401);
+      assert.equal(findMany.mock.callCount(), 0);
+    } else {
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), scenario.showAll ? [published, fixture] : [published]);
+      assert.equal(findMany.mock.calls[0].arguments[0]?.where?.published, scenario.showAll ? undefined : true);
+    }
     assertPrivateResponse(response);
   });
 }
@@ -188,7 +197,7 @@ test('a list database failure also keeps private cache headers', async () => {
   mock.method(console, 'error', () => {});
 
   const response = await listTracks(new NextRequest('http://localhost/api/tracks?all=true', {
-    headers: { Cookie: `admin_session=${testSecret}` },
+    headers: { Cookie: `monstajam_auth.session_token=${testSecret}` },
   }));
 
   assert.equal(response.status, 500);

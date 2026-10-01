@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { isAdminSession } from '@/lib/auth';
+import { getAdminIdentity } from '@/lib/auth-provider';
 import { prisma } from '@/lib/prisma';
 import { toPublicTrack } from '@/lib/track-playback';
 import TrackPageView from '@/components/TrackPageView';
@@ -16,9 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TrackPreviewPage({ params }: { params: Promise<{ slug: string }> }) {
-  // Check here as well as in middleware: direct server renders must be protected.
-  const cookieStore = await cookies();
-  if (!isAdminSession(cookieStore.get('admin_session')?.value)) {
+  if (!await getAdminIdentity(await headers())) {
     redirect('/upload/login');
   }
 

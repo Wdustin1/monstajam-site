@@ -8,7 +8,9 @@
 
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, randomBytes } = require('node:crypto');
+const fs = require('node:fs/promises');
+const os = require('node:os');
 const net = require('node:net');
 const path = require('node:path');
 
@@ -18,6 +20,7 @@ const base = `http://127.0.0.1:${port}`;
 const password = `local-privacy-${randomUUID()}`;
 const keepAlive = process.argv.includes('--keep-alive');
 const production = process.argv.includes('--production');
+const origin = `${production ? 'https' : 'http'}://localhost:${port}`;
 const privateMarkers = ['PRIVATE_FIXTURE_TITLE_9d2a', 'PRIVATE_FIXTURE_STORY_7e3b', 'private-fixture-a8f4.mp3', 'private-fixture-cover-6c8a'];
 let child;
 let serverLog = '';
@@ -42,7 +45,32 @@ function stop() {
 }
 
 async function request(route, options = {}) {
-  return fetch(base + route, { redirect: 'manual', ...options, signal: AbortSignal.timeout(60000) });
+  const fetchOptions = {
+    redirect: 'manual', ...options,
+    headers: { ...(production ? { 'X-Forwarded-Proto': 'https' } : {}), ...(options.method === 'POST' ? { Origin: origin } : {}), ...options.headers },
+    signal: AbortSignal.timeout(60000),
+  };
+  let response = await fetch(base + route, fetchOptions);
+  if (options.headers?.RSC === '1' && response.status === 307 && response.headers.has('location')) {
+    const corrected = new URL(response.headers.get('location'), origin);
+    const original = new URL(route, origin);
+    if (corrected.origin === origin && corrected.pathname === original.pathname && corrected.searchParams.has('_rsc')) {
+      await response.body?.cancel();
+      response = await fetch(base + corrected.pathname + corrected.search, fetchOptions);
+    }
+  }
+  return response;
+}
+
+async function assertLoginRedirect(response, context) {
+  const body = await response.text();
+  if ([302, 303, 307, 308].includes(response.status)) {
+    assert.equal(new URL(response.headers.get('location'), origin).pathname, '/upload/login');
+  } else {
+    assert.equal(response.status, 200, `${context} returned unexpected status`);
+    assert.match(body, /NEXT_REDIRECT[^\n]*\/upload\/login/, `${context} must serialize the login redirect`);
+  }
+  assertPrivateAbsent(body, context);
 }
 
 function assertPrivateAbsent(body, context) {
@@ -115,17 +143,15 @@ async function runChecks() {
   const previewPath = '/upload/preview/privacy-draft-track';
   for (const [description, headers] of [['signed out', {}], ['invalid cookie', { Cookie: 'admin_session=intentionally-wrong' }]]) {
     const result = await request(previewPath, { headers });
-    assert.ok([302, 303, 307, 308].includes(result.status), `${description} preview must redirect`);
-    assert.equal(new URL(result.headers.get('location'), base).pathname, '/upload/login');
-    assertPrivateAbsent(await result.text(), `${description} preview`);
+    await assertLoginRedirect(result, `${description} preview`);
   }
   console.log('PASS signed-out and invalid-cookie preview access');
 
-  const login = await request('/api/auth/login', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+  const login = await request('/api/auth/sign-in/username', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Dustin', password }),
   });
   assert.equal(login.status, 200, 'Normal login must accept the generated test password');
-  const cookie = login.headers.getSetCookie().find((value) => value.startsWith('admin_session='))?.split(';')[0];
+  const cookie = login.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
   assert.ok(cookie, 'Login must issue an admin session cookie');
   const preview = await request(previewPath, { headers: { Cookie: cookie, 'User-Agent': 'Googlebot' } });
   assert.equal(preview.status, 200, 'Authenticated draft preview must load');
@@ -151,9 +177,8 @@ async function runChecks() {
   assert.equal(adminListing.status, 200);
   assert.deepEqual((await adminListing.json()).map((track) => track.slug), ['privacy-public-track', 'privacy-draft-track']);
   const signedOutListing = await request('/api/tracks?all=true');
-  assert.equal(signedOutListing.status, 200);
+  assert.equal(signedOutListing.status, 401);
   const signedOutTracks = await signedOutListing.json();
-  assert.deepEqual(signedOutTracks.map((track) => track.slug), ['privacy-public-track']);
   assertPrivateAbsent(JSON.stringify(signedOutTracks), 'Signed-out admin listing after authenticated request');
   const publicListingAfterAdmin = await request('/api/tracks');
   assert.equal(publicListingAfterAdmin.status, 200);
@@ -163,8 +188,7 @@ async function runChecks() {
   const authenticatedPublic = await request('/tracks/privacy-draft-track', { headers: { Cookie: cookie, 'User-Agent': 'Googlebot' } });
   await assertNotFound(authenticatedPublic, 'Authenticated public draft route');
   const afterPreview = await request(previewPath);
-  assert.ok([302, 303, 307, 308].includes(afterPreview.status));
-  assertPrivateAbsent(await afterPreview.text(), 'Signed-out preview after authenticated render');
+  await assertLoginRedirect(afterPreview, 'Signed-out preview after authenticated render');
   const afterRsc = await request(previewPath + '?_rsc=after-auth', { headers: { RSC: '1' } });
   assertPrivateAbsent(await afterRsc.text(), 'Signed-out preview RSC after authenticated render');
   const afterPrefetch = await request(previewPath + '?_rsc=prefetch-after-auth', {
@@ -176,17 +200,23 @@ async function runChecks() {
 
 async function main() {
   await assertPortFree();
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'monstajam-draft-privacy-'));
+  const controlPath = path.join(temporaryDirectory, 'control.json');
+  await fs.writeFile(controlPath, '{}');
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
-    if (/ADMIN_SECRET|DATABASE_URL|BLOB_READ_WRITE_TOKEN|SUPABASE|^NODE_OPTIONS$|^NODE_ENV$/.test(key)) delete env[key];
+    if (/ADMIN_SECRET|DATABASE_URL|BLOB.*TOKEN|AUDIO.*TOKEN|SUPABASE|BETTER_AUTH|AUTH_SECRET|^NODE_OPTIONS$|^NODE_ENV$/.test(key)) delete env[key];
   }
   Object.assign(env, {
     NODE_ENV: production ? 'production' : 'development', NEXT_TELEMETRY_DISABLED: '1',
-    MONSTAJAM_LOCAL_PRIVACY_FIXTURES: '1', ADMIN_SECRET: password,
+    MONSTAJAM_LOCAL_PRIVACY_FIXTURES: '1',
+    MONSTAJAM_NAMED_AUTH_FIXTURES: '1', MONSTAJAM_NAMED_AUTH_CONTROL: controlPath,
+    MONSTAJAM_NAMED_AUTH_PASSWORD: password, BETTER_AUTH_URL: origin,
+    BETTER_AUTH_SECRET: randomBytes(48).toString('base64url'),
     MONSTAJAM_LOCAL_PRIVACY_PRODUCTION: production ? '1' : '0',
     BLOB_READ_WRITE_TOKEN: 'disabled-local-privacy-test',
     DATABASE_URL: 'mongodb://127.0.0.1:27019/monstajam_privacy_test?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000',
-    NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/privacy-prisma.cjs').replaceAll('\\', '/')}"`,
+    NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/named-auth.cjs').replaceAll('\\', '/')}"`,
   });
   const command = production ? ['start'] : ['dev', '--webpack'];
   child = spawn(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), ...command, '--hostname', '127.0.0.1', '--port', String(port)], {
@@ -200,7 +230,8 @@ async function main() {
   await runChecks();
   console.log('Draft privacy HTTP integration passed.');
   if (keepAlive) {
-    console.log(`Server retained for browser smoke. URL: ${base}/upload/login`);
+    console.log(`Server retained for browser smoke. URL: ${origin}/upload/login`);
+    console.log('Local fixture username: Dustin');
     console.log(`Generated local-only password: ${password}`);
     console.log('All database writes are blocked by the fixture. Press Ctrl+C to stop.');
     await new Promise((resolve) => child.once('exit', resolve));

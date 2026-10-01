@@ -1,101 +1,68 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
+import { accountButtonClass, accountInputClass, accountPost, usernamePattern, validUsername } from '@/lib/admin-account-client';
 
 export default function AdminLoginPage() {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false);
   const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setError('');
     setLoading(true);
-
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-
-      if (res.ok) {
-        // Older browsers need a document boundary for beforeunload to protect
-        // Back/Forward navigation from the editor.
-        if (!('navigation' in window)) {
-          window.location.replace('/upload');
-          return;
-        }
-        router.push('/upload');
-        router.refresh();
-      } else {
-        setError('Invalid password');
+      await accountPost('/api/auth/sign-in/username', { username: username.trim(), password });
+      // A document boundary preserves Back/Forward protection for browsers
+      // without the Navigation API when they enter the content editor.
+      if (!('navigation' in window)) {
+        window.location.replace('/upload');
+        return;
       }
-    } catch {
-      setError('Something went wrong');
+      router.push('/upload');
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Sign-in failed. Please try again.');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05000A]">
-      {/* Ambient glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[120px]" />
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-sm mx-4 flex flex-col gap-6"
-      >
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-3 mb-2">
-          <Image
-            src="/monstajam-logo.png"
-            alt="MonstaJam"
-            width={64}
-            height={64}
-            className="rounded-full"
-          />
-          <div className="text-center">
-            <h1 className="text-2xl font-black tracking-widest text-white">
-              MONSTA<span className="text-cyan-400">JAM</span>
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Admin Dashboard</p>
+    <main className="flex min-h-screen items-center justify-center bg-[#05000A] px-4 py-12 text-white">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Image src="/monstajam-logo.png" alt="MonstaJam" width={64} height={64} className="rounded-full" />
+          <h1 className="text-2xl font-semibold">Sign in to MonstaJam</h1>
+          <p className="text-sm text-slate-400">Use your personal username and password.</p>
+        </div>
+        <fieldset disabled={loading} className="space-y-5" aria-busy={loading}>
+          <div>
+            <label htmlFor="username" className="mb-2 block text-sm text-slate-300">Username</label>
+            <input id="username" name="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} required minLength={3} maxLength={30} pattern={usernamePattern} placeholder="For example, Dustin" autoFocus value={username} onChange={(event) => setUsername(event.target.value)} aria-describedby="username-help" className={accountInputClass} />
+            <p id="username-help" className="mt-2 text-xs text-slate-400">Usernames are not case-sensitive.</p>
           </div>
-        </div>
-
-        {/* Password field */}
-        <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-sm text-gray-400 font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Enter admin password"
-            autoFocus
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
-          />
-          {error && (
-            <p className="text-red-400 text-sm">{error}</p>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading || !password}
-          className="w-full py-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-sm tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Signing in…' : 'Sign In'}
-        </button>
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm text-slate-300">Password</label>
+            <input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className={accountInputClass} />
+          </div>
+          {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+          <button type="submit" disabled={!validUsername(username) || !password || loading} className={`${accountButtonClass} w-full`}>{loading ? 'Signing in…' : 'Sign in'}</button>
+        </fieldset>
+        <p className="text-sm leading-6 text-slate-400">Forgot your password? Ask the owner for a password-reset link.</p>
+        <p className="text-sm leading-6 text-slate-400">New admin? Open the activation link shared with you by the owner.</p>
+        <Link href="/" className="inline-block text-sm text-cyan-300 underline underline-offset-4">Back to the site</Link>
       </form>
-    </div>
+    </main>
   );
 }

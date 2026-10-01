@@ -14,10 +14,9 @@ if (
   database.protocol !== 'mongodb:' || !['127.0.0.1', 'localhost', '[::1]'].includes(database.hostname) ||
   database.pathname !== '/monstajam_admin_save_test' || database.username || database.password ||
   !path.resolve(controlPath).startsWith(temporaryRoot) || !fs.existsSync(controlPath) ||
-  !process.env.ADMIN_SECRET?.startsWith('local-admin-save-')
+  process.env.MONSTAJAM_NAMED_AUTH_FIXTURES !== '1'
 ) throw new Error('Admin save fixture requires explicit local-only configuration and its temporary control file.');
 
-const originalSecret = process.env.ADMIN_SECRET;
 let controls = {};
 let consumedFailure = 0;
 let consumedReadFailure = 0;
@@ -52,7 +51,6 @@ function refreshControls() {
   try {
     const updated = JSON.parse(fs.readFileSync(controlPath, 'utf8'));
     controls = updated;
-    process.env.ADMIN_SECRET = updated.expireSession ? `expired-${originalSecret}` : originalSecret;
     if ((updated.resetGeneration ?? 0) !== appliedReset) {
       appliedReset = updated.resetGeneration ?? 0;
       resetRows();

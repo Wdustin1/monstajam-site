@@ -1,3 +1,4 @@
+import { mockNamedAdminSession } from './fixtures/admin-session';
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test';
 import type { AudioAsset, Prisma, PrismaClient } from '@prisma/client';
@@ -12,7 +13,7 @@ let getTrack: typeof import('../../src/app/api/tracks/[slug]/route').GET;
 
 const slug = 'managed-audio-track';
 const secret = 'track-audio-unit-test';
-const originalSecret = process.env.ADMIN_SECRET;
+
 const assetId = '507f1f77bcf86cd799439012';
 const legacy: Track = {
   id: '507f1f77bcf86cd799439011', slug, number: 1, title: 'Existing track',
@@ -58,7 +59,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  process.env.ADMIN_SECRET = secret;
+  mockNamedAdminSession(secret);
   stored = { ...legacy, credits: [] };
   asset = { ...ready };
   writes = [];
@@ -93,8 +94,8 @@ beforeEach(() => {
 
 afterEach(() => {
   mock.restoreAll();
-  if (originalSecret === undefined) delete process.env.ADMIN_SECRET;
-  else process.env.ADMIN_SECRET = originalSecret;
+
+
 });
 
 after(() => {
@@ -105,7 +106,7 @@ after(() => {
 function request(path: string, method: string, body?: unknown, cookie: string | null = secret) {
   return new NextRequest(`http://localhost${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: `admin_session=${cookie}` } : {}) },
+    headers: { Origin: 'http://localhost', 'Content-Type': 'application/json', ...(cookie ? { Cookie: `monstajam_auth.session_token=${cookie}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }

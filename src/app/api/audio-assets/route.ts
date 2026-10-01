@@ -17,7 +17,7 @@ const inputSchema = z.object({
 }).refine(input => Boolean(input.originalUrl) !== Boolean(input.audioAssetId), 'Choose one uploaded original.');
 
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
+  if (!(await isAdminRequest(req))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers }); }
   const parsed = inputSchema.safeParse(body);

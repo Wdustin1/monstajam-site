@@ -6,7 +6,7 @@ import { audioAssetStatus } from '@/lib/audio-assets';
 export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const headers = { 'Cache-Control': 'private, no-store' };
-  if (!isAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
+  if (!(await isAdminRequest(req))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
   const { id } = await params;
   if (!/^[a-fA-F0-9]{24}$/.test(id)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers });
   try {

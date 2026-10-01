@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Standalone CommonJS Node fixture runner. */
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, randomBytes } = require('node:crypto');
 const fs = require('node:fs/promises');
 const net = require('node:net');
 const os = require('node:os');
@@ -17,7 +17,9 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const port = 3311;
 const base = `http://127.0.0.1:${port}`;
+const origin = `http://localhost:${port}`;
 const password = `local-admin-save-${randomUUID()}`;
+const smokeOnly = process.argv.includes('--smoke-only');
 let child;
 let stopping = false;
 let serverLog = '';
@@ -38,14 +40,14 @@ function stop() {
 }
 
 async function request(route, { cookie, body, ...options } = {}) {
-  const headers = { ...options.headers, ...(cookie ? { Cookie: cookie } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) };
+  const headers = { ...options.headers, ...(cookie ? { Cookie: cookie } : {}), ...(body ? { 'Content-Type': 'application/json', Origin: origin } : {}) };
   return fetch(base + route, { redirect: 'manual', ...options, headers, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(60000) });
 }
 
 async function smoke() {
-  const login = await request('/api/auth/login', { method: 'POST', body: { password } });
+  const login = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password } });
   assert.equal(login.status, 200);
-  const cookie = login.headers.getSetCookie().find((value) => value.startsWith('admin_session='))?.split(';')[0];
+  let cookie = login.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
   assert.ok(cookie);
   const list = await request('/api/tracks?all=true', { cookie });
   assert.equal((await list.json()).length, 2);
@@ -77,6 +79,10 @@ async function smoke() {
   save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Must not persist' } });
   assert.equal(save.status, 401);
   await setControls({ expireSession: false, resetGeneration: 1 });
+  const relogin = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password } });
+  assert.equal(relogin.status, 200);
+  cookie = relogin.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
+  assert.ok(cookie, 'Revoked fixture sessions must be replaced through a fresh sign-in');
   read = await request('/api/tracks/admin-save-live', { cookie });
   assert.equal((await read.json()).mood, 'Original fixture mood');
   console.log('PASS normal login, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
@@ -92,14 +98,17 @@ async function main() {
   controlPath = path.join(temporaryDirectory, 'control.json');
   await setControls({});
   const env = { ...process.env };
-  for (const key of Object.keys(env)) if (/ADMIN_SECRET|DATABASE_URL|BLOB_READ_WRITE_TOKEN|SUPABASE|^NODE_OPTIONS$|^NODE_ENV$/.test(key)) delete env[key];
+  for (const key of Object.keys(env)) if (/ADMIN_SECRET|DATABASE_URL|BLOB.*TOKEN|AUDIO.*TOKEN|SUPABASE|BETTER_AUTH|AUTH_SECRET|^NODE_OPTIONS$|^NODE_ENV$/.test(key)) delete env[key];
   Object.assign(env, {
-    NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', ADMIN_SECRET: password,
+    NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1',
+    BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: randomBytes(48).toString('base64url'),
+    MONSTAJAM_NAMED_AUTH_FIXTURES: '1', MONSTAJAM_NAMED_AUTH_CONTROL: controlPath,
+    MONSTAJAM_NAMED_AUTH_PASSWORD: password, MONSTAJAM_NAMED_CONTENT_FIXTURE: 'admin-save',
     BLOB_READ_WRITE_TOKEN: 'disabled-local-admin-save-fixture',
     AUDIO_READ_WRITE_TOKEN: 'disabled-local-admin-save-fixture',
     DATABASE_URL: 'mongodb://127.0.0.1:27019/monstajam_admin_save_test?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000',
     MONSTAJAM_ADMIN_SAVE_FIXTURES: '1', MONSTAJAM_ADMIN_SAVE_CONTROL: controlPath,
-    NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/admin-save-prisma.cjs').replaceAll('\\', '/')}"`,
+    NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/named-auth.cjs').replaceAll('\\', '/')}"`,
   });
   child = spawn(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(port)], {
     cwd: root, env, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
@@ -119,8 +128,12 @@ async function main() {
   }
   if (!ready) throw new Error('Next fixture server startup timed out.\n' + serverLog);
   await smoke();
-  console.log(`Dashboard fixture ready: ${base}/upload/login`);
-  console.log(`Generated local-only password: ${password}`);
+  if (smokeOnly) { stop(); return; }
+  const credentialsPath = path.join(temporaryDirectory, 'browser.json');
+  await fs.writeFile(credentialsPath, JSON.stringify({ url: origin + '/upload/login', username: 'Dustin', password }));
+  console.log(`Dashboard fixture ready: ${origin}/upload/login`);
+  console.log('Local fixture username: Dustin');
+  console.log(`Local fixture credentials: ${credentialsPath}`);
   console.log(`Control file: ${controlPath}`);
   console.log(`Next PID: ${child.pid}`);
   console.log('Use failMutationGeneration: 2 for the next failure (1 was consumed by startup smoke).');

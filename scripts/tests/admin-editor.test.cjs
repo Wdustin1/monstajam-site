@@ -175,7 +175,7 @@ beforeEach(async () => {
   document.body.innerHTML = '<div id="root"></div>';
   container = document.getElementById('root');
   root = createRoot(container);
-  await act(async () => { root.render(React.createElement(UploadDashboard)); });
+  await act(async () => { root.render(React.createElement(UploadDashboard, { currentAdmin: { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' } })); });
   assert.equal(network.calls.filter((call) => call.method === 'GET').length, 2);
 });
 

@@ -6,23 +6,28 @@ import { VideoCreateSchema } from '@/lib/schemas';
 // GET /api/videos — list videos
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const all = searchParams.get('all') === 'true' && isAdminRequest(req);
+  const wantsAll = searchParams.get('all') === 'true';
+  const all = wantsAll && await isAdminRequest(req);
+  const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
+  if (wantsAll && !all) {
+    return NextResponse.json({ error: 'Sign in to load the admin library.' }, { status: 401, headers });
+  }
 
   try {
     const videos = await prisma.video.findMany({
       where: all ? {} : { published: true },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
-    return NextResponse.json(videos);
+    return NextResponse.json(videos, { headers });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: 'Failed to fetch videos' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch videos' }, { status: 500, headers });
   }
 }
 
 // POST /api/videos — create video (admin only)
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -1,3 +1,4 @@
+import { mockNamedAdminSession } from './fixtures/admin-session';
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test';
 import type { PrismaClient } from '@prisma/client';
@@ -12,7 +13,7 @@ let createVideo: typeof import('../../src/app/api/videos/route').POST;
 let updateVideo: typeof import('../../src/app/api/videos/[id]/route').PUT;
 
 const testSecret = 'local-admin-save-test';
-const originalSecret = process.env.ADMIN_SECRET;
+
 const track = {
   slug: 'admin-save-track', title: 'Saved track', artist: 'MonstaJam', genre: 'Hip-Hop',
   bpm: 120, mood: 'Calm', story: 'Existing track story',
@@ -53,7 +54,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  process.env.ADMIN_SECRET = testSecret;
+  mockNamedAdminSession(testSecret);
   writes = [];
   mock.method(console, 'error', () => {});
   for (const model of ['track', 'video'] as const) {
@@ -71,8 +72,8 @@ beforeEach(() => {
 
 afterEach(() => {
   mock.restoreAll();
-  if (originalSecret === undefined) delete process.env.ADMIN_SECRET;
-  else process.env.ADMIN_SECRET = originalSecret;
+
+
 });
 
 after(() => {
@@ -90,7 +91,7 @@ const routes = [
 function request(route: typeof routes[number], body: unknown, cookie: string | null = testSecret) {
   return new NextRequest(`http://localhost${route.path}`, {
     method: route.method,
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: `admin_session=${cookie}` } : {}) },
+    headers: { Origin: 'http://localhost', 'Content-Type': 'application/json', ...(cookie ? { Cookie: `monstajam_auth.session_token=${cookie}` } : {}) },
     body: JSON.stringify(body),
   });
 }
@@ -174,7 +175,7 @@ for (const route of routes) {
   test(`${route.name} reports invalid JSON without writing`, async () => {
     const response = await route.run(new NextRequest(`http://localhost${route.path}`, {
       method: route.method,
-      headers: { 'Content-Type': 'application/json', Cookie: `admin_session=${testSecret}` },
+      headers: { Origin: 'http://localhost', 'Content-Type': 'application/json', Cookie: `monstajam_auth.session_token=${testSecret}` },
       body: '{',
     }));
 
