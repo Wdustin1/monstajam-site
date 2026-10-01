@@ -35,6 +35,16 @@ Artwork remains public. `/api/cover` only downloads HTTPS artwork from this proj
 
 Run `npm run test:cover-proxy` for source restrictions, unsafe-content rejection, image compatibility, timeout/size limits, and URL-encoding regression checks. Tests use generated images and mocked downloads, with no production writes.
 
+## Admin save protection
+
+- Track and video editors track unsaved changes independently. Switching dashboard tabs preserves both forms. Replacing an edited item, starting another item, or leaving requires a discard decision; opening a saved preview in another tab preserves the editor.
+- Saves, publication changes, deletion, reload, and sign-out share a per-dashboard request lock. Controls remain disabled until the request finishes. Small metadata requests time out after 30 seconds; an uncertain save retains edits and asks the admin to check the library before retrying.
+- Empty optional metadata is sent as explicit `null`, so clearing BPM, mood, story, streaming links, video artist, or video duration persists. Omitted API fields remain unchanged.
+- Failed saves retain form values and selected files. Already-uploaded files are reused when retrying the same form. Session expiry offers sign-in in a separate tab. Successful responses update the library directly, without depending on a second refresh request.
+- Navigation protection uses a custom discard dialog for in-app actions and browser history where supported, plus the browser's native unload warning for refresh/close. Older browsers enter and leave the dashboard through document navigation. Browser shutdown or forced mobile app termination cannot be guaranteed to show an unload warning. Draft edits are held in memory, not autosaved to storage.
+
+Run `npm run test:admin-save` for schema/API and response-handling regressions, and `npm run test:admin-editor` for the real React editor with simulated DOM, network failures, and Blob uploads. `npm run test:admin-save:fixture` starts the real dashboard/API on `http://127.0.0.1:3311` using in-memory data and a generated test password; its temporary control file can inject delay, failure, and session expiry for manual browser checks. None of these tests write to production.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
+import { AdminSaveError, adminFetch, formChanged, readAdminResponse } from '@/lib/admin-save';
+import { useAdminNavigationGuard } from './useAdminNavigationGuard';
+import { useDiscardConfirmation } from './useDiscardConfirmation';
 import {
   AlertTriangle,
   CheckCircle,
@@ -317,7 +320,7 @@ function StatusPill({
 
 function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void }) {
   useEffect(() => {
-    if (!toast) return;
+    if (!toast || toast.type === 'error') return;
     const timer = window.setTimeout(onDismiss, 4800);
     return () => window.clearTimeout(timer);
   }, [toast, onDismiss]);
@@ -325,13 +328,14 @@ function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void 
   if (!toast) return null;
 
   return (
-    <div className="fixed right-5 top-5 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-white/10 bg-slate-950/95 p-4 text-sm shadow-2xl shadow-black/40">
+    <div role={toast.type === 'error' ? 'alert' : 'status'} className="fixed right-5 top-5 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-white/10 bg-slate-950/95 p-4 text-sm shadow-2xl shadow-black/40">
       {toast.type === 'success' ? (
         <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-300" />
       ) : (
         <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-300" />
       )}
       <div className="text-slate-100">{toast.message}</div>
+      <button type="button" onClick={onDismiss} aria-label="Dismiss notification">×</button>
     </div>
   );
 }
@@ -340,18 +344,25 @@ function ConfirmDialog({
   confirm,
   onCancel,
   onConfirm,
+  busy,
 }: {
   confirm: ConfirmState;
   onCancel: () => void;
   onConfirm: () => void;
+  busy: boolean;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (confirm) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [confirm]);
   if (!confirm) return null;
 
   const title = confirm.kind === 'track' ? confirm.item.title : confirm.item.title;
   const noun = confirm.kind === 'track' ? 'track' : 'video';
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4">
+    <dialog ref={dialog} onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }} aria-label={`Delete ${noun}`} className="fixed inset-0 m-auto bg-transparent p-4 text-white backdrop:bg-black/75">
       <div className="w-full max-w-md rounded-lg border border-rose-400/30 bg-slate-950 p-6 shadow-2xl shadow-black/60">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-md bg-rose-400/10 text-rose-300">
@@ -360,12 +371,14 @@ function ConfirmDialog({
           <div>
             <h3 className="text-lg font-semibold text-white">Delete {noun}</h3>
             <p className="mt-1 text-sm text-slate-400">This removes &quot;{title}&quot; from the database.</p>
+            <p className="mt-1 text-sm text-slate-400">Any unsaved edits to this item will also be discarded.</p>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
+            disabled={busy}
             className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white"
           >
             Cancel
@@ -373,13 +386,14 @@ function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
+            disabled={busy}
             className="rounded-md bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400"
           >
-            Delete
+            {busy ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -402,36 +416,76 @@ export default function UploadDashboard() {
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [trackErrors, setTrackErrors] = useState<Record<string, string>>({});
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({});
+  const [trackBaseline, setTrackBaseline] = useState(emptyTrackForm);
+  const [videoBaseline, setVideoBaseline] = useState(emptyVideoForm);
+  const [trackFormVersion, setTrackFormVersion] = useState(0);
+  const [trackSaveError, setTrackSaveError] = useState<string | null>(null);
+  const [videoSaveError, setVideoSaveError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const operation = useRef(false);
+  const trackLoadVersion = useRef(0);
+  const videoLoadVersion = useRef(0);
+  const uploadedFiles = useRef<Partial<Record<'audio' | 'covers', { file: File; url: string }>>>({});
+  const trackDirty = formChanged(trackForm, trackBaseline);
+  const videoDirty = formChanged(videoForm, videoBaseline);
+
+  const navigationBlocked = useCallback(() => {
+    setToast({ type: 'error', message: 'Please wait for the current request to finish before leaving.' });
+  }, []);
+  const discard = useDiscardConfirmation();
+  const approveLeave = useAdminNavigationGuard(trackDirty || videoDirty, Boolean(busy), navigationBlocked, discard.ask);
+
+  function beginOperation(label: string) {
+    if (operation.current) return false;
+    operation.current = true;
+    setBusy(label);
+    return true;
+  }
+  function endOperation() {
+    operation.current = false;
+    setBusy(null);
+  }
+  async function mayDiscard(dirty: boolean) {
+    if (operation.current) return false;
+    const approved = !dirty || await discard.ask();
+    return approved && !operation.current;
+  }
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
   }, []);
 
   const loadTracks = useCallback(async () => {
+    const version = ++trackLoadVersion.current;
     setTracksLoading(true);
     try {
-      const res = await fetch('/api/tracks?all=true', { credentials: 'include' });
+      const res = await adminFetch('/api/tracks?all=true', { credentials: 'include' });
       if (!res.ok) throw new Error('Track library failed to load.');
-      setTracks(await res.json());
+      const next = await res.json();
+      if (version !== trackLoadVersion.current) return;
+      setTracks(next);
       setLastLoadedAt(new Date());
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Track library failed to load.');
+      if (version === trackLoadVersion.current) showToast('error', error instanceof Error ? error.message : 'Track library failed to load.');
     } finally {
-      setTracksLoading(false);
+      if (version === trackLoadVersion.current) setTracksLoading(false);
     }
   }, [showToast]);
 
   const loadVideos = useCallback(async () => {
+    const version = ++videoLoadVersion.current;
     setVideosLoading(true);
     try {
-      const res = await fetch('/api/videos?all=true', { credentials: 'include' });
+      const res = await adminFetch('/api/videos?all=true', { credentials: 'include' });
       if (!res.ok) throw new Error('Video library failed to load.');
-      setVideos(await res.json());
+      const next = await res.json();
+      if (version !== videoLoadVersion.current) return;
+      setVideos(next);
       setLastLoadedAt(new Date());
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Video library failed to load.');
+      if (version === videoLoadVersion.current) showToast('error', error instanceof Error ? error.message : 'Video library failed to load.');
     } finally {
-      setVideosLoading(false);
+      if (version === videoLoadVersion.current) setVideosLoading(false);
     }
   }, [showToast]);
 
@@ -468,26 +522,41 @@ export default function UploadDashboard() {
   }, [query, tracks]);
 
   const resetTrackForm = () => {
+    const empty = emptyTrackForm();
     setEditingSlug(null);
-    setTrackForm(emptyTrackForm());
+    setTrackForm(empty);
+    setTrackBaseline(empty);
+    setTrackFormVersion((value) => value + 1);
+    uploadedFiles.current = {};
+    setTrackSaveError(null);
     setTrackErrors({});
     setUploadPhase('');
   };
 
   const resetVideoForm = () => {
+    const empty = emptyVideoForm();
     setEditingVideoId(null);
-    setVideoForm(emptyVideoForm());
+    setVideoForm(empty);
+    setVideoBaseline(empty);
+    setVideoSaveError(null);
     setVideoErrors({});
   };
 
-  const startEditTrack = (track: PublishedTrack) => {
+  const startEditTrack = async (track: PublishedTrack) => {
+    if (operation.current) return;
+    if (editingSlug === track.slug) {
+      setActiveTab('tracks');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!await mayDiscard(trackDirty) || operation.current) return;
     setEditingSlug(track.slug);
     setTrackErrors({});
     setUploadPhase('');
-    setTrackForm({
+    const form: TrackFormState = {
       title: track.title,
       artist: track.artist,
-      genre: GENRES.includes(track.genre) ? track.genre : 'Other',
+      genre: track.genre,
       bpm: track.bpm ? String(track.bpm) : '',
       mood: track.mood ?? '',
       story: track.story ?? '',
@@ -496,24 +565,39 @@ export default function UploadDashboard() {
       published: track.published,
       audioFile: null,
       coverFile: null,
-    });
+    };
+    setTrackForm(form);
+    setTrackBaseline(form);
+    setTrackSaveError(null);
+    setTrackFormVersion((value) => value + 1);
+    uploadedFiles.current = {};
+    setActiveTab('tracks');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const startEditVideo = (video: VideoRecord) => {
+  const startEditVideo = async (video: VideoRecord) => {
+    if (operation.current) return;
+    if (editingVideoId === video.id) { setActiveTab('videos'); return; }
+    if (!await mayDiscard(videoDirty) || operation.current) return;
     setEditingVideoId(video.id);
     setVideoErrors({});
-    setVideoForm({
+    const form: VideoFormState = {
       title: video.title,
       artist: video.artist ?? '',
       youtubeUrl: video.youtubeUrl,
       duration: video.duration ?? '',
       published: video.published,
-    });
+    };
+    setVideoForm(form);
+    setVideoBaseline(form);
+    setVideoSaveError(null);
+    setActiveTab('videos');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   async function uploadFile(file: File, bucket: 'audio' | 'covers') {
+    const cached = uploadedFiles.current[bucket];
+    if (cached?.file === file) return cached.url;
     const ext = file.name.split('.').pop() || 'bin';
     const path = `monstajam/${bucket}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     setUploadPhase(bucket === 'audio' ? 'Uploading audio to Blob storage' : 'Uploading cover art to Blob storage');
@@ -523,6 +607,7 @@ export default function UploadDashboard() {
       contentType: file.type || 'application/octet-stream',
       multipart: bucket === 'audio',
     });
+    uploadedFiles.current[bucket] = { file, url: blob.url };
     return blob.url;
   }
 
@@ -533,7 +618,7 @@ export default function UploadDashboard() {
 
     if (!trackForm.title.trim()) errors.title = 'Track title is required.';
     if (!trackForm.artist.trim()) errors.artist = 'Artist name is required.';
-    if (trackForm.bpm && Number.isNaN(Number(trackForm.bpm))) errors.bpm = 'BPM must be a number.';
+    if (trackForm.bpm && !Number.isInteger(Number(trackForm.bpm))) errors.bpm = 'BPM must be a whole number.';
     if (trackForm.bpm && (Number(trackForm.bpm) < 40 || Number(trackForm.bpm) > 300)) {
       errors.bpm = 'BPM must be between 40 and 300.';
     }
@@ -546,9 +631,12 @@ export default function UploadDashboard() {
   }
 
   async function handleTrackSubmit() {
-    if (!validateTrackForm()) return;
+    if (operation.current || tracksLoading || !validateTrackForm()) return;
+    if (!beginOperation('Saving track…')) return;
 
     setSubmittingTrack(true);
+    setTrackSaveError(null);
+    setToast(null);
     setUploadPhase(editingSlug ? 'Saving track changes' : 'Preparing new track');
 
     try {
@@ -561,11 +649,11 @@ export default function UploadDashboard() {
         title: trackForm.title.trim(),
         artist: trackForm.artist.trim(),
         genre: trackForm.genre,
-        bpm: trackForm.bpm ? Number(trackForm.bpm) : undefined,
-        mood: trackForm.mood.trim() || undefined,
-        story: trackForm.story.trim() || undefined,
-        spotifyUrl: trackForm.spotifyUrl.trim() || undefined,
-        appleMusicUrl: trackForm.appleMusicUrl.trim() || undefined,
+        bpm: trackForm.bpm ? Number(trackForm.bpm) : null,
+        mood: trackForm.mood.trim() || null,
+        story: trackForm.story.trim() || null,
+        spotifyUrl: trackForm.spotifyUrl.trim() || null,
+        appleMusicUrl: trackForm.appleMusicUrl.trim() || null,
         color: GENRE_COLORS[trackForm.genre] ?? GENRE_COLORS.Other,
         published: trackForm.published,
       };
@@ -574,13 +662,13 @@ export default function UploadDashboard() {
       if (coverUrl) payload.coverUrl = coverUrl;
 
       const res = editingSlug
-        ? await fetch(`/api/tracks/${editingSlug}`, {
+        ? await adminFetch(`/api/tracks/${editingSlug}`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           })
-        : await fetch('/api/tracks', {
+        : await adminFetch('/api/tracks', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -591,53 +679,70 @@ export default function UploadDashboard() {
             }),
           });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || (editingSlug ? 'Track update failed.' : 'Track create failed.'));
-      }
+      const saved = await readAdminResponse<PublishedTrack>(res);
+      ++trackLoadVersion.current;
+      setTracksLoading(false);
+      setTracks((current) => [...current.filter((track) => track.id !== saved.id), saved].sort((a, b) => a.number - b.number));
+      setLastLoadedAt(new Date());
 
       showToast('success', editingSlug ? 'Track changes saved.' : 'Track added to the library.');
       resetTrackForm();
-      await loadTracks();
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Track save failed.');
+      if (error instanceof AdminSaveError) setTrackErrors(error.fields);
+      setTrackSaveError(error instanceof AdminSaveError ? error.message : 'The save could not be confirmed. Reload the library to check before retrying.');
     } finally {
       setSubmittingTrack(false);
       setUploadPhase('');
+      endOperation();
     }
   }
 
   async function toggleTrackPublish(track: PublishedTrack) {
+    if (editingSlug === track.slug && trackDirty) {
+      showToast('error', 'Save or discard your track edits before changing its publish status in the library.');
+      return;
+    }
+    if (!beginOperation('Updating track status…')) return;
     try {
       if (!track.published && !track.audioUrl) {
         showToast('error', 'Add audio before publishing this track.');
         return;
       }
-      const res = await fetch(`/api/tracks/${track.slug}`, {
+      const res = await adminFetch(`/api/tracks/${track.slug}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published: !track.published }),
       });
-      if (!res.ok) throw new Error('Publish status failed to update.');
+      const saved = await readAdminResponse<PublishedTrack>(res);
+      ++trackLoadVersion.current;
+      setTracksLoading(false);
+      setTracks((current) => current.map((item) => item.id === saved.id ? saved : item));
+      if (editingSlug === saved.slug) {
+        setTrackForm((form) => ({ ...form, published: saved.published }));
+        setTrackBaseline((form) => ({ ...form, published: saved.published }));
+      }
       showToast('success', !track.published ? 'Track published.' : 'Track moved to draft.');
-      await loadTracks();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Publish status failed to update.');
-    }
+    } finally { endOperation(); }
   }
 
   async function handleDeleteTrack(track: PublishedTrack) {
+    if (!beginOperation('Deleting track…')) return;
     try {
-      const res = await fetch(`/api/tracks/${track.slug}`, { method: 'DELETE', credentials: 'include' });
-      if (!res.ok) throw new Error('Track delete failed.');
+      const res = await adminFetch(`/api/tracks/${track.slug}`, { method: 'DELETE', credentials: 'include' });
+      await readAdminResponse(res);
+      ++trackLoadVersion.current;
+      setTracksLoading(false);
+      setTracks((current) => current.filter((item) => item.id !== track.id));
       showToast('success', 'Track deleted.');
       if (editingSlug === track.slug) resetTrackForm();
-      await loadTracks();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Track delete failed.');
     } finally {
       setConfirm(null);
+      endOperation();
     }
   }
 
@@ -652,74 +757,97 @@ export default function UploadDashboard() {
   }
 
   async function handleVideoSubmit() {
-    if (!validateVideoForm()) return;
+    if (operation.current || videosLoading || !validateVideoForm()) return;
     const youtubeId = extractYouTubeId(videoForm.youtubeUrl);
     if (!youtubeId) return;
+    if (!beginOperation('Saving video…')) return;
 
     setSubmittingVideo(true);
+    setVideoSaveError(null);
+    setToast(null);
     try {
       const payload = {
         title: videoForm.title.trim(),
-        artist: videoForm.artist.trim() || undefined,
+        artist: videoForm.artist.trim() || null,
         youtubeUrl: videoForm.youtubeUrl.trim(),
         youtubeId,
-        duration: videoForm.duration.trim() || undefined,
+        duration: videoForm.duration.trim() || null,
         published: videoForm.published,
         order: editingVideoId ? undefined : videos.length,
       };
 
       const res = editingVideoId
-        ? await fetch(`/api/videos/${editingVideoId}`, {
+        ? await adminFetch(`/api/videos/${editingVideoId}`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           })
-        : await fetch('/api/videos', {
+        : await adminFetch('/api/videos', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
 
-      if (!res.ok) throw new Error(editingVideoId ? 'Video update failed.' : 'Video create failed.');
+      const saved = await readAdminResponse<VideoRecord>(res);
+      ++videoLoadVersion.current;
+      setVideosLoading(false);
+      setVideos((current) => [...current.filter((video) => video.id !== saved.id), saved].sort((a, b) => a.order - b.order));
+      setLastLoadedAt(new Date());
       showToast('success', editingVideoId ? 'Video changes saved.' : 'Video added.');
       resetVideoForm();
-      await loadVideos();
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Video save failed.');
+      if (error instanceof AdminSaveError) setVideoErrors(error.fields);
+      setVideoSaveError(error instanceof AdminSaveError ? error.message : 'The save could not be confirmed. Reload the library to check before retrying.');
     } finally {
       setSubmittingVideo(false);
+      endOperation();
     }
   }
 
   async function toggleVideoPublish(video: VideoRecord) {
+    if (editingVideoId === video.id && videoDirty) {
+      showToast('error', 'Save or discard your video edits before changing its publish status in the library.');
+      return;
+    }
+    if (!beginOperation('Updating video status…')) return;
     try {
-      const res = await fetch(`/api/videos/${video.id}`, {
+      const res = await adminFetch(`/api/videos/${video.id}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published: !video.published }),
       });
-      if (!res.ok) throw new Error('Video publish status failed to update.');
+      const saved = await readAdminResponse<VideoRecord>(res);
+      ++videoLoadVersion.current;
+      setVideosLoading(false);
+      setVideos((current) => current.map((item) => item.id === saved.id ? saved : item));
+      if (editingVideoId === saved.id) {
+        setVideoForm((form) => ({ ...form, published: saved.published }));
+        setVideoBaseline((form) => ({ ...form, published: saved.published }));
+      }
       showToast('success', !video.published ? 'Video published.' : 'Video moved to draft.');
-      await loadVideos();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Video publish status failed to update.');
-    }
+    } finally { endOperation(); }
   }
 
   async function handleDeleteVideo(video: VideoRecord) {
+    if (!beginOperation('Deleting video…')) return;
     try {
-      const res = await fetch(`/api/videos/${video.id}`, { method: 'DELETE', credentials: 'include' });
-      if (!res.ok) throw new Error('Video delete failed.');
+      const res = await adminFetch(`/api/videos/${video.id}`, { method: 'DELETE', credentials: 'include' });
+      await readAdminResponse(res);
+      ++videoLoadVersion.current;
+      setVideosLoading(false);
+      setVideos((current) => current.filter((item) => item.id !== video.id));
       showToast('success', 'Video deleted.');
       if (editingVideoId === video.id) resetVideoForm();
-      await loadVideos();
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Video delete failed.');
     } finally {
       setConfirm(null);
+      endOperation();
     }
   }
 
@@ -734,10 +862,27 @@ export default function UploadDashboard() {
 
   const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
 
+  async function reloadLibrary() {
+    if (!beginOperation('Reloading library…')) return;
+    try { await Promise.all([loadTracks(), loadVideos()]); }
+    finally { endOperation(); }
+  }
+
+  async function signOut() {
+    if (!await mayDiscard(trackDirty || videoDirty) || !beginOperation('Signing out…')) return;
+    try {
+      await readAdminResponse(await adminFetch('/api/auth/logout', { method: 'POST', credentials: 'include' }));
+      approveLeave();
+      window.location.href = '/upload/login';
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Sign out failed. Please retry.');
+    } finally { endOperation(); }
+  }
+
   return (
     <section className="relative overflow-hidden bg-[#080b12] px-4 pb-10 pt-4 text-white sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(0,199,190,0.14),transparent_28%),radial-gradient(circle_at_86%_2%,rgba(255,80,130,0.12),transparent_24%)]" />
-      <div className="relative mx-auto max-w-7xl">
+      <fieldset disabled={Boolean(busy)} aria-busy={Boolean(busy)} className="relative mx-auto min-w-0 max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300">
@@ -754,10 +899,7 @@ export default function UploadDashboard() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                loadTracks();
-                loadVideos();
-              }}
+              onClick={reloadLibrary}
               className="inline-flex items-center gap-2 rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/40 hover:text-white"
             >
               <RefreshCw className="h-4 w-4" />
@@ -765,10 +907,7 @@ export default function UploadDashboard() {
             </button>
             <button
               type="button"
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-                window.location.href = '/upload/login';
-              }}
+              onClick={signOut}
               className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100"
             >
               Sign out
@@ -792,7 +931,7 @@ export default function UploadDashboard() {
             <button
               key={id}
               type="button"
-              onClick={() => setActiveTab(id)}
+              onClick={() => { if (!operation.current) setActiveTab(id); }}
               className={[
                 'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition',
                 activeTab === id
@@ -802,9 +941,11 @@ export default function UploadDashboard() {
             >
               <Icon className="h-4 w-4" />
               {label}
+              {((id === 'tracks' && trackDirty) || (id === 'videos' && videoDirty)) && ' (unsaved)'}
             </button>
           ))}
         </nav>
+        {busy && <p role="status" className="mt-4 text-sm text-cyan-200">{busy} Please wait.</p>}
 
         {activeTab === 'tracks' && (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -819,7 +960,7 @@ export default function UploadDashboard() {
                 {editingSlug && (
                   <button
                     type="button"
-                    onClick={resetTrackForm}
+                    onClick={async () => { if (await mayDiscard(trackDirty) && !operation.current) resetTrackForm(); }}
                     className="rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white"
                   >
                     New track
@@ -844,6 +985,7 @@ export default function UploadDashboard() {
                 </Field>
                 <Field label="Genre">
                   <Select value={trackForm.genre} onChange={(event) => setTrackForm((form) => ({ ...form, genre: event.target.value }))}>
+                    {!GENRES.includes(trackForm.genre) && <option value={trackForm.genre}>{trackForm.genre}</option>}
                     {GENRES.map((genre) => (
                       <option key={genre} value={genre}>
                         {genre}
@@ -860,21 +1002,21 @@ export default function UploadDashboard() {
                     placeholder="88"
                   />
                 </Field>
-                <Field label="Mood">
+                <Field label="Mood" error={trackErrors.mood}>
                   <TextInput
                     value={trackForm.mood}
                     onChange={(event) => setTrackForm((form) => ({ ...form, mood: event.target.value }))}
                     placeholder="Moody"
                   />
                 </Field>
-                <Field label="Spotify URL">
+                <Field label="Spotify URL" error={trackErrors.spotifyUrl}>
                   <TextInput
                     value={trackForm.spotifyUrl}
                     onChange={(event) => setTrackForm((form) => ({ ...form, spotifyUrl: event.target.value }))}
                     placeholder="https://open.spotify.com/..."
                   />
                 </Field>
-                <Field label="Apple Music URL">
+                <Field label="Apple Music URL" error={trackErrors.appleMusicUrl}>
                   <TextInput
                     value={trackForm.appleMusicUrl}
                     onChange={(event) => setTrackForm((form) => ({ ...form, appleMusicUrl: event.target.value }))}
@@ -882,7 +1024,7 @@ export default function UploadDashboard() {
                   />
                 </Field>
                 <div className="md:col-span-2">
-                  <Field label="Track story / lyrics">
+                  <Field label="Track story / lyrics" error={trackErrors.story}>
                     <TextArea
                       value={trackForm.story}
                       onChange={(event) => setTrackForm((form) => ({ ...form, story: event.target.value }))}
@@ -900,6 +1042,7 @@ export default function UploadDashboard() {
                       <span>{fileLabel(trackForm.audioFile, editingSlug ? 'Keep current audio unless replaced' : 'MP3 or WAV')}</span>
                     </div>
                     <input
+                      key={`audio-${trackFormVersion}`}
                       type="file"
                       accept=".wav,.mp3,audio/*"
                       className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
@@ -914,6 +1057,7 @@ export default function UploadDashboard() {
                       <span>{fileLabel(trackForm.coverFile, editingSlug ? 'Keep current cover unless replaced' : 'PNG or JPG')}</span>
                     </div>
                     <input
+                      key={`cover-${trackFormVersion}`}
                       type="file"
                       accept="image/jpeg,image/png"
                       className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
@@ -933,14 +1077,16 @@ export default function UploadDashboard() {
                 <button
                   type="button"
                   onClick={handleTrackSubmit}
-                  disabled={submittingTrack}
+                  disabled={submittingTrack || tracksLoading}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submittingTrack ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {editingSlug ? 'Save changes' : 'Add track'}
+                  {submittingTrack ? 'Saving…' : trackSaveError ? 'Retry save' : editingSlug ? 'Save changes' : 'Add track'}
                 </button>
               </div>
               {uploadPhase && <p className="mt-3 text-sm text-cyan-200">{uploadPhase}</p>}
+              {trackDirty && <p className="mt-3 text-sm text-amber-200">Unsaved track changes</p>}
+              {trackSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{trackSaveError} Your edits have been kept. <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></div>}
             </section>
 
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
@@ -1013,7 +1159,7 @@ export default function UploadDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setConfirm({ kind: 'track', item: track })}
+                        onClick={() => { if (!operation.current) setConfirm({ kind: 'track', item: track }); }}
                         className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -1046,7 +1192,7 @@ export default function UploadDashboard() {
                   <p className="mt-1 text-sm text-slate-400">Paste any standard YouTube URL and the dashboard will extract the video ID.</p>
                 </div>
                 {editingVideoId && (
-                  <button type="button" onClick={resetVideoForm} className="rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white">
+                  <button type="button" onClick={async () => { if (await mayDiscard(videoDirty) && !operation.current) resetVideoForm(); }} className="rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:text-white">
                     New video
                   </button>
                 )}
@@ -1055,7 +1201,7 @@ export default function UploadDashboard() {
                 <Field label="Video title" required error={videoErrors.title}>
                   <TextInput value={videoForm.title} onChange={(event) => setVideoForm((form) => ({ ...form, title: event.target.value }))} />
                 </Field>
-                <Field label="Artist">
+                <Field label="Artist" error={videoErrors.artist}>
                   <TextInput value={videoForm.artist} onChange={(event) => setVideoForm((form) => ({ ...form, artist: event.target.value }))} />
                 </Field>
                 <div className="md:col-span-2">
@@ -1068,7 +1214,7 @@ export default function UploadDashboard() {
                     {youtubePreviewId && <p className="mt-2 text-sm text-emerald-300">Video ID: {youtubePreviewId}</p>}
                   </Field>
                 </div>
-                <Field label="Duration">
+                <Field label="Duration" error={videoErrors.duration}>
                   <TextInput value={videoForm.duration} onChange={(event) => setVideoForm((form) => ({ ...form, duration: event.target.value }))} placeholder="3:52" />
                 </Field>
               </div>
@@ -1088,13 +1234,15 @@ export default function UploadDashboard() {
                 <button
                   type="button"
                   onClick={handleVideoSubmit}
-                  disabled={submittingVideo}
+                  disabled={submittingVideo || videosLoading}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submittingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Youtube className="h-4 w-4" />}
-                  {editingVideoId ? 'Save changes' : 'Add video'}
+                  {submittingVideo ? 'Saving…' : videoSaveError ? 'Retry save' : editingVideoId ? 'Save changes' : 'Add video'}
                 </button>
               </div>
+              {videoDirty && <p className="mt-3 text-sm text-amber-200">Unsaved video changes</p>}
+              {videoSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{videoSaveError} Your edits have been kept. <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></div>}
             </section>
 
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
@@ -1129,7 +1277,7 @@ export default function UploadDashboard() {
                       <button type="button" onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25">
                         {video.published ? 'Draft' : 'Live'}
                       </button>
-                      <button type="button" onClick={() => setConfirm({ kind: 'video', item: video })} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50">Delete</button>
+                      <button type="button" onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50">Delete</button>
                     </div>
                   </article>
                 ))}
@@ -1171,7 +1319,6 @@ export default function UploadDashboard() {
                         key={track.id}
                         type="button"
                         onClick={() => {
-                          setActiveTab('tracks');
                           startEditTrack(track);
                         }}
                         className="flex w-full items-center justify-between rounded-md border border-amber-300/20 bg-amber-300/10 p-3 text-left text-sm text-amber-100 transition hover:border-amber-300/40"
@@ -1190,10 +1337,11 @@ export default function UploadDashboard() {
             </section>
           </div>
         )}
-      </div>
+      </fieldset>
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
-      <ConfirmDialog confirm={confirm} onCancel={() => setConfirm(null)} onConfirm={confirmDelete} />
+      <ConfirmDialog confirm={confirm} busy={Boolean(busy)} onCancel={() => setConfirm(null)} onConfirm={confirmDelete} />
+      {discard.dialog}
     </section>
   );
 }

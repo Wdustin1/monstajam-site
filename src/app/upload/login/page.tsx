@@ -23,6 +23,12 @@ export default function AdminLoginPage() {
       });
 
       if (res.ok) {
+        // Older browsers need a document boundary for beforeunload to protect
+        // Back/Forward navigation from the editor.
+        if (!('navigation' in window)) {
+          window.location.replace('/upload');
+          return;
+        }
         router.push('/upload');
         router.refresh();
       } else {

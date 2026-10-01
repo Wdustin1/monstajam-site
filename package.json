@@ -11,7 +11,10 @@
     "test:admin-smoke": "tsx scripts/admin-smoke.ts",
     "test:draft-privacy": "tsx --test scripts/tests/draft-privacy.test.ts",
     "test:draft-privacy:integration": "node scripts/tests/draft-privacy.integration.cjs",
-    "test:cover-proxy": "tsx --test scripts/tests/cover-proxy.test.ts"
+    "test:cover-proxy": "tsx --test scripts/tests/cover-proxy.test.ts",
+    "test:admin-save": "tsx --test scripts/tests/admin-save.test.ts",
+    "test:admin-save:fixture": "node scripts/tests/admin-save.fixture.cjs",
+    "test:admin-editor": "tsx --test scripts/tests/admin-editor.test.cjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -39,6 +42,7 @@
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
+    "jsdom": "^30.1.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

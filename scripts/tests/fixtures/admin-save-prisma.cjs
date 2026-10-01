@@ -1,0 +1,132 @@
+/* Local-only in-memory Prisma fixture. It never connects to a database. */
+'use strict';
+/* eslint-disable @typescript-eslint/no-require-imports -- Node preload must use CommonJS. */
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { randomBytes } = require('node:crypto');
+
+const database = new URL(process.env.DATABASE_URL || 'file:///missing');
+const controlPath = process.env.MONSTAJAM_ADMIN_SAVE_CONTROL || '';
+const temporaryRoot = path.resolve(os.tmpdir()) + path.sep;
+if (
+  process.env.MONSTAJAM_ADMIN_SAVE_FIXTURES !== '1' || process.env.NODE_ENV !== 'development' ||
+  database.protocol !== 'mongodb:' || !['127.0.0.1', 'localhost', '[::1]'].includes(database.hostname) ||
+  database.pathname !== '/monstajam_admin_save_test' || database.username || database.password ||
+  !path.resolve(controlPath).startsWith(temporaryRoot) || !fs.existsSync(controlPath) ||
+  !process.env.ADMIN_SECRET?.startsWith('local-admin-save-')
+) throw new Error('Admin save fixture requires explicit local-only configuration and its temporary control file.');
+
+const originalSecret = process.env.ADMIN_SECRET;
+let controls = {};
+let consumedFailure = 0;
+let consumedReadFailure = 0;
+let appliedReset = -1;
+let tracks;
+let videos;
+
+function resetRows() {
+  const common = {
+    artist: 'Fixture Artist', genre: 'Hip-Hop', bpm: 105, mood: 'Original fixture mood',
+    color: 'bg-gradient-to-br from-purple-600 to-blue-500', accentCyan: false,
+    subtitle: 'Local test subtitle', story: 'Original fixture story for clearing and saving.',
+    spotifyUrl: 'https://example.invalid/spotify', appleMusicUrl: 'https://example.invalid/apple',
+    audioUrl: null, coverUrl: null, credits: [],
+    createdAt: new Date('2026-01-01T12:00:00Z'), updatedAt: new Date('2026-01-01T12:00:00Z'),
+  };
+  tracks = [
+    { ...common, id: '000000000000000000000001', slug: 'admin-save-live', title: 'Fixture Live Track', number: 1, published: true },
+    { ...common, id: '000000000000000000000002', slug: 'admin-save-draft', title: 'Fixture Draft Track', number: 2, published: false },
+  ];
+  videos = [{ id: '000000000000000000000003', title: 'Fixture Video', artist: 'Fixture Video Artist',
+    youtubeUrl: 'https://www.youtube.com/watch?v=LOCAL000001', youtubeId: 'LOCAL000001', duration: '3:45',
+    published: true, order: 0, createdAt: common.createdAt, updatedAt: common.updatedAt }];
+}
+
+function refreshControls() {
+  try {
+    const updated = JSON.parse(fs.readFileSync(controlPath, 'utf8'));
+    controls = updated;
+    process.env.ADMIN_SECRET = updated.expireSession ? `expired-${originalSecret}` : originalSecret;
+    if ((updated.resetGeneration ?? 0) !== appliedReset) {
+      appliedReset = updated.resetGeneration ?? 0;
+      resetRows();
+    }
+  } catch { /* A partial editor write must not interrupt a running request. */ }
+}
+refreshControls();
+fs.watchFile(controlPath, { persistent: false, interval: 100 }, refreshControls);
+
+function matches(row, where = {}) {
+  return Object.entries(where).every(([key, value]) => row[key] === value);
+}
+
+function read(model, args = {}) {
+  refreshControls();
+  const failure = Number(controls.failReadGeneration || 0);
+  if (failure > consumedReadFailure) {
+    consumedReadFailure = failure;
+    throw new Error('Intentional local fixture read failure');
+  }
+  let result = (model === 'track' ? tracks : videos).filter((row) => matches(row, args.where));
+  const orderBy = args.orderBy ? (Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy]) : [];
+  result.sort((a, b) => {
+    for (const order of orderBy) for (const [field, direction] of Object.entries(order)) {
+      const comparison = a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0;
+      if (comparison) return direction === 'desc' ? -comparison : comparison;
+    }
+    return 0;
+  });
+  if (args.skip) result = result.slice(args.skip);
+  if (args.take !== undefined) result = result.slice(0, args.take);
+  return result.map((row) => structuredClone(args.select
+    ? Object.fromEntries(Object.entries(args.select).filter(([, enabled]) => enabled).map(([field]) => [field, row[field]]))
+    : row));
+}
+
+async function mutate(model, operation, args) {
+  refreshControls();
+  const failure = Number(controls.failMutationGeneration || 0);
+  const shouldFail = failure > consumedFailure;
+  if (shouldFail) consumedFailure = failure;
+  const delayMs = Math.min(10000, Math.max(0, Number(controls.delayMs || 0)));
+  if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  if (shouldFail) throw new Error('Intentional local fixture mutation failure');
+  const rows = model === 'track' ? tracks : videos;
+  const data = Object.fromEntries(Object.entries(args.data || {}).filter(([, value]) => value !== undefined));
+  if (operation === 'create') {
+    if (model === 'track' && rows.some((row) => row.slug === data.slug)) throw new Error('Duplicate fixture slug');
+    const row = { id: randomBytes(12).toString('hex'), credits: [], published: false, createdAt: new Date(), updatedAt: new Date(), ...data };
+    rows.push(row);
+    return structuredClone(row);
+  }
+  const index = rows.findIndex((row) => matches(row, args.where));
+  if (index < 0) throw new Error('Fixture record not found');
+  if (operation === 'delete') return structuredClone(rows.splice(index, 1)[0]);
+  rows[index] = { ...rows[index], ...data, updatedAt: new Date() };
+  return structuredClone(rows[index]);
+}
+
+function model(name) {
+  const methods = {
+    findMany: async (args) => read(name, args),
+    findFirst: async (args) => read(name, args)[0] ?? null,
+    findUnique: async (args) => read(name, args)[0] ?? null,
+    count: async (args) => read(name, args).length,
+    create: async (args) => mutate(name, 'create', args),
+    update: async (args) => mutate(name, 'update', args),
+    delete: async (args) => mutate(name, 'delete', args),
+  };
+  return new Proxy(methods, { get(target, key) {
+    if (key in target) return target[key];
+    return async () => { throw new Error('Unsupported local fixture operation: ' + String(key)); };
+  } });
+}
+
+globalThis.prisma = new Proxy({ track: model('track'), video: model('video') }, {
+  get(target, key) {
+    if (key in target) return target[key];
+    if (key === '$connect' || key === '$disconnect') return async () => undefined;
+    return async () => { throw new Error('No real database access is permitted by this fixture: ' + String(key)); };
+  },
+});

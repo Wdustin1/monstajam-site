@@ -4,10 +4,10 @@ import { z } from 'zod';
 
 export const VideoCreateSchema = z.object({
   title:      z.string().min(1, 'Title is required').max(200),
-  artist:     z.string().max(200).optional(),
+  artist:     z.string().max(200).optional().nullable(),
   youtubeUrl: z.string().url('Must be a valid YouTube URL'),
   youtubeId:  z.string().min(1).max(20),
-  duration:   z.string().max(10).optional(),
+  duration:   z.string().max(10).optional().nullable(),
   published:  z.boolean().optional(),
   order:      z.number().int().min(0).optional(),
 });
@@ -32,8 +32,8 @@ export const TrackCreateSchema = z.object({
   story:         z.string().max(10000).optional().nullable(),
   audioUrl:      urlOrEmpty,
   coverUrl:      urlOrEmpty,
-  spotifyUrl:    urlOrEmpty,
-  appleMusicUrl: urlOrEmpty,
+  spotifyUrl:    urlOrEmpty.nullable(),
+  appleMusicUrl: urlOrEmpty.nullable(),
   previewOnly:   z.boolean().optional(),  // true = 30-sec preview (default), false = full song
   published:     z.boolean().optional(),
   accentCyan:    z.boolean().optional().nullable(),
