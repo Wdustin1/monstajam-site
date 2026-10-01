@@ -31,10 +31,11 @@ export const TrackCreateSchema = z.object({
   color:         z.string().max(200).optional(),
   story:         z.string().max(10000).optional().nullable(),
   audioUrl:      urlOrEmpty,
+  audioAssetId:  z.string().regex(/^[a-f\d]{24}$/i, 'Choose a processed audio upload').optional(),
+  playbackMode:  z.enum(['preview', 'full']).optional(),
   coverUrl:      urlOrEmpty,
   spotifyUrl:    urlOrEmpty.nullable(),
   appleMusicUrl: urlOrEmpty.nullable(),
-  previewOnly:   z.boolean().optional(),  // true = 30-sec preview (default), false = full song
   published:     z.boolean().optional(),
   accentCyan:    z.boolean().optional().nullable(),
 });

@@ -2,6 +2,7 @@ import GenreBrowser from '@/components/GenreBrowser';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
+import { toPublicTrack } from '@/lib/track-playback';
 
 export const metadata = {
   title: 'Browse Genres — MonstaJam',
@@ -21,7 +22,7 @@ export default async function GenresPage() {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#05000A' }}>
       <Navbar activeLink="genres" />
       <div className="flex-grow pt-24 pb-32">
-        <GenreBrowser tracks={tracks} />
+        <GenreBrowser tracks={tracks.map(toPublicTrack)} />
       </div>
       <Footer />
     </div>

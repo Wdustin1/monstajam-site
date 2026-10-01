@@ -24,6 +24,7 @@ let consumedReadFailure = 0;
 let appliedReset = -1;
 let tracks;
 let videos;
+let audioAssets;
 
 function resetRows() {
   const common = {
@@ -35,12 +36,16 @@ function resetRows() {
     createdAt: new Date('2026-01-01T12:00:00Z'), updatedAt: new Date('2026-01-01T12:00:00Z'),
   };
   tracks = [
-    { ...common, id: '000000000000000000000001', slug: 'admin-save-live', title: 'Fixture Live Track', number: 1, published: true },
-    { ...common, id: '000000000000000000000002', slug: 'admin-save-draft', title: 'Fixture Draft Track', number: 2, published: false },
+    { ...common, id: '000000000000000000000001', slug: 'admin-save-live', title: 'Fixture Live Track', number: 1, published: true, playbackMode: 'preview', audioAssetId: '000000000000000000000004' },
+    { ...common, id: '000000000000000000000002', slug: 'admin-save-draft', title: 'Fixture Draft Track', number: 2, published: false, genre: 'Full Songs', playbackMode: null, audioAssetId: null },
   ];
   videos = [{ id: '000000000000000000000003', title: 'Fixture Video', artist: 'Fixture Video Artist',
     youtubeUrl: 'https://www.youtube.com/watch?v=LOCAL000001', youtubeId: 'LOCAL000001', duration: '3:45',
     published: true, order: 0, createdAt: common.createdAt, updatedAt: common.updatedAt }];
+  audioAssets = [{ id: '000000000000000000000004', key: 'local-fixture-only',
+    originalPath: 'monstajam/originals/local-fixture.wav', originalName: 'Local fixture.wav',
+    previewPath: 'monstajam/previews/local-fixture.mp3', previewStart: 12.5, previewDuration: 45,
+    status: 'ready', error: null, createdAt: common.createdAt, updatedAt: common.updatedAt }];
 }
 
 function refreshControls() {
@@ -68,7 +73,7 @@ function read(model, args = {}) {
     consumedReadFailure = failure;
     throw new Error('Intentional local fixture read failure');
   }
-  let result = (model === 'track' ? tracks : videos).filter((row) => matches(row, args.where));
+  let result = (model === 'track' ? tracks : model === 'video' ? videos : audioAssets).filter((row) => matches(row, args.where));
   const orderBy = args.orderBy ? (Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy]) : [];
   result.sort((a, b) => {
     for (const order of orderBy) for (const [field, direction] of Object.entries(order)) {
@@ -85,6 +90,7 @@ function read(model, args = {}) {
 }
 
 async function mutate(model, operation, args) {
+  if (model === 'audioAsset') throw new Error('This UI fixture does not prepare or write real audio assets.');
   refreshControls();
   const failure = Number(controls.failMutationGeneration || 0);
   const shouldFail = failure > consumedFailure;
@@ -123,7 +129,7 @@ function model(name) {
   } });
 }
 
-globalThis.prisma = new Proxy({ track: model('track'), video: model('video') }, {
+globalThis.prisma = new Proxy({ track: model('track'), video: model('video'), audioAsset: model('audioAsset') }, {
   get(target, key) {
     if (key in target) return target[key];
     if (key === '$connect' || key === '$disconnect') return async () => undefined;

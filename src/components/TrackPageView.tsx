@@ -23,7 +23,7 @@ export default function TrackPageView({
       {preview && (
         <aside className="relative z-10 mx-5 mt-24 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100" aria-label="Admin preview">
           <strong>{track.published ? 'Admin preview' : 'Draft preview'}</strong>
-          <p className="mt-1">Only signed-in admins can open this preview. It shows your last saved changes.</p>
+          <p className="mt-1">Only signed-in admins can open this preview. It shows your last saved changes and lets you audition the full song.</p>
           <a href="/upload" className="mt-2 inline-block font-semibold underline">Back to admin</a>
         </aside>
       )}

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { AdminSaveError, adminFetch, formChanged, readAdminResponse } from '@/lib/admin-save';
+import { initialPlaybackMode, loadAdminAudioAsset, prepareAdminAudio, type AdminAudioAsset, type AudioPreparation, type PlaybackMode } from '@/lib/admin-audio';
+import { usePlayer } from '@/context/PlayerContext';
 import { useAdminNavigationGuard } from './useAdminNavigationGuard';
 import { useDiscardConfirmation } from './useDiscardConfirmation';
 import {
@@ -41,6 +43,8 @@ interface PublishedTrack {
   spotifyUrl: string | null;
   appleMusicUrl: string | null;
   audioUrl: string | null;
+  audioAssetId?: string | null;
+  playbackMode?: PlaybackMode | null;
   coverUrl: string | null;
   published: boolean;
   createdAt: string;
@@ -79,6 +83,8 @@ type TrackFormState = {
   published: boolean;
   audioFile: File | null;
   coverFile: File | null;
+  playbackMode: PlaybackMode;
+  previewStart: string;
 };
 
 type VideoFormState = {
@@ -131,6 +137,8 @@ const emptyTrackForm = (): TrackFormState => ({
   published: false,
   audioFile: null,
   coverFile: null,
+  playbackMode: 'preview',
+  previewStart: '0',
 });
 
 const emptyVideoForm = (): VideoFormState => ({
@@ -171,6 +179,10 @@ function formatDate(value?: string) {
 
 function fileLabel(file: File | null, fallback: string) {
   return file ? `${file.name} (${Math.round(file.size / 1024)} KB)` : fallback;
+}
+
+function hasTrackAudio(track: PublishedTrack) {
+  return Boolean(track.audioUrl || track.audioAssetId);
 }
 
 function StatCard({
@@ -398,6 +410,7 @@ function ConfirmDialog({
 }
 
 export default function UploadDashboard() {
+  const { pause: pausePublicPlayer, isPlaying: publicPlayerPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<AdminTab>('tracks');
   const [tracks, setTracks] = useState<PublishedTrack[]>([]);
   const [videos, setVideos] = useState<VideoRecord[]>([]);
@@ -426,8 +439,28 @@ export default function UploadDashboard() {
   const trackLoadVersion = useRef(0);
   const videoLoadVersion = useRef(0);
   const uploadedFiles = useRef<Partial<Record<'audio' | 'covers', { file: File; url: string }>>>({});
+  const preparedAudio = useRef<AudioPreparation | undefined>(undefined);
+  const audioDetailVersion = useRef(0);
+  const [savedAudio, setSavedAudio] = useState<AdminAudioAsset | null>(null);
+  const [audioDetailsLoading, setAudioDetailsLoading] = useState(false);
+  const [audioDetailsError, setAudioDetailsError] = useState<string | null>(null);
+  const fullAudition = useRef<HTMLAudioElement>(null);
+  const previewAudition = useRef<HTMLAudioElement>(null);
+  const editingTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : undefined;
+  const canChoosePreviewStart = Boolean(trackForm.audioFile || (editingTrack?.audioAssetId && savedAudio && !audioDetailsLoading));
   const trackDirty = formChanged(trackForm, trackBaseline);
   const videoDirty = formChanged(videoForm, videoBaseline);
+
+  useEffect(() => {
+    if (!publicPlayerPlaying) return;
+    fullAudition.current?.pause();
+    previewAudition.current?.pause();
+  }, [publicPlayerPlaying]);
+
+  function playAudition(kind: 'full' | 'preview') {
+    pausePublicPlayer();
+    (kind === 'full' ? previewAudition : fullAudition).current?.pause();
+  }
 
   const navigationBlocked = useCallback(() => {
     setToast({ type: 'error', message: 'Please wait for the current request to finish before leaving.' });
@@ -497,7 +530,7 @@ export default function UploadDashboard() {
   const metrics = useMemo(() => {
     const liveTracks = tracks.filter((track) => track.published).length;
     const draftTracks = tracks.length - liveTracks;
-    const missingAudio = tracks.filter((track) => !track.audioUrl).length;
+    const missingAudio = tracks.filter((track) => !hasTrackAudio(track)).length;
     const missingCovers = tracks.filter((track) => !track.coverUrl).length;
     const liveVideos = videos.filter((video) => video.published).length;
 
@@ -522,12 +555,19 @@ export default function UploadDashboard() {
   }, [query, tracks]);
 
   const resetTrackForm = () => {
+    ++audioDetailVersion.current;
+    fullAudition.current?.pause();
+    previewAudition.current?.pause();
     const empty = emptyTrackForm();
     setEditingSlug(null);
     setTrackForm(empty);
     setTrackBaseline(empty);
     setTrackFormVersion((value) => value + 1);
     uploadedFiles.current = {};
+    preparedAudio.current = undefined;
+    setSavedAudio(null);
+    setAudioDetailsLoading(false);
+    setAudioDetailsError(null);
     setTrackSaveError(null);
     setTrackErrors({});
     setUploadPhase('');
@@ -542,6 +582,23 @@ export default function UploadDashboard() {
     setVideoErrors({});
   };
 
+  async function readSavedAudio(assetId: string, version: number) {
+    setAudioDetailsLoading(true);
+    setAudioDetailsError(null);
+    try {
+      const asset = await loadAdminAudioAsset(assetId);
+      if (version !== audioDetailVersion.current) return;
+      setSavedAudio(asset);
+      setTrackForm((current) => current.audioFile ? current : { ...current, previewStart: String(asset.previewStart) });
+      setTrackBaseline((current) => ({ ...current, previewStart: String(asset.previewStart) }));
+    } catch (error) {
+      if (version !== audioDetailVersion.current) return;
+      setAudioDetailsError(error instanceof Error ? error.message : 'Saved preview settings could not be loaded.');
+    } finally {
+      if (version === audioDetailVersion.current) setAudioDetailsLoading(false);
+    }
+  }
+
   const startEditTrack = async (track: PublishedTrack) => {
     if (operation.current) return;
     if (editingSlug === track.slug) {
@@ -550,6 +607,8 @@ export default function UploadDashboard() {
       return;
     }
     if (!await mayDiscard(trackDirty) || operation.current) return;
+    fullAudition.current?.pause();
+    previewAudition.current?.pause();
     setEditingSlug(track.slug);
     setTrackErrors({});
     setUploadPhase('');
@@ -565,20 +624,37 @@ export default function UploadDashboard() {
       published: track.published,
       audioFile: null,
       coverFile: null,
+      playbackMode: initialPlaybackMode(track),
+      previewStart: '0',
     };
     setTrackForm(form);
     setTrackBaseline(form);
     setTrackSaveError(null);
     setTrackFormVersion((value) => value + 1);
     uploadedFiles.current = {};
+    preparedAudio.current = undefined;
+    setSavedAudio(null);
+    setAudioDetailsError(null);
+    const audioVersion = ++audioDetailVersion.current;
+    setAudioDetailsLoading(Boolean(track.audioAssetId));
+    if (track.audioAssetId) {
+      void readSavedAudio(track.audioAssetId, audioVersion);
+    }
     setActiveTab('tracks');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startEditVideo = async (video: VideoRecord) => {
     if (operation.current) return;
-    if (editingVideoId === video.id) { setActiveTab('videos'); return; }
+    if (editingVideoId === video.id) {
+      fullAudition.current?.pause();
+      previewAudition.current?.pause();
+      setActiveTab('videos');
+      return;
+    }
     if (!await mayDiscard(videoDirty) || operation.current) return;
+    fullAudition.current?.pause();
+    previewAudition.current?.pause();
     setEditingVideoId(video.id);
     setVideoErrors({});
     const form: VideoFormState = {
@@ -599,10 +675,13 @@ export default function UploadDashboard() {
     const cached = uploadedFiles.current[bucket];
     if (cached?.file === file) return cached.url;
     const ext = file.name.split('.').pop() || 'bin';
-    const path = `monstajam/${bucket}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    setUploadPhase(bucket === 'audio' ? 'Uploading audio to Blob storage' : 'Uploading cover art to Blob storage');
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-').slice(-120) || `audio.${ext}`;
+    const path = bucket === 'audio'
+      ? `monstajam/originals/${crypto.randomUUID()}-${safeName}`
+      : `monstajam/covers/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    setUploadPhase(bucket === 'audio' ? 'Uploading your private original…' : 'Uploading cover art…');
     const blob = await upload(path, file, {
-      access: 'public',
+      access: bucket === 'audio' ? 'private' : 'public',
       handleUploadUrl: '/api/upload',
       contentType: file.type || 'application/octet-stream',
       multipart: bucket === 'audio',
@@ -614,7 +693,7 @@ export default function UploadDashboard() {
   function validateTrackForm() {
     const errors: Record<string, string> = {};
     const editingTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : null;
-    const hasAudio = Boolean(editingTrack?.audioUrl || trackForm.audioFile);
+    const hasAudio = Boolean(editingTrack?.audioUrl || editingTrack?.audioAssetId || trackForm.audioFile);
 
     if (!trackForm.title.trim()) errors.title = 'Track title is required.';
     if (!trackForm.artist.trim()) errors.artist = 'Artist name is required.';
@@ -624,6 +703,12 @@ export default function UploadDashboard() {
     }
     if (trackForm.published && !hasAudio) {
       errors.audio = 'Live tracks need an audio file. Save as draft if the audio is not ready.';
+    }
+    if (trackForm.audioFile && trackForm.audioFile.size > 500 * 1024 * 1024) {
+      errors.audio = 'Choose an audio file of 500 MB or less.';
+    }
+    if (canChoosePreviewStart && (!Number.isFinite(Number(trackForm.previewStart)) || Number(trackForm.previewStart) < 0 || Number(trackForm.previewStart) > 7200)) {
+      errors.previewStart = 'Choose a start time between 0 and 7,200 seconds.';
     }
 
     setTrackErrors(errors);
@@ -640,9 +725,21 @@ export default function UploadDashboard() {
     setUploadPhase(editingSlug ? 'Saving track changes' : 'Preparing new track');
 
     try {
-      let audioUrl: string | undefined;
+      let audioAssetId: string | undefined;
       let coverUrl: string | undefined;
-      if (trackForm.audioFile) audioUrl = await uploadFile(trackForm.audioFile, 'audio');
+      const previewStart = Number(trackForm.previewStart || 0);
+      const currentTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : undefined;
+      if (trackForm.audioFile || (currentTrack?.audioAssetId && savedAudio && previewStart !== savedAudio.previewStart)) {
+        const source = trackForm.audioFile
+          ? { originalUrl: await uploadFile(trackForm.audioFile, 'audio'), originalName: trackForm.audioFile.name }
+          : { audioAssetId: currentTrack!.audioAssetId! };
+        const asset = await prepareAdminAudio(source, previewStart, {
+          previous: preparedAudio.current,
+          onAsset: (preparation) => { preparedAudio.current = preparation; },
+          onProgress: setUploadPhase,
+        });
+        audioAssetId = asset.id;
+      }
       if (trackForm.coverFile) coverUrl = await uploadFile(trackForm.coverFile, 'covers');
 
       const payload: Record<string, unknown> = {
@@ -656,9 +753,10 @@ export default function UploadDashboard() {
         appleMusicUrl: trackForm.appleMusicUrl.trim() || null,
         color: GENRE_COLORS[trackForm.genre] ?? GENRE_COLORS.Other,
         published: trackForm.published,
+        playbackMode: trackForm.playbackMode,
       };
 
-      if (audioUrl) payload.audioUrl = audioUrl;
+      if (audioAssetId) payload.audioAssetId = audioAssetId;
       if (coverUrl) payload.coverUrl = coverUrl;
 
       const res = editingSlug
@@ -704,7 +802,7 @@ export default function UploadDashboard() {
     }
     if (!beginOperation('Updating track status…')) return;
     try {
-      if (!track.published && !track.audioUrl) {
+      if (!track.published && !track.audioUrl && !track.audioAssetId) {
         showToast('error', 'Add audio before publishing this track.');
         return;
       }
@@ -931,7 +1029,14 @@ export default function UploadDashboard() {
             <button
               key={id}
               type="button"
-              onClick={() => { if (!operation.current) setActiveTab(id); }}
+              onClick={() => {
+                if (operation.current) return;
+                if (id !== 'tracks') {
+                  fullAudition.current?.pause();
+                  previewAudition.current?.pause();
+                }
+                setActiveTab(id);
+              }}
               className={[
                 'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition',
                 activeTab === id
@@ -1035,7 +1140,7 @@ export default function UploadDashboard() {
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <Field label={editingSlug ? 'Replace audio file' : 'Audio file'} error={trackErrors.audio}>
+                <Field label={editingSlug ? 'Replace audio file' : 'Audio file'} error={trackErrors.audio ?? trackErrors.audioAssetId ?? trackErrors.originalUrl ?? trackErrors.originalName}>
                   <div className="rounded-md border border-dashed border-cyan-300/30 bg-cyan-300/[0.03] p-4">
                     <div className="flex items-center gap-3 text-sm text-slate-300">
                       <FileAudio className="h-5 w-5 text-cyan-300" />
@@ -1046,7 +1151,10 @@ export default function UploadDashboard() {
                       type="file"
                       accept=".wav,.mp3,audio/*"
                       className="mt-3 block w-full text-sm text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
-                      onChange={(event) => setTrackForm((form) => ({ ...form, audioFile: event.target.files?.[0] ?? null }))}
+                      onChange={(event) => {
+                        const audioFile = event.target.files?.[0] ?? null;
+                        setTrackForm((form) => ({ ...form, audioFile, previewStart: audioFile ? form.previewStart : String(savedAudio?.previewStart ?? 0) }));
+                      }}
                     />
                   </div>
                 </Field>
@@ -1065,6 +1173,56 @@ export default function UploadDashboard() {
                     />
                   </div>
                 </Field>
+              </div>
+
+              <div className="mt-5 space-y-4 rounded-md border border-white/10 bg-slate-950/40 p-4">
+                <label className="flex cursor-pointer items-start gap-3 text-sm text-white">
+                  <input
+                    type="checkbox"
+                    checked={trackForm.playbackMode === 'full'}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, playbackMode: event.target.checked ? 'full' : 'preview' }))}
+                    className="mt-0.5 h-4 w-4 accent-cyan-400"
+                  />
+                  <span>
+                    <span className="block font-semibold">Allow full-song playback</span>
+                    <span className="mt-1 block text-xs text-slate-400">Off by default: visitors hear a 45-second preview. Turn on to let visitors play the entire song. Genre does not change this setting.</span>
+                  </span>
+                </label>
+                <Field label="Preview starts at (seconds)" error={trackErrors.previewStart}>
+                  <TextInput
+                    type="number"
+                    min="0"
+                    max="7200"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={trackForm.previewStart}
+                    disabled={!canChoosePreviewStart}
+                    onChange={(event) => setTrackForm((form) => ({ ...form, previewStart: event.target.value }))}
+                  />
+                </Field>
+                <p className="text-xs text-slate-400">
+                  {audioDetailsLoading ? 'Loading the saved preview settings…' : canChoosePreviewStart
+                    ? 'The preview begins here and plays for up to 45 seconds. A new clip is prepared when you save; your saved track stays available until then.'
+                    : editingTrack?.audioUrl
+                      ? 'This track uses older audio. You can still edit its details. Replace its audio to choose a preview start time.'
+                      : 'Choose an audio file to set the preview start. Leave it at 0 to start at the beginning.'}
+                </p>
+                {audioDetailsError && <div role="alert" className="text-sm text-rose-300">
+                  {audioDetailsError} Your saved audio is unchanged.
+                  <button type="button" onClick={() => {
+                    if (editingTrack?.audioAssetId && !operation.current) void readSavedAudio(editingTrack.audioAssetId, audioDetailVersion.current);
+                  }} className="ml-2 underline">Reload preview settings</button>
+                </div>}
+                {editingTrack?.audioAssetId && <div key={editingTrack.audioAssetId} className="space-y-3 border-t border-white/10 pt-4">
+                  <p className="text-xs text-slate-400">Listen to the saved audio. Unsaved changes are not included.</p>
+                  <label className="block text-sm text-slate-300">Saved preview
+                    <audio ref={previewAudition} aria-label="Saved preview" controls preload="none" src={`/api/audio/${encodeURIComponent(editingTrack.slug)}?preview=true`} onPlay={() => playAudition('preview')} className="mt-2 w-full" />
+                  </label>
+                  <label className="block text-sm text-slate-300">Full song (admin only)
+                    <audio ref={fullAudition} aria-label="Full song (admin only)" controls preload="none" src={`/api/audio/${encodeURIComponent(editingTrack.slug)}?full=true`} onPlay={() => playAudition('full')} className="mt-2 w-full" />
+                  </label>
+                </div>}
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
@@ -1133,7 +1291,8 @@ export default function UploadDashboard() {
                       <StatusPill tone={track.published ? 'live' : 'draft'}>{track.published ? 'Live' : 'Draft'}</StatusPill>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <StatusPill tone={track.audioUrl ? 'neutral' : 'warn'}>{track.audioUrl ? 'Audio' : 'No audio'}</StatusPill>
+                      <StatusPill tone={hasTrackAudio(track) ? 'neutral' : 'warn'}>{hasTrackAudio(track) ? 'Audio' : 'No audio'}</StatusPill>
+                      <StatusPill tone="neutral">{initialPlaybackMode(track) === 'full' ? 'Full song' : '45-sec preview'}</StatusPill>
                       <StatusPill tone={track.coverUrl ? 'neutral' : 'warn'}>{track.coverUrl ? 'Cover' : 'No cover'}</StatusPill>
                       <span className="inline-flex items-center gap-1 text-xs text-slate-500">
                         <Clock className="h-3.5 w-3.5" />
@@ -1292,7 +1451,7 @@ export default function UploadDashboard() {
               <h2 className="text-xl font-semibold text-white">Release readiness</h2>
               <div className="mt-5 space-y-3">
                 {[
-                  { label: 'All live tracks have audio', ok: tracks.filter((track) => track.published && !track.audioUrl).length === 0 },
+                  { label: 'All live tracks have audio', ok: tracks.filter((track) => track.published && !hasTrackAudio(track)).length === 0 },
                   { label: 'All live tracks have cover art', ok: tracks.filter((track) => track.published && !track.coverUrl).length === 0 },
                   { label: 'Admin library is reachable', ok: !tracksLoading && !videosLoading },
                   { label: 'Drafts are separated from public output', ok: metrics.draftTracks + metrics.draftVideos >= 0 },
@@ -1307,13 +1466,13 @@ export default function UploadDashboard() {
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <h2 className="text-xl font-semibold text-white">Needs attention</h2>
               <div className="mt-5 space-y-3">
-                {tracks.filter((track) => !track.audioUrl || !track.coverUrl).length === 0 ? (
+                {tracks.filter((track) => !hasTrackAudio(track) || !track.coverUrl).length === 0 ? (
                   <div className="rounded-md border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-200">
                     No missing track media found.
                   </div>
                 ) : (
                   tracks
-                    .filter((track) => !track.audioUrl || !track.coverUrl)
+                    .filter((track) => !hasTrackAudio(track) || !track.coverUrl)
                     .map((track) => (
                       <button
                         key={track.id}
@@ -1326,7 +1485,7 @@ export default function UploadDashboard() {
                         <span>
                           <span className="block font-semibold">{track.title}</span>
                           <span className="mt-1 block text-xs text-amber-200/70">
-                            {!track.audioUrl ? 'Missing audio' : 'Audio ok'} · {!track.coverUrl ? 'Missing cover' : 'Cover ok'}
+                            {!hasTrackAudio(track) ? 'Missing audio' : 'Audio ok'} · {!track.coverUrl ? 'Missing cover' : 'Cover ok'}
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4" />

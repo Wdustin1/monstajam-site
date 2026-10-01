@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
+import { getPlaybackMode, toPublicTrack } from '@/lib/track-playback';
 
 // GET /api/tracks/[slug] — drafts require an explicit authenticated preview
 export async function GET(
@@ -20,7 +21,7 @@ export async function GET(
     if (!track || (!track.published && !canPreview)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404, headers });
     }
-    return NextResponse.json(track, { headers });
+    return NextResponse.json(canPreview ? track : toPublicTrack(track), { headers });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Failed to fetch track' }, { status: 500, headers });
@@ -53,12 +54,41 @@ export async function PUT(
 
   const { slug } = await params;
   const { accentCyan, ...trackInput } = parsed.data;
-  const trackData: Prisma.TrackUpdateInput = {
-    ...trackInput,
-    ...(accentCyan != null && { accentCyan }),
-  };
 
   try {
+    const current = await prisma.track.findUnique({
+      where: { slug },
+      select: { genre: true, playbackMode: true, audioUrl: true, audioAssetId: true },
+    });
+    if (!current) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (trackInput.audioUrl !== undefined && trackInput.audioUrl !== (current.audioUrl ?? '')) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: { audioUrl: ['Use a processed audio upload to replace this track\'s audio.'] },
+      }, { status: 422 });
+    }
+
+    const trackData: Prisma.TrackUpdateInput = {
+      ...trackInput,
+      ...(trackInput.playbackMode === undefined && current.playbackMode == null && { playbackMode: getPlaybackMode(current) }),
+      ...(accentCyan != null && { accentCyan }),
+    };
+
+    if (trackInput.audioAssetId) {
+      const asset = await prisma.audioAsset.findUnique({
+        where: { id: trackInput.audioAssetId },
+        select: { status: true, originalPath: true, previewPath: true },
+      });
+      if (!asset || asset.status !== 'ready' || !asset.originalPath || !asset.previewPath) {
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: { audioAssetId: ['Wait for audio processing to finish successfully before saving.'] },
+        }, { status: 422 });
+      }
+      trackData.audioUrl = null;
+    }
+
     const track = await prisma.track.update({
       where: { slug },
       data: trackData,

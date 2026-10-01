@@ -7,9 +7,10 @@ import ScrollIndicator from '@/components/ScrollIndicator';
 import MusicLibrary from '@/components/MusicLibrary';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
+import { toPublicTrack } from '@/lib/track-playback';
 
 export default async function Home() {
-  const [tracks, videoCount] = await Promise.all([
+  const [trackRecords, videoCount] = await Promise.all([
     prisma.track.findMany({
       where: { published: true },
       include: { credits: true },
@@ -17,12 +18,14 @@ export default async function Home() {
     }),
     prisma.video.count({ where: { published: true } }),
   ]);
+  const tracks = trackRecords.map(toPublicTrack);
   const artistCount = new Set(tracks.map((t: { artist: string }) => t.artist)).size;
 
   // Featured track = most recently added (highest createdAt)
-  const latest = tracks.length
-    ? [...tracks].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  const latestRecord = trackRecords.length
+    ? [...trackRecords].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
     : null;
+  const latest = latestRecord ? toPublicTrack(latestRecord) : null;
 
   const featuredTrack = latest ? {
     slug: latest.slug,
@@ -34,6 +37,7 @@ export default async function Home() {
     genre: latest.genre ?? null,
     bpm: latest.bpm ?? null,
     number: latest.number ?? null,
+    playbackMode: latest.playbackMode,
   } : null;
 
   return (

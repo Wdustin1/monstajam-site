@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { isAdminSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { toPublicTrack } from '@/lib/track-playback';
 import TrackPageView from '@/components/TrackPageView';
 
 export const dynamic = 'force-dynamic';
@@ -25,5 +26,13 @@ export default async function TrackPreviewPage({ params }: { params: Promise<{ s
   const track = await prisma.track.findUnique({ where: { slug }, include: { credits: true } });
   if (!track) notFound();
 
-  return <TrackPageView track={track} allTracks={[]} preview />;
+  const publicTrack = toPublicTrack(track);
+  const audition = {
+    ...publicTrack,
+    audioUrl: track.audioAssetId && publicTrack.audioUrl
+      ? `${publicTrack.audioUrl}${publicTrack.audioUrl.includes('?') ? '&' : '?'}full=true`
+      : track.audioUrl,
+    playbackMode: 'full' as const,
+  };
+  return <TrackPageView track={audition} allTracks={[]} preview />;
 }

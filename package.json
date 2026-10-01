@@ -14,7 +14,9 @@
     "test:cover-proxy": "tsx --test scripts/tests/cover-proxy.test.ts",
     "test:admin-save": "tsx --test scripts/tests/admin-save.test.ts",
     "test:admin-save:fixture": "node scripts/tests/admin-save.fixture.cjs",
-    "test:admin-editor": "tsx --test scripts/tests/admin-editor.test.cjs"
+    "test:admin-editor": "tsx --test scripts/tests/admin-editor.test.cjs",
+    "test:audio": "tsx --test scripts/tests/*audio*.test.ts scripts/tests/*audio*.test.cjs scripts/tests/track-playback.test.ts scripts/tests/player-playback.test.cjs",
+    "migrate:audio": "tsx scripts/migrate-audio.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -24,6 +26,7 @@
     "@supabase/supabase-js": "^2.99.3",
     "@types/pg": "^8.18.0",
     "@vercel/blob": "^2.3.3",
+    "ffmpeg-static": "5.3.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
     "mongodb": "^7.1.1",

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, ChevronDown, X } from 'lucide-react';
 import SongCard from './SongCard';
 import { usePlayer, type PlayerTrack } from '@/context/PlayerContext';
+import { getPlaybackMode } from '@/lib/track-playback';
 
 export interface Credit {
   id: string;
@@ -21,8 +22,8 @@ export type TrackWithCredits = PlayerTrack & {
   spotifyUrl?: string | null;
   appleMusicUrl?: string | null;
   published?: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
   credits?: Credit[];
 };
 
@@ -88,7 +89,8 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
     return tracks.filter((t) => {
       const q = search.toLowerCase();
       if (q && !t.title.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q)) return false;
-      if (genre !== 'All' && t.genre !== genre) return false;
+      if (genre === 'Full Songs' && getPlaybackMode(t) !== 'full') return false;
+      if (genre !== 'All' && genre !== 'Full Songs' && t.genre !== genre) return false;
       if (mood !== 'All' && t.mood !== mood) return false;
       if (bpm !== 'All' && t.bpm != null) {
         const b = t.bpm;
@@ -102,11 +104,11 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
   }, [search, genre, bpm, mood, tracks]);
 
   const fullSongs = useMemo(() => (
-    tracks.filter((track) => track.genre === 'Full Songs')
+    tracks.filter((track) => getPlaybackMode(track) === 'full')
   ), [tracks]);
   const showingFullSongsLane = fullSongs.length > 0 && genre === 'All' && !search && bpm === 'All' && mood === 'All';
   const libraryTracks = showingFullSongsLane
-    ? filtered.filter((track) => track.genre !== 'Full Songs')
+    ? filtered.filter((track) => getPlaybackMode(track) !== 'full')
     : filtered;
 
   // Keep player queue in sync with visible filtered tracks
@@ -184,13 +186,13 @@ export default function MusicLibrary({ tracks }: { tracks: TrackWithCredits[] })
             <SongCard key={track.slug} track={track} />
           ))}
         </div>
-      ) : (
+      ) : !showingFullSongsLane ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-600">
           <Search className="w-12 h-12 mb-4 opacity-20" />
           <p className="text-lg font-semibold text-gray-500">No tracks found</p>
           <p className="text-sm mt-1">Try adjusting your filters</p>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

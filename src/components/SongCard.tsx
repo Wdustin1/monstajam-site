@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Play, Pause, Music, Music4 } from 'lucide-react';
 import { proxyCoverUrl } from '@/lib/proxy-cover';
+import { getPlaybackMode, isSamePlayback } from '@/lib/track-playback';
 import type { TrackWithCredits } from './MusicLibrary';
 import { usePlayer } from '@/context/PlayerContext';
 
@@ -39,10 +40,10 @@ function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverU
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
           className="w-14 h-14 rounded-full flex items-center justify-center border border-white/20 hover:bg-white hover:text-black transition-all"
           style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}
-          aria-label="Play"
+          aria-label={isActive ? 'Pause' : 'Play'}
         >
           <svg className="w-6 h-6 ml-0.5" fill="white" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z"/>
+            <path d={isActive ? 'M6 19h4V5H6v14zm8-14v14h4V5h-4z' : 'M8 5v14l11-7z'}/>
           </svg>
         </button>
       </div>
@@ -52,8 +53,8 @@ function AlbumArt({ color, coverUrl, onPlay, isActive }: { color: string; coverU
 
 export default function SongCard({ track }: SongCardProps) {
   const { currentTrack, isPlaying, toggle } = usePlayer();
-  const isActive = currentTrack?.slug === track.slug && isPlaying;
-  const isFullSong = track.genre === 'Full Songs';
+  const isActive = isSamePlayback(currentTrack, track) && isPlaying;
+  const isFullSong = getPlaybackMode(track) === 'full';
 
   return (
     <article
@@ -113,7 +114,7 @@ export default function SongCard({ track }: SongCardProps) {
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
             </svg>
-            {isFullSong ? 'FULL SONG' : 'EXCLUSIVE'}
+            {isFullSong ? 'FULL SONG' : '45s PREVIEW'}
           </span>
           <div className="flex gap-2">
             {track.spotifyUrl && track.spotifyUrl !== '#' && (

@@ -4,29 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePlayer } from '@/context/PlayerContext';
-
-interface Track {
-  id: string;
-  slug: string;
-  number: number;
-  title: string;
-  subtitle: string | null;
-  artist: string;
-  genre: string;
-  bpm: number | null;
-  mood: string | null;
-  color: string;
-  accentCyan: boolean | null;
-  story: string | null;
-  spotifyUrl: string | null;
-  appleMusicUrl: string | null;
-  audioUrl: string | null;
-  coverUrl: string | null;
-  published: boolean;
-}
+import { getPlaybackMode, isSamePlayback, type PublicTrack } from '@/lib/track-playback';
 
 interface GenreBrowserProps {
-  tracks: Track[];
+  tracks: PublicTrack[];
 }
 
 export default function GenreBrowser({ tracks }: GenreBrowserProps) {
@@ -35,13 +16,13 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
   const { toggle, currentTrack, isPlaying, setQueue } = usePlayer();
 
   // Derive genre list from actual tracks
-  const genres = ['All', ...Array.from(new Set(tracks.map(t => t.genre))).sort()];
+  const genres = ['All', ...Array.from(new Set(tracks.map(t => t.genre).filter((genre): genre is string => !!genre))).sort()];
 
   const filtered = activeGenre === 'All'
     ? tracks
     : tracks.filter(t => t.genre === activeGenre);
 
-  const handlePlay = (track: Track) => {
+  const handlePlay = (track: PublicTrack) => {
     setQueue(filtered);
     toggle(track);
   };
@@ -120,7 +101,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-10">
             {filtered.map((track) => {
-              const isActive = currentTrack?.slug === track.slug;
+              const isActive = isSamePlayback(currentTrack, track);
               return (
                 <div
                   key={track.slug}
@@ -175,6 +156,7 @@ export default function GenreBrowser({ tracks }: GenreBrowserProps) {
                       <h3 className="font-bold text-white text-sm leading-tight truncate">{track.title}</h3>
                     </Link>
                     <p className="text-gray-400 text-xs mt-0.5 truncate">{track.artist}</p>
+                    <p className="text-gray-500 text-[10px] mt-1">{getPlaybackMode(track) === 'full' ? 'Full song' : '45-second preview'}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"

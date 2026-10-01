@@ -49,6 +49,9 @@ async function smoke() {
   assert.ok(cookie);
   const list = await request('/api/tracks?all=true', { cookie });
   assert.equal((await list.json()).length, 2);
+  const asset = await request('/api/audio-assets/000000000000000000000004', { cookie });
+  assert.equal(asset.status, 200);
+  assert.equal((await asset.json()).previewStart, 12.5);
   let save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Fixture read-after-write success' } });
   assert.equal(save.status, 200);
   let read = await request('/api/tracks/admin-save-live', { cookie });
@@ -93,6 +96,7 @@ async function main() {
   Object.assign(env, {
     NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', ADMIN_SECRET: password,
     BLOB_READ_WRITE_TOKEN: 'disabled-local-admin-save-fixture',
+    AUDIO_READ_WRITE_TOKEN: 'disabled-local-admin-save-fixture',
     DATABASE_URL: 'mongodb://127.0.0.1:27019/monstajam_admin_save_test?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000',
     MONSTAJAM_ADMIN_SAVE_FIXTURES: '1', MONSTAJAM_ADMIN_SAVE_CONTROL: controlPath,
     NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/admin-save-prisma.cjs').replaceAll('\\', '/')}"`,
@@ -121,6 +125,7 @@ async function main() {
   console.log(`Next PID: ${child.pid}`);
   console.log('Use failMutationGeneration: 2 for the next failure (1 was consumed by startup smoke).');
   console.log('All database writes stay in process memory. No upload credentials are configured. Ctrl+C stops the server.');
+  console.log('Fixture Live Track has a ready managed asset at 12.5 seconds; Fixture Draft Track uses the legacy Full Songs fallback. Actual audio streaming/conversion is not provided by this UI fixture.');
   await new Promise((resolve) => child.once('exit', resolve));
 }
 process.on('SIGINT', () => { stop(); process.exit(130); });
