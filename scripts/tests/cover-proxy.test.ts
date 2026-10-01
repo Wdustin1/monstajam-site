@@ -316,20 +316,26 @@ test('a body stream failure does not expose upstream details', async () => {
 
 test('the download deadline also stops a stalled response body', { timeout: 1000 }, async () => {
   const controller = new AbortController();
+  let cancelled = false;
   mock.method(AbortSignal, 'timeout', () => controller.signal);
   const stream = new ReadableStream<Uint8Array>({
-    pull() {
-      return new Promise<void>((resolve) => {
-        setImmediate(() => {
-          controller.abort(new DOMException('secret-upstream stalled download', 'TimeoutError'));
-          resolve();
-        });
-      });
+    pull() {},
+    cancel() {
+      cancelled = true;
+      return Promise.resolve();
     },
   });
   mock.method(globalThis, 'fetch', async () => new Response(stream));
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException('secret-upstream stalled download', 'TimeoutError'));
+  }, 20);
 
-  await assertSafeError(await GET(coverRequest()), 504);
+  try {
+    await assertSafeError(await GET(coverRequest()), 504);
+    assert.equal(cancelled, true, 'a timed-out body must be cancelled');
+  } finally {
+    clearTimeout(timer);
+  }
 });
 
 test('cover source parsing keeps percent-encoded path and query data intact', () => {
