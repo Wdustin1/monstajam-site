@@ -59,8 +59,8 @@ async function main() {
     ownsDatabase = true;
     await store.ensureAuthIndexes();
     await provider.getAuth().api.createUser({ body: {
-      name: 'Local fixture owner', email: 'owner@fixture.invalid',
-      password: 'local-browser-fixture-2026!', role: 'owner', data: { accessStatus: 'active' },
+      name: 'Local fixture owner', email: store.createInternalAccountEmail(),
+      password: 'local-browser-fixture-2026!', role: 'owner', data: { accessStatus: 'active', username: 'Dustin' },
     } });
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'monstajam-mongo-browser-'));
     const stopFile = path.join(directory, 'stop');
@@ -95,7 +95,7 @@ async function main() {
     }
     assert.ok(ready, 'Local Next fixture did not become ready.');
     interval = setInterval(() => { void fs.access(stopFile).then(() => requestStop?.()).catch(() => {}); }, 500);
-    console.log(JSON.stringify({ ready: true, url: origin + '/upload/login', email: 'owner@fixture.invalid', isolatedDatabase: databaseName, stopFile, nextPid: child.pid }));
+    console.log(JSON.stringify({ ready: true, url: origin + '/upload/login', username: 'Dustin', isolatedDatabase: databaseName, stopFile, nextPid: child.pid }));
     await finish;
   } finally {
     if (interval) clearInterval(interval);

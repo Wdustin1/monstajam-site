@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { MongoClient, ObjectId, type Document } from 'mongodb';
 
 export const AUTH_COLLECTIONS = {
@@ -9,10 +9,16 @@ export const AUTH_COLLECTIONS = {
 export type AdminRole = 'owner' | 'admin';
 export type AccessStatus = 'pending' | 'active' | 'removed';
 export type AdminUserDocument = Document & {
-  _id: ObjectId; name: string; email: string; role: AdminRole; accessStatus: AccessStatus;
+  _id: ObjectId; name: string; username: string; email: string; role: AdminRole; accessStatus: AccessStatus;
   authLocked?: boolean; currentLinkHash?: string | null; linkExpiresAt?: Date | null;
   resetNonce?: string | null; lastLoginAt?: Date | null;
 };
+
+export function normalizeUsername(value: string) { return value.trim().toLowerCase(); }
+
+// Better Auth's credential/reset internals require an email column. These
+// random, non-deliverable aliases are never login names or public account data.
+export function createInternalAccountEmail() { return `${randomUUID()}@accounts.monstajam.invalid`; }
 
 const globals = globalThis as typeof globalThis & { __monstajamAuthMongoClient?: MongoClient };
 
@@ -47,6 +53,7 @@ export async function ensureAuthIndexes() {
   const db = getAuthDatabase();
   await Promise.all([
     db.collection(AUTH_COLLECTIONS.users).createIndex({ email: 1 }, { name: 'auth_users_email_uidx', unique: true }),
+    db.collection(AUTH_COLLECTIONS.users).createIndex({ username: 1 }, { name: 'auth_users_username_uidx', unique: true }),
     db.collection(AUTH_COLLECTIONS.users).createIndex({ role: 1 }, {
       name: 'one_immutable_owner', unique: true, partialFilterExpression: { role: 'owner' },
     }),

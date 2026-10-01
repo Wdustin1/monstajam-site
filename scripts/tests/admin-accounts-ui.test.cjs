@@ -1,5 +1,5 @@
-/* Actual account components in a virtual DOM. No provider, database, browser,
- * email, or external network is used. Real session coverage runs separately. */
+/* Actual account components in a virtual DOM with synthetic accounts. No
+ * provider, database, browser, or external network is used. */
 'use strict';
 /* eslint-disable @typescript-eslint/no-require-imports -- Standalone Node test and scoped Next component doubles. */
 const assert = require('node:assert/strict');
@@ -33,7 +33,7 @@ const Accounts = require('../../src/components/AdminAccounts').default;
 const PasswordSettings = require('../../src/components/AdminPasswordSettings').default;
 const Dashboard = require('../../src/components/UploadDashboard').default;
 const originalFetch = globalThis.fetch;
-const owner = { id: 'owner', name: 'Fixture Owner', email: 'owner@example.invalid', role: 'owner' };
+const owner = { id: 'owner', name: 'Dustin', username: 'dustin', role: 'owner' };
 const expiry = '2099-01-01T12:00:00.000Z';
 const setupUrl = 'http://localhost/upload/activate#token=fixture-private-token';
 
@@ -52,10 +52,10 @@ async function fakeFetch(input, init = {}) {
     if (result) return result;
   }
   if (input === '/api/admin/accounts' && call.method === 'GET') return response({ accounts: structuredClone(network.accounts), currentUserId: owner.id });
-  if (input === '/api/admin/accounts/activation-info') return response({ name: 'Invited Admin', email: 'invited@example.invalid', status: 'pending', expiresAt: expiry });
+  if (input === '/api/admin/accounts/activation-info') return response({ name: 'Invited Admin', username: 'invited.admin', status: 'pending', expiresAt: expiry });
   if (input === '/api/admin/accounts' && call.method === 'POST') {
     const record = { id: 'invited', ...call.body, role: 'admin', status: 'pending', linkExpiresAt: expiry, lastLoginAt: null, canRevoke: true };
-    network.accounts = [...network.accounts.filter((item) => item.email !== record.email), record];
+    network.accounts = [...network.accounts.filter((item) => item.username !== record.username), record];
     return response({ account: record, activationUrl: setupUrl, expiresAt: expiry }, 201);
   }
   if (input.endsWith('/link')) return response({ activationUrl: setupUrl, expiresAt: expiry });
@@ -99,9 +99,9 @@ beforeEach(() => {
   router = { pushes: [], refreshes: 0, push(value) { this.pushes.push(value); }, refresh() { this.refreshes++; } };
   network = { calls: [], copies: [], handler: null, gate: null, accounts: [
     { ...owner, status: 'active', linkExpiresAt: null, lastLoginAt: null, canRevoke: false },
-    { id: 'active', name: 'Active Admin', email: 'active@example.invalid', role: 'admin', status: 'active', linkExpiresAt: null, lastLoginAt: '2026-01-01T00:00:00.000Z', canRevoke: true },
-    { id: 'pending', name: 'Pending Admin', email: 'pending@example.invalid', role: 'admin', status: 'pending', linkExpiresAt: '2020-01-01T00:00:00.000Z', lastLoginAt: null, canRevoke: true },
-    { id: 'removed', name: 'Removed Admin', email: 'removed@example.invalid', role: 'admin', status: 'removed', linkExpiresAt: null, lastLoginAt: null, canRevoke: false },
+    { id: 'active', name: 'Active Admin', username: 'active.admin', role: 'admin', status: 'active', linkExpiresAt: null, lastLoginAt: '2026-01-01T00:00:00.000Z', canRevoke: true },
+    { id: 'pending', name: 'Pending Admin', username: 'pending.admin', role: 'admin', status: 'pending', linkExpiresAt: '2020-01-01T00:00:00.000Z', lastLoginAt: null, canRevoke: true },
+    { id: 'removed', name: 'Removed Admin', username: 'removed.admin', role: 'admin', status: 'removed', linkExpiresAt: null, lastLoginAt: null, canRevoke: false },
   ] };
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text) => { network.copies.push(text); } } });
   globalThis.fetch = fakeFetch;
@@ -113,23 +113,23 @@ after(() => {
   dom.window.close();
 });
 
-test('email sign-in retains credentials after failure and prevents duplicate pending submissions', async () => {
+test('username sign-in retains credentials after failure and prevents duplicate pending submissions', async () => {
   await render(Login);
-  await change('email', 'admin@example.invalid'); await change('password', 'fixture-password-123');
-  network.handler = (call) => call.url === '/api/auth/sign-in/email' ? response({ message: 'Invalid email or password' }, 401) : null;
+  await change('username', 'Dustin'); await change('password', 'fixture-password-123');
+  network.handler = (call) => call.url === '/api/auth/sign-in/username' ? response({ message: 'Invalid username or password' }, 401) : null;
   await submit();
-  assert.match(container.textContent, /Invalid email or password/);
-  assert.equal(container.querySelector('#email').value, 'admin@example.invalid');
+  assert.match(container.textContent, /Invalid username or password/);
+  assert.equal(container.querySelector('#username').value, 'Dustin');
   assert.equal(container.querySelector('#password').value, 'fixture-password-123');
   network.handler = null;
   const gate = deferred(); network.gate = gate;
   await submit(); await submit();
-  assert.equal(writes('/api/auth/sign-in/email').length, 2);
+  assert.equal(writes('/api/auth/sign-in/username').length, 2);
   assert.ok(container.querySelector('fieldset').disabled);
   await act(async () => { gate.resolve(); });
   assert.deepEqual(router.pushes, ['/upload']);
   assert.equal(router.refreshes, 1);
-  assert.deepEqual(writes('/api/auth/sign-in/email')[0].body, { email: 'admin@example.invalid', password: 'fixture-password-123' });
+  assert.deepEqual(writes('/api/auth/sign-in/username')[0].body, { username: 'Dustin', password: 'fixture-password-123' });
 });
 
 test('activation reads only the fragment token, validates matching passwords, then clears the token after success', async () => {
@@ -138,7 +138,7 @@ test('activation reads only the fragment token, validates matching passwords, th
   const infoCall = network.calls[0];
   assert.equal(infoCall.url, '/api/admin/accounts/activation-info');
   assert.deepEqual(infoCall.body, { token: 'fixture-private-token' });
-  assert.match(container.textContent, /invited@example.invalid/);
+  assert.match(container.textContent, /invited.admin/);
   await change('new-password', 'fixture-password-123'); await change('confirm-password', 'different-password-123');
   await submit();
   assert.match(container.textContent, /passwords do not match/);
@@ -152,8 +152,8 @@ test('activation reads only the fragment token, validates matching passwords, th
   assert.deepEqual(writes('/api/auth/reset-password')[0].body, { token: 'fixture-private-token', newPassword: 'fixture-password-123' });
   assert.equal(dom.window.location.hash, '');
   assert.equal(container.querySelector('input[type=password]'), null);
-  assert.match(container.textContent, /Sign in with invited@example.invalid/);
-  assert.equal(writes('/api/auth/sign-in/email').length, 0, 'Activation must not silently create a login session');
+  assert.match(container.textContent, /Sign in with invited.admin/);
+  assert.equal(writes('/api/auth/sign-in/username').length, 0, 'Activation must not silently create a login session');
 });
 
 test('invalid or already-used setup link exposes no password form or account details', async () => {
@@ -162,7 +162,7 @@ test('invalid or already-used setup link exposes no password form or account det
   await render(Activation);
   assert.match(container.textContent, /invalid or expired/);
   assert.equal(container.querySelector('form'), null);
-  assert.doesNotMatch(container.textContent, /invited@example.invalid/);
+  assert.doesNotMatch(container.textContent, /invited.admin/);
 });
 
 test('an incomplete link makes no lookup and a failed password reset retains its inputs for correction', async () => {
@@ -184,39 +184,58 @@ test('owner list shows all account states and cannot offer owner removal', async
   await render(Accounts);
   assert.match(row('Pending Admin').textContent, /Pending activation.*Link expired/s);
   assert.match(row('Removed Admin').textContent, /Removed/);
-  assert.ok(button('Remove access', row('Fixture Owner')).disabled);
-  assert.equal(row('Fixture Owner').querySelectorAll('button').length, 1);
-  await click(button('Remove access', row('Fixture Owner')));
+  assert.ok(button('Remove access', row('Dustin')).disabled);
+  assert.equal(row('Dustin').querySelectorAll('button').length, 1);
+  await click(button('Remove access', row('Dustin')));
   assert.equal(container.querySelector('dialog'), null);
   assert.equal(writes().length, 0);
 });
 
 test('invite creates one request while pending and presents a manually copied, expiring setup link', async () => {
   await render(Accounts);
-  await change('invite-name', ' New Admin '); await change('invite-email', 'new@example.invalid');
+  await change('invite-name', ' New Admin '); await change('invite-username', 'new.admin');
   const gate = deferred(); network.gate = gate;
   await submit(); await submit();
   assert.equal(writes('/api/admin/accounts').length, 1);
   assert.ok(container.querySelector('fieldset').disabled);
   await act(async () => { gate.resolve(); });
-  assert.deepEqual(writes('/api/admin/accounts')[0].body, { name: 'New Admin', email: 'new@example.invalid' });
+  assert.deepEqual(writes('/api/admin/accounts')[0].body, { name: 'New Admin', username: 'new.admin' });
   assert.equal(container.querySelector('#invite-name').value, '');
   assert.equal(container.querySelector('#setup-link').value, setupUrl);
-  assert.match(container.textContent, /No email has been sent/);
+  assert.match(container.textContent, /Share this privately/);
   assert.match(container.textContent, /2099/);
   assert.deepEqual(network.copies, []);
   await click(button('Copy link'));
   assert.deepEqual(network.copies, [setupUrl]);
+  await change('invite-name', 'Another Person');
+  assert.equal(container.querySelector('#invite-username').value, 'another.person', 'Successful invite restores username suggestions for the next person');
+});
+
+test('username suggestion follows the name until explicitly edited and enforces the username format', async () => {
+  await render(Accounts);
+  await change('invite-name', 'Dustin');
+  assert.equal(container.querySelector('#invite-username').value, 'dustin');
+  await change('invite-name', 'Dustin Jones');
+  assert.equal(container.querySelector('#invite-username').value, 'dustin.jones');
+  await change('invite-username', 'Dustin.music');
+  await change('invite-name', 'Dustin J');
+  assert.equal(container.querySelector('#invite-username').value, 'Dustin.music', 'A chosen username must not be replaced by later display-name edits');
+  assert.equal(button('Create activation link').disabled, false);
+  for (const invalid of ['ab', 'has spaces', 'name@example.invalid', 'x'.repeat(31)]) {
+    await change('invite-username', invalid);
+    assert.ok(button('Create activation link').disabled);
+  }
+  assert.equal(writes().length, 0);
 });
 
 test('failed invite preserves entered details and failed refresh preserves the loaded account list', async () => {
   await render(Accounts);
-  await change('invite-name', 'Pending Person'); await change('invite-email', 'person@example.invalid');
+  await change('invite-name', 'Pending Person'); await change('invite-username', 'pending.person');
   network.handler = (call) => call.method === 'POST' ? response({ error: 'An invitation already exists.' }, 409) : null;
   await submit();
   assert.match(container.textContent, /invitation already exists/);
   assert.equal(container.querySelector('#invite-name').value, 'Pending Person');
-  assert.equal(container.querySelector('#invite-email').value, 'person@example.invalid');
+  assert.equal(container.querySelector('#invite-username').value, 'pending.person');
   assert.equal(container.querySelector('#setup-link'), null);
   network.handler = (call) => call.method === 'GET' ? response({ error: 'Temporarily unavailable.' }, 503) : null;
   await click(button('Refresh accounts'));
@@ -251,8 +270,64 @@ test('replacement reset/activation links and removed-account reinvites use their
   await click(button('New activation link', row('Pending Admin')));
   assert.deepEqual(writes('/api/admin/accounts/pending/link')[0].body, { kind: 'activate' });
   await click(button('Reinvite', row('Removed Admin')));
-  assert.deepEqual(writes('/api/admin/accounts')[0].body, { email: 'removed@example.invalid', name: 'Removed Admin' });
+  assert.deepEqual(writes('/api/admin/accounts')[0].body, { username: 'removed.admin', name: 'Removed Admin' });
   assert.match(row('Removed Admin').textContent, /Pending activation/);
+});
+
+for (const action of ['replace', 'revoke', 'reinvite', 'invite-form']) {
+  test(`an uncertain ${action} clears the same-account setup link before the request finishes`, async () => {
+    await render(Accounts);
+    await click(button('Password-reset link', row('Active Admin')));
+    assert.equal(container.querySelector('#setup-link').value, setupUrl);
+    if (action === 'reinvite' || action === 'invite-form') {
+      // Another owner session may remove the account while this page is open.
+      network.accounts = network.accounts.map((account) => account.id === 'active' ? { ...account, status: 'removed', canRevoke: false } : account);
+      await click(button('Refresh accounts'));
+    }
+    if (action === 'revoke') {
+      await click(button('Remove access', row('Active Admin')));
+      await click(button('Keep access', container.querySelector('dialog')));
+      assert.equal(container.querySelector('#setup-link').value, setupUrl, 'Canceling confirmation does not invalidate a link');
+      await click(button('Remove access', row('Active Admin')));
+    }
+    if (action === 'invite-form') {
+      await change('invite-name', 'Active Admin');
+      await change('invite-username', 'ACTIVE.ADMIN');
+    }
+    const gate = deferred(); network.gate = gate;
+    network.handler = (call) => {
+      if (call.method !== 'GET') throw new TypeError('Simulated response lost after server mutation');
+      return null;
+    };
+    if (action === 'replace') await click(button('Password-reset link', row('Active Admin')));
+    else if (action === 'revoke') await click(button('Remove access', container.querySelector('dialog')));
+    else if (action === 'reinvite') await click(button('Reinvite', row('Active Admin')));
+    else await submit();
+    assert.equal(container.querySelector('#setup-link'), null, 'Hide the old link while its validity is uncertain');
+    assert.equal([...container.querySelectorAll('button')].some((item) => item.textContent === 'Copy link'), false);
+    await act(async () => { gate.resolve(); });
+    assert.match(container.textContent, /connection was interrupted/);
+    assert.equal(container.querySelector('#setup-link'), null, 'A failed response must not restore the old link');
+    assert.deepEqual(network.copies, []);
+    if (action === 'replace') {
+      const replacement = 'http://localhost/upload/activate#token=replacement-fixture-token';
+      network.handler = (call) => call.url.endsWith('/link') ? response({ activationUrl: replacement, expiresAt: expiry }) : null;
+      await click(button('Password-reset link', row('Active Admin')));
+      assert.equal(container.querySelector('#setup-link').value, replacement);
+      await click(button('Copy link'));
+      assert.deepEqual(network.copies, [replacement], 'Only the successfully issued replacement is copied');
+    }
+  });
+}
+
+test('a failed link request for another account preserves the displayed account link', async () => {
+  await render(Accounts);
+  await click(button('Password-reset link', row('Active Admin')));
+  network.handler = (call) => call.url === '/api/admin/accounts/pending/link' ? response({ error: 'Link creation unavailable.' }, 503) : null;
+  await click(button('New activation link', row('Pending Admin')));
+  assert.match(container.textContent, /Link creation unavailable/);
+  assert.equal(container.querySelector('#setup-link').value, setupUrl);
+  assert.match(container.querySelector('[aria-label="Setup link"]').textContent, /active.admin/);
 });
 
 test('a failed removal remains visible inside its dialog without claiming the account was removed', async () => {
@@ -285,10 +360,11 @@ test('password change preserves values on failure, sends current/new passwords o
 });
 
 test('dashboard identity links expose account settings to admins and access management only to the owner', async () => {
-  await render(Dashboard, { currentAdmin: { ...owner, role: 'admin' } });
+  await render(Dashboard, { currentAdmin: { ...owner, role: 'admin', email: 'internal-alias@example.invalid' } });
   assert.ok(container.querySelector('a[href="/upload/account"]'));
   assert.equal(container.querySelector('a[href="/upload/admins"]'), null);
-  assert.match(container.textContent, /Signed in as owner@example.invalid · Admin/);
+  assert.match(container.textContent, /Signed in as Dustin \(dustin\) · Admin/);
+  assert.doesNotMatch(container.textContent, /internal-alias/);
   await render(Dashboard, { currentAdmin: owner });
   assert.ok(container.querySelector('a[href="/upload/admins"]'));
 });

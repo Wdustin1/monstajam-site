@@ -27,18 +27,19 @@ if (contentFixture === 'admin-save') require('./admin-save-prisma.cjs');
 else if (contentFixture === 'privacy') require('./privacy-prisma.cjs');
 else throw new Error('Unsupported local content fixture.');
 const { createAuthProvider } = tsRequire('../../../src/lib/auth-provider.ts', __filename);
+const { createInternalAccountEmail } = tsRequire('../../../src/lib/auth-store.ts', __filename);
 const db = Object.fromEntries(['auth_users', 'auth_sessions', 'auth_accounts', 'auth_verifications', 'auth_rate_limits', 'auth_audit'].map((name) => [name, []]));
 let lastRevoke = 0;
 function refreshControls() {
   const control = JSON.parse(fs.readFileSync(controlPath, 'utf8'));
   for (const user of db.auth_users || []) {
-    const state = control.users?.[user.email];
+    const state = control.users?.[user.username];
     if (state?.accessStatus) user.accessStatus = state.accessStatus;
     if (state?.role) user.role = state.role;
     if (typeof state?.authLocked === 'boolean') user.authLocked = state.authLocked;
   }
   if (Number(control.revokeGeneration || 0) > lastRevoke) {
-    const user = db.auth_users?.find((entry) => entry.email === control.revokeEmail);
+    const user = db.auth_users?.find((entry) => entry.username === control.revokeUsername);
     if (user) db.auth_sessions = (db.auth_sessions || []).filter((session) => session.userId !== user.id);
     lastRevoke = Number(control.revokeGeneration);
   }
@@ -54,14 +55,14 @@ const provider = createAuthProvider({
   },
 });
 const ready = (async () => {
-  for (const [email, role, accessStatus] of [
-    ['owner@fixture.invalid', 'owner', 'active'],
-    ['admin@fixture.invalid', 'admin', 'active'],
-    ['pending@fixture.invalid', 'admin', 'pending'],
+  for (const [username, role, accessStatus] of [
+    ['Dustin', 'owner', 'active'],
+    ['admin', 'admin', 'active'],
+    ['pending', 'admin', 'pending'],
   ]) {
     await provider.api.createUser({ body: {
-      email, name: email.split('@')[0] + ' fixture', password: process.env.MONSTAJAM_NAMED_AUTH_PASSWORD,
-      role, data: { accessStatus },
+      email: createInternalAccountEmail(), name: username + ' fixture', password: process.env.MONSTAJAM_NAMED_AUTH_PASSWORD,
+      role, data: { accessStatus, username },
     } });
   }
 })();

@@ -1,4 +1,11 @@
-export type AdminIdentity = { id: string; name: string; email: string; role: 'owner' | 'admin' };
+export type AdminIdentity = { id: string; name: string; username: string; role: 'owner' | 'admin' };
+
+export const usernamePattern = '[A-Za-z0-9_.]{3,30}';
+export function validUsername(value: string): boolean { return /^[A-Za-z0-9_.]{3,30}$/.test(value.trim()); }
+export function suggestUsername(name: string): string {
+  return name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+    .replace(/[^a-z0-9_.]+/g, '.').replace(/^[._]+|[._]+$/g, '').slice(0, 30);
+}
 
 export type AdminAccount = AdminIdentity & {
   status: 'pending' | 'active' | 'removed';

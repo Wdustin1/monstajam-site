@@ -12,11 +12,11 @@ type Track = {
 };
 
 const baseUrl = process.env.ADMIN_SMOKE_BASE_URL;
-const email = process.env.ADMIN_SMOKE_EMAIL;
+const username = process.env.ADMIN_SMOKE_USERNAME;
 const password = process.env.ADMIN_SMOKE_PASSWORD;
 
-if (!baseUrl || !email || !password) {
-  console.error('Set ADMIN_SMOKE_BASE_URL, ADMIN_SMOKE_EMAIL, and ADMIN_SMOKE_PASSWORD before running admin smoke tests.');
+if (!baseUrl || !username || !password) {
+  console.error('Set ADMIN_SMOKE_BASE_URL, ADMIN_SMOKE_USERNAME, and ADMIN_SMOKE_PASSWORD before running admin smoke tests.');
   process.exit(1);
 }
 
@@ -66,10 +66,10 @@ async function cleanup() {
 }
 
 async function main() {
-  await jsonRequest('/api/auth/sign-in/email', {
+  await jsonRequest('/api/auth/sign-in/username', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   });
 
   const before = await jsonRequest<Track[]>('/api/tracks?all=true');

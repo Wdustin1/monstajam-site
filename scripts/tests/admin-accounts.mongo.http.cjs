@@ -9,9 +9,9 @@ const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const origin = 'http://localhost:3399';
 const transport = 'http://127.0.0.1:3399';
-const ownerEmail = 'owner@fixture.invalid';
+const ownerUsername = 'Dustin';
 const ownerPassword = 'local-browser-fixture-2026!';
-const email = `http-${randomBytes(8).toString('hex')}@fixture.invalid`;
+const username = `http_${randomBytes(8).toString('hex')}`;
 const password = randomBytes(30).toString('base64url');
 let ownerCookie;
 let createdId;
@@ -30,7 +30,9 @@ async function request(route, { method = 'GET', cookie, body } = {}) {
 async function json(response, status, label) {
   assert.equal(response.status, status, `${label}: unexpected HTTP status`);
   assert.match(response.headers.get('cache-control') || '', /no-store/, `${label} must not cache`);
-  return response.json();
+  const body = await response.json();
+  assert.doesNotMatch(JSON.stringify(body), /@accounts\.monstajam\.invalid|"(?:email|emailVerified|token|resetNonce|credentialLockVersion)"\s*:/, label + ' leaked internal account data');
+  return body;
 }
 function cookie(response) {
   const value = response.headers.getSetCookie().find((entry) => entry.includes('monstajam_auth.session_token='));
@@ -48,36 +50,40 @@ function token(link) {
   assert.ok(value);
   return value;
 }
-async function signIn(loginEmail, loginPassword) {
-  const response = await request('/api/auth/sign-in/email', { method: 'POST', body: { email: loginEmail, password: loginPassword } });
+async function signIn(loginUsername, loginPassword) {
+  const response = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: loginUsername, password: loginPassword } });
   const data = await json(response, 200, 'Named sign-in');
-  assert.equal(data.user.email, loginEmail);
+  assert.equal(data.user.username, loginUsername.trim().toLowerCase());
   return { cookie: cookie(response), user: data.user };
 }
 
 async function main() {
   assert.ok(process.argv.includes('--local-fixture'), 'Pass --local-fixture to use this test-only server.');
   try {
-    const owner = await signIn(ownerEmail, ownerPassword);
+    const owner = await signIn(ownerUsername.toUpperCase(), ownerPassword);
     assert.equal(owner.user.name, 'Local fixture owner', 'Refuse to mutate an unknown local server');
     assert.equal(owner.user.role, 'owner');
     ownerCookie = owner.cookie;
     const list = await json(await request('/api/admin/accounts', { cookie: ownerCookie }), 200, 'Owner account list');
     assert.equal(list.currentUserId, owner.user.id);
+    await json(await request('/api/auth/sign-in/email', { method: 'POST', body: { email: 'unused@fixture.invalid', password: ownerPassword } }), 404, 'Email sign-in remains closed');
     checked('owner signs in and accesses the account list through real Next HTTP');
 
     const invite = await json(await request('/api/admin/accounts', {
-      method: 'POST', cookie: ownerCookie, body: { name: 'HTTP regression admin', email },
+      method: 'POST', cookie: ownerCookie, body: { name: 'HTTP regression admin', username: username.toUpperCase() },
     }), 201, 'Owner invitation');
     createdId = invite.account.id;
     assert.equal(invite.account.status, 'pending');
-    assert.equal(invite.account.email, email);
+    assert.equal(invite.account.username, username);
+    await json(await request('/api/admin/accounts', {
+      method: 'POST', cookie: ownerCookie, body: { name: 'Duplicate name attempt', username },
+    }), 409, 'Case-insensitive duplicate username');
     const activationToken = token(invite);
     assert.ok(Date.parse(invite.expiresAt) > Date.now());
     const info = await json(await request('/api/admin/accounts/activation-info', {
       method: 'POST', body: { token: activationToken },
     }), 200, 'Activation information');
-    assert.equal(info.email, email);
+    assert.equal(info.username, username);
     assert.equal(info.status, 'pending');
     checked('owner invitation crosses route bundles and returns a usable one-hour fragment link');
 
@@ -87,7 +93,7 @@ async function main() {
     await json(await request('/api/auth/reset-password', {
       method: 'POST', body: { token: activationToken, newPassword: password },
     }), 410, 'Consumed activation replay');
-    const firstAdmin = await signIn(email, password);
+    const firstAdmin = await signIn(username.toUpperCase(), password);
     assert.equal(firstAdmin.user.role, 'admin');
     await json(await request('/api/tracks?all=true', { cookie: firstAdmin.cookie }), 200, 'Admin content access');
     await json(await request('/api/admin/accounts', { cookie: firstAdmin.cookie }), 403, 'Admin cannot manage accounts');
@@ -95,7 +101,7 @@ async function main() {
 
     await json(await request('/api/auth/logout', { method: 'POST', cookie: firstAdmin.cookie, body: {} }), 200, 'Admin logout');
     await json(await request('/api/tracks?all=true', { cookie: firstAdmin.cookie }), 401, 'Logged-out cookie replay');
-    const secondAdmin = await signIn(email, password);
+    const secondAdmin = await signIn(username.toUpperCase(), password);
     const resetLink = await json(await request(`/api/admin/accounts/${createdId}/link`, {
       method: 'POST', cookie: ownerCookie, body: { kind: 'reset' },
     }), 200, 'Owner reset link');

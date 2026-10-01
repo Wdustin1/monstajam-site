@@ -16,7 +16,7 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
   const auth = getAuth();
   const context = await auth.$context;
   const messages: string[] = [];
-  const email = `credential-race-${randomBytes(6).toString('hex')}@fixture.invalid`;
+  const username = `race_${randomBytes(6).toString('hex')}`;
   const passwords = Array.from({ length: 4 }, () => randomBytes(30).toString('base64url'));
   let phase = 'fixture account creation';
 
@@ -34,7 +34,7 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
     assert.ok(cookie, 'Named session cookie is required');
     return cookie;
   }
-  const signIn = async (password: string) => cookieFrom(await request('/sign-in/email', { email, password }));
+  const signIn = async (password: string) => cookieFrom(await request('/sign-in/username', { username, password }));
   const identity = (cookie: string) => getAdminIdentity(new Headers({ Cookie: cookie }));
   function token(link: { activationUrl: string }) {
     const value = new URLSearchParams(new URL(link.activationUrl).hash.slice(1)).get('token');
@@ -61,7 +61,7 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
       }
       return valid;
     };
-    const pending = request('/sign-in/email', { email, password });
+    const pending = request('/sign-in/username', { username, password });
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
@@ -80,7 +80,7 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
 
   try {
     const user = (await auth.api.createUser({ body: {
-      email, name: 'Credential race fixture', password: passwords[0], role: 'admin', data: { accessStatus: 'active' },
+      email: `${username}@fixture.invalid`, name: 'Credential race fixture', password: passwords[0], role: 'admin', data: { username, accessStatus: 'active' },
     } })).user;
     let cookie = await signIn(passwords[0]);
     let setup = await issueAccountLink(actor, user.id, 'reset');
@@ -100,7 +100,7 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
     assert.equal((await request('/reset-password', { token: firstToken, newPassword: passwords[1] })).status, 200);
     assert.equal(await identity(lateCookie), null, 'Completed reset must revoke the earlier sign-in');
     assert.equal(await identity(cookie), null);
-    assert.equal((await request('/sign-in/email', { email, password: passwords[0] })).status, 401);
+    assert.equal((await request('/sign-in/username', { username, password: passwords[0] })).status, 401);
     cookie = await signIn(passwords[1]);
     messages.push('HTTP sign-in cannot be overtaken by reset/change; completed reset revokes the earlier session');
 
@@ -118,13 +118,13 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
     await duringVerifiedSignIn(passwords[2], async (finish) => {
       await revokeAdminAccount(actor, user.id);
       assert.equal(await identity(cookie), null);
-      await expectServiceStatus(() => createAdminAccount(actor, { email, name: 'Credential race fixture' }), 409);
+      await expectServiceStatus(() => createAdminAccount(actor, { username, name: 'Credential race fixture' }), 409);
       const result = await finish();
       assert.notEqual(result.status, 200, 'Removed account must not finish signing in');
     });
-    const reinvited = await createAdminAccount(actor, { email, name: 'Credential race fixture' });
+    const reinvited = await createAdminAccount(actor, { username, name: 'Credential race fixture' });
     assert.equal(reinvited.account.status, 'pending');
-    assert.notEqual((await request('/sign-in/email', { email, password: passwords[2] })).status, 200);
+    assert.notEqual((await request('/sign-in/username', { username, password: passwords[2] })).status, 200);
     assert.equal((await request('/reset-password', { token: token(reinvited), newPassword: passwords[3] })).status, 200);
     const restoredCookie = await signIn(passwords[3]);
     assert.equal((await identity(restoredCookie))?.id, user.id);
@@ -133,17 +133,17 @@ export async function runCredentialRaceChecks(actor: AdminIdentity): Promise<str
 
     phase = 'invalid-login responses do not reveal account state';
     const failures = [
-      await request('/sign-in/email', { email, password: passwords[0] }),
-      await request('/sign-in/email', { email: `missing-${randomBytes(6).toString('hex')}@fixture.invalid`, password: passwords[0] }),
+      await request('/sign-in/username', { username, password: passwords[0] }),
+      await request('/sign-in/username', { username: `missing_${randomBytes(6).toString('hex')}`, password: passwords[0] }),
     ];
     await revokeAdminAccount(actor, user.id);
-    failures.push(await request('/sign-in/email', { email, password: passwords[3] }));
-    await createAdminAccount(actor, { email, name: 'Credential race fixture' });
-    failures.push(await request('/sign-in/email', { email, password: passwords[3] }));
+    failures.push(await request('/sign-in/username', { username, password: passwords[3] }));
+    await createAdminAccount(actor, { username, name: 'Credential race fixture' });
+    failures.push(await request('/sign-in/username', { username, password: passwords[3] }));
     assert.ok(failures.every(response => response.status === 401));
     const bodies = await Promise.all(failures.map(response => response.json()));
     for (const body of bodies) assert.deepEqual(body, bodies[0]);
-    assert.equal((await db.collection(AUTH_COLLECTIONS.users).findOne({ email }))?.resetNonce, null);
+    assert.equal((await db.collection(AUTH_COLLECTIONS.users).findOne({ username }))?.resetNonce, null);
     messages.push('Unknown, removed, pending and incorrect-password logins return the same generic response');
     return messages;
   } catch {

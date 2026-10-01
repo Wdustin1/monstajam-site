@@ -35,7 +35,7 @@ export default function AdminPasswordSettings({ currentAdmin }: { currentAdmin: 
         <header>
           <h1 className="text-3xl font-semibold">Your account</h1>
           <p className="mt-3 text-slate-300">{currentAdmin.name} · {currentAdmin.role === 'owner' ? 'Owner' : 'Admin'}</p>
-          <p className="mt-1 break-all text-sm text-slate-400">{currentAdmin.email}</p>
+          <p className="mt-1 break-all text-sm text-slate-400">Username: {currentAdmin.username}</p>
         </header>
         <form onSubmit={submit} className="rounded-lg border border-white/15 p-5 sm:p-6">
           <h2 className="text-xl font-semibold">Change password</h2>

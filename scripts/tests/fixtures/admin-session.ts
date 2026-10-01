@@ -14,7 +14,7 @@ export function mockNamedAdminSession(token: string, active = true) {
   return mock.method(adminAuthorization, 'getIdentity', async (headers: Headers) => {
     const cookie = headers.get('cookie')?.split(';').map(value => value.trim());
     return active && cookie?.includes(`monstajam_auth.session_token=${token}`)
-      ? { id: 'fixture-admin', name: 'Fixture Admin', email: 'admin@example.test', role: 'admin' as const }
+      ? { id: 'fixture-admin', name: 'Fixture Admin', username: 'fixture_admin', role: 'admin' as const }
       : null;
   });
 }

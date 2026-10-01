@@ -994,7 +994,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               Upload songs, prep releases, manage videos, and catch missing media before anything goes live.
             </p>
-            <p className="mt-2 text-xs text-slate-400">Signed in as {currentAdmin.email} · {currentAdmin.role === 'owner' ? 'Owner' : 'Admin'}</p>
+            <p className="mt-2 text-xs text-slate-400">Signed in as {currentAdmin.name} ({currentAdmin.username}) · {currentAdmin.role === 'owner' ? 'Owner' : 'Admin'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a href="/upload/account" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Your account</a>

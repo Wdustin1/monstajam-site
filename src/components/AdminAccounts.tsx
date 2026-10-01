@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { accountButtonClass, accountInputClass, accountPost, accountRequest, accountSecondaryClass, type AdminAccount, type AdminIdentity } from '@/lib/admin-account-client';
+import { accountButtonClass, accountInputClass, accountPost, accountRequest, accountSecondaryClass, suggestUsername, usernamePattern, validUsername, type AdminAccount, type AdminIdentity } from '@/lib/admin-account-client';
 
-type SetupLink = { activationUrl: string; expiresAt: string; email: string; kind: 'activate' | 'reset' };
+type SetupLink = { activationUrl: string; expiresAt: string; username: string; kind: 'activate' | 'reset' };
 type AccountList = { accounts: AdminAccount[]; currentUserId: string };
 type LinkResult = { activationUrl: string; expiresAt: string };
 
@@ -19,7 +19,7 @@ function RevokeDialog({ account, busy, error, onCancel, onConfirm }: { account: 
   return (
     <dialog ref={dialog} aria-labelledby="revoke-title" onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-rose-300/30 bg-slate-950 p-6 text-white backdrop:bg-black/75">
       <h2 id="revoke-title" className="text-lg font-semibold">{account.status === 'pending' ? 'Cancel this invitation?' : 'Remove admin access?'}</h2>
-      <p className="mt-3 break-words text-sm leading-6 text-slate-300">{account.email} will lose access immediately. Existing sessions and setup links will stop working. Their songs and videos will stay on the site.</p>
+      <p className="mt-3 break-words text-sm leading-6 text-slate-300">{account.username} will lose access immediately. Existing sessions and setup links will stop working. Their songs and videos will stay on the site.</p>
       {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
       <div className="mt-6 flex justify-end gap-3">
         <button type="button" disabled={busy} onClick={onCancel} className={accountSecondaryClass}>Keep access</button>
@@ -34,7 +34,8 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [setupLink, setSetupLink] = useState<SetupLink | null>(null);
@@ -70,17 +71,24 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
     finally { operation.current = false; setBusy(false); }
   }
 
-  function revealLink(link: LinkResult, accountEmail: string, kind: 'activate' | 'reset') {
-    setSetupLink({ ...link, email: accountEmail, kind });
+  function revealLink(link: LinkResult, accountUsername: string, kind: 'activate' | 'reset') {
+    setSetupLink({ ...link, username: accountUsername, kind });
     setCopyStatus('');
+  }
+
+  function hideAccountLink(accountUsername: string) {
+    // The server may invalidate the old link even if its response is lost.
+    const canonicalUsername = accountUsername.trim().toLowerCase();
+    setSetupLink((current) => current?.username === canonicalUsername ? null : current);
   }
 
   async function invite(event: React.FormEvent) {
     event.preventDefault();
     await mutate(async () => {
-      const result = await accountPost<LinkResult & { account: AdminAccount }>('/api/admin/accounts', { name: name.trim(), email: email.trim() });
-      revealLink(result, result.account.email, 'activate');
-      setName(''); setEmail('');
+      hideAccountLink(username);
+      const result = await accountPost<LinkResult & { account: AdminAccount }>('/api/admin/accounts', { name: name.trim(), username: username.trim() });
+      revealLink(result, result.account.username, 'activate');
+      setName(''); setUsername(''); setUsernameEdited(false);
       setNotice('Invitation created. Copy the link and share it directly with this person.');
       await load();
     });
@@ -88,8 +96,9 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
 
   async function makeLink(account: AdminAccount, kind: 'activate' | 'reset') {
     await mutate(async () => {
+      hideAccountLink(account.username);
       const result = await accountPost<LinkResult>(`/api/admin/accounts/${encodeURIComponent(account.id)}/link`, { kind });
-      revealLink(result, account.email, kind);
+      revealLink(result, account.username, kind);
       setNotice('New link created. Any previous setup link for this account no longer works.');
       await load();
     });
@@ -97,8 +106,9 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
 
   async function reinvite(account: AdminAccount) {
     await mutate(async () => {
-      const result = await accountPost<LinkResult & { account: AdminAccount }>('/api/admin/accounts', { email: account.email, name: account.name });
-      revealLink(result, account.email, 'activate');
+      hideAccountLink(account.username);
+      const result = await accountPost<LinkResult & { account: AdminAccount }>('/api/admin/accounts', { username: account.username, name: account.name });
+      revealLink(result, account.username, 'activate');
       setNotice('New invitation created. The person must set a password before signing in.');
       await load();
     });
@@ -108,10 +118,10 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
     if (!confirm || !confirm.canRevoke) return;
     const account = confirm;
     await mutate(async () => {
+      hideAccountLink(account.username);
       await accountRequest(`/api/admin/accounts/${encodeURIComponent(account.id)}`, { method: 'DELETE' });
-      if (setupLink?.email === account.email) setSetupLink(null);
       setConfirm(null);
-      setNotice(`Access removed for ${account.email}.`);
+      setNotice(`Access removed for ${account.username}.`);
       await load();
     });
   }
@@ -131,14 +141,14 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
         </nav>
         <header>
           <h1 className="text-3xl font-semibold">Admin access</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400">Signed in as {currentAdmin.email}. Admins can manage songs and videos. Only you can manage admin access.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-400">Signed in as {currentAdmin.name} ({currentAdmin.username}). Admins can manage songs and videos. Only you can manage admin access.</p>
         </header>
         {error && <p role="alert" className="rounded-md border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200">{error} <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></p>}
         {notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}
         {setupLink && (
           <section aria-label="Setup link" className="space-y-3 rounded-lg border border-cyan-400/40 bg-cyan-400/5 p-5">
-            <h2 className="text-lg font-semibold">{setupLink.kind === 'activate' ? 'Activation' : 'Password-reset'} link for {setupLink.email}</h2>
-            <p className="text-sm leading-6 text-slate-300">Share this privately with this person. It expires {dateLabel(setupLink.expiresAt)} and can be used once. No email has been sent.</p>
+            <h2 className="text-lg font-semibold">{setupLink.kind === 'activate' ? 'Activation' : 'Password-reset'} link for {setupLink.username}</h2>
+            <p className="text-sm leading-6 text-slate-300">Share this privately with this person. It expires {dateLabel(setupLink.expiresAt)} and can be used once.</p>
             <label htmlFor="setup-link" className="block text-sm text-slate-300">Private setup link</label>
             <input ref={linkField} id="setup-link" readOnly value={setupLink.activationUrl} onFocus={(event) => event.target.select()} className={accountInputClass} />
             <div className="flex flex-wrap items-center gap-3">
@@ -152,9 +162,13 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
           <h2 className="text-lg font-semibold">Invite an admin</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">Create a personal account and share its one-hour activation link.</p>
           <fieldset disabled={busy} aria-busy={busy} className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div><label htmlFor="invite-name" className="mb-2 block text-sm text-slate-300">Name</label><input id="invite-name" required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} className={accountInputClass} /></div>
-            <div><label htmlFor="invite-email" className="mb-2 block text-sm text-slate-300">Email</label><input id="invite-email" type="email" autoCapitalize="none" spellCheck={false} required value={email} onChange={(event) => setEmail(event.target.value)} className={accountInputClass} /></div>
-            <div className="sm:col-span-2"><button type="submit" disabled={busy || !name.trim() || !email.trim()} className={accountButtonClass}>{busy ? 'Please wait…' : 'Create activation link'}</button></div>
+            <div><label htmlFor="invite-name" className="mb-2 block text-sm text-slate-300">Name</label><input id="invite-name" required maxLength={100} value={name} onChange={(event) => { setName(event.target.value); if (!usernameEdited) setUsername(suggestUsername(event.target.value)); }} className={accountInputClass} /></div>
+            <div>
+              <label htmlFor="invite-username" className="mb-2 block text-sm text-slate-300">Username</label>
+              <input id="invite-username" type="text" autoCapitalize="none" spellCheck={false} required minLength={3} maxLength={30} pattern={usernamePattern} value={username} onChange={(event) => { setUsernameEdited(true); setUsername(event.target.value); }} aria-describedby="invite-username-help" className={accountInputClass} />
+              <p id="invite-username-help" className="mt-2 text-xs leading-5 text-slate-400">Use their name or a unique variation. 3–30 letters, numbers, dots or underscores. Not case-sensitive.</p>
+            </div>
+            <div className="sm:col-span-2"><button type="submit" disabled={busy || !name.trim() || !validUsername(username)} className={accountButtonClass}>{busy ? 'Please wait…' : 'Create activation link'}</button></div>
           </fieldset>
         </form>
         <section aria-label="Admin accounts" className="space-y-4">
@@ -168,7 +182,7 @@ export default function AdminAccounts({ currentAdmin }: { currentAdmin: AdminIde
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h3 className="font-semibold">{account.name}{account.id === currentAdmin.id ? ' (you)' : ''}</h3>
-                  <p className="mt-1 break-all text-sm text-slate-300">{account.email}</p>
+                  <p className="mt-1 break-all text-sm text-slate-300">Username: {account.username}</p>
                   <p className="mt-2 text-sm text-slate-400">{account.role === 'owner' ? 'Owner' : 'Admin'} · {account.status === 'active' ? 'Active' : account.status === 'pending' ? 'Pending activation' : 'Removed'}</p>
                   {account.status === 'pending' && <p className="mt-2 text-xs text-slate-400">{account.linkExpiresAt && new Date(account.linkExpiresAt).valueOf() <= Date.now() ? 'Link expired' : 'Link expires'}: {dateLabel(account.linkExpiresAt)}</p>}
                   {account.status === 'active' && <p className="mt-2 text-xs text-slate-400">Last sign-in: {dateLabel(account.lastLoginAt)}</p>}

@@ -147,8 +147,8 @@ async function runChecks() {
   }
   console.log('PASS signed-out and invalid-cookie preview access');
 
-  const login = await request('/api/auth/sign-in/email', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'owner@fixture.invalid', password }),
+  const login = await request('/api/auth/sign-in/username', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Dustin', password }),
   });
   assert.equal(login.status, 200, 'Normal login must accept the generated test password');
   const cookie = login.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
@@ -231,7 +231,7 @@ async function main() {
   console.log('Draft privacy HTTP integration passed.');
   if (keepAlive) {
     console.log(`Server retained for browser smoke. URL: ${origin}/upload/login`);
-    console.log('Generated local-only email: owner@fixture.invalid');
+    console.log('Local fixture username: Dustin');
     console.log(`Generated local-only password: ${password}`);
     console.log('All database writes are blocked by the fixture. Press Ctrl+C to stop.');
     await new Promise((resolve) => child.once('exit', resolve));

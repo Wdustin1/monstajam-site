@@ -45,7 +45,7 @@ async function request(route, { cookie, body, ...options } = {}) {
 }
 
 async function smoke() {
-  const login = await request('/api/auth/sign-in/email', { method: 'POST', body: { email: 'owner@fixture.invalid', password } });
+  const login = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password } });
   assert.equal(login.status, 200);
   let cookie = login.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
   assert.ok(cookie);
@@ -79,7 +79,7 @@ async function smoke() {
   save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Must not persist' } });
   assert.equal(save.status, 401);
   await setControls({ expireSession: false, resetGeneration: 1 });
-  const relogin = await request('/api/auth/sign-in/email', { method: 'POST', body: { email: 'owner@fixture.invalid', password } });
+  const relogin = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password } });
   assert.equal(relogin.status, 200);
   cookie = relogin.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
   assert.ok(cookie, 'Revoked fixture sessions must be replaced through a fresh sign-in');
@@ -130,9 +130,9 @@ async function main() {
   await smoke();
   if (smokeOnly) { stop(); return; }
   const credentialsPath = path.join(temporaryDirectory, 'browser.json');
-  await fs.writeFile(credentialsPath, JSON.stringify({ url: origin + '/upload/login', email: 'owner@fixture.invalid', password }));
+  await fs.writeFile(credentialsPath, JSON.stringify({ url: origin + '/upload/login', username: 'Dustin', password }));
   console.log(`Dashboard fixture ready: ${origin}/upload/login`);
-  console.log('Generated local-only email: owner@fixture.invalid');
+  console.log('Local fixture username: Dustin');
   console.log(`Local fixture credentials: ${credentialsPath}`);
   console.log(`Control file: ${controlPath}`);
   console.log(`Next PID: ${child.pid}`);

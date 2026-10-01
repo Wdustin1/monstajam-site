@@ -4,9 +4,10 @@ import { APIError } from 'better-auth/api';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import { admin } from 'better-auth/plugins/admin';
 import { adminAc, userAc } from 'better-auth/plugins/admin/access';
-import { AUTH_COLLECTIONS, getAuthDatabase, getAuthMongoClient, hashVerificationIdentifier, type AdminRole } from './auth-store';
+import { username } from 'better-auth/plugins/username';
+import { AUTH_COLLECTIONS, getAuthDatabase, getAuthMongoClient, hashVerificationIdentifier, normalizeUsername, type AdminRole } from './auth-store';
 
-export type AdminIdentity = { id: string; name: string; email: string; role: AdminRole };
+export type AdminIdentity = { id: string; name: string; username: string; role: AdminRole };
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
 export const SETUP_LINK_SECONDS = 60 * 60;
@@ -85,9 +86,12 @@ export function createAuthProvider(config: {
       window: 60, max: 60,
       // The reset wrapper applies a database limit before it claims a one-use
       // link. A second limiter after that claim could strand a valid account.
-      customRules: { '/sign-in/email': { window: 60, max: 5 }, '/reset-password': false },
+      customRules: { '/sign-in/username': { window: 60, max: 5 }, '/reset-password': false },
     },
-    plugins: [admin({ defaultRole: 'admin', adminRoles: ['owner'], roles: { owner: adminAc, admin: userAc } })],
+    plugins: [
+      admin({ defaultRole: 'admin', adminRoles: ['owner'], roles: { owner: adminAc, admin: userAc } }),
+      username({ immutableUsername: true, displayUsername: false, usernameNormalization: normalizeUsername, minUsernameLength: 3, maxUsernameLength: 30, validationOrder: { username: 'pre-normalization' } }),
+    ],
     databaseHooks: {
       session: {
         create: {
@@ -131,6 +135,6 @@ export async function getAdminIdentity(headers: Headers): Promise<AdminIdentity 
   if (!/(?:^|;\s*)(?:__Secure-)?monstajam_auth\.session_token=/.test(headers.get('cookie') ?? '')) return null;
   const session = await getAuth().api.getSession({ headers, query: { disableCookieCache: true } });
   const user = session?.user;
-  if (!user || user.accessStatus !== 'active' || user.authLocked || user.banned || (user.role !== 'owner' && user.role !== 'admin')) return null;
-  return { id: user.id, name: user.name, email: user.email, role: user.role };
+  if (!user || !user.username || user.accessStatus !== 'active' || user.authLocked || user.banned || (user.role !== 'owner' && user.role !== 'admin')) return null;
+  return { id: user.id, name: user.name, username: user.username, role: user.role };
 }

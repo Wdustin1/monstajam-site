@@ -63,11 +63,19 @@ async function request(route, { cookie, body, ...options } = {}) {
 function assertPrivateAbsent(text, description) {
   for (const marker of privateMarkers) assert.ok(!text.includes(marker), `${description} leaked ${marker}`);
 }
+function assertHiddenAliasesAbsent(body, label) {
+  const serialized = typeof body === 'string' ? body : JSON.stringify(body);
+  assert.ok(!serialized.includes('@accounts.monstajam.invalid'), label + ' leaked an internal account alias');
+  if (typeof body !== 'string') assert.doesNotMatch(serialized, /"(?:email|emailVerified|token|resetNonce|credentialLockVersion)"\s*:/);
+}
 function assertNoStore(response) { assert.match(response.headers.get('cache-control') || '', /no-store/); }
-async function login(email) {
-  const response = await request('/api/auth/sign-in/email', { method: 'POST', body: { email, password } });
-  assert.equal(response.status, 200, `Login failed for local fixture ${email}: ${await response.clone().text()}`);
+async function login(username) {
+  const response = await request('/api/auth/sign-in/username', { method: 'POST', body: { username, password } });
+  assert.equal(response.status, 200, `Login failed for local fixture ${username}`);
   assertNoStore(response);
+  const body = await response.json();
+  assert.equal(body.user.username, username.trim().toLowerCase());
+  assertHiddenAliasesAbsent(body, 'Sign-in response');
   const setCookies = response.headers.getSetCookie();
   const session = setCookies.find((value) => value.includes('monstajam_auth.session_token='));
   assert.ok(session, 'Named login must issue the real signed session cookie');
@@ -103,18 +111,21 @@ async function checks() {
   const oldLogin = await request('/api/auth/login', { method: 'POST', body: { password } });
   assert.equal(oldLogin.status, 401);
   assert.equal(oldLogin.headers.has('set-cookie'), false);
-  for (const endpoint of ['/sign-up/email', '/request-password-reset', '/admin/create-user', '/admin/set-role', '/admin/impersonate-user']) {
+  for (const endpoint of ['/sign-in/email', '/sign-up/email', '/is-username-available', '/request-password-reset', '/admin/create-user', '/admin/set-role', '/admin/impersonate-user']) {
     const response = await request('/api/auth' + endpoint, { method: 'POST', body: {} });
     assert.ok([403, 404].includes(response.status), `${endpoint} must be unavailable over HTTP, got ${response.status}`);
   }
-  const crossOrigin = await request('/api/auth/sign-in/email', { method: 'POST', body: { email: 'owner@fixture.invalid', password }, headers: { Origin: 'https://untrusted.invalid' } });
+  const crossOrigin = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password }, headers: { Origin: 'https://untrusted.invalid' } });
   assert.equal(crossOrigin.status, 403);
-  const pending = await request('/api/auth/sign-in/email', { method: 'POST', body: { email: 'pending@fixture.invalid', password } });
+  const pending = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'pending', password } });
   assert.equal(pending.status, 401);
   console.log('PASS signup/admin endpoint closure, origin enforcement, inactive account and obsolete login rejection');
 
-  const ownerCookie = await login('owner@fixture.invalid');
-  const adminCookie = await login('admin@fixture.invalid');
+  const ownerCookie = await login('DuStIn');
+  const adminCookie = await login('ADMIN');
+  const session = await request('/api/auth/get-session', { cookie: ownerCookie });
+  assertNoStore(session);
+  assertHiddenAliasesAbsent(await session.json(), 'Session response');
   const listing = await request('/api/tracks?all=true', { cookie: adminCookie });
   assertNoStore(listing);
   assert.equal((await listing.json()).length, 2);
@@ -122,6 +133,7 @@ async function checks() {
   assert.equal(preview.status, 200);
   if (production) assertNoStore(preview);
   const previewBody = await preview.text();
+  assertHiddenAliasesAbsent(previewBody, 'Authenticated page');
   assert.match(previewBody, /PRIVATE_FIXTURE_TITLE_9d2a/);
   assert.match(previewBody, /name="robots"[^>]*noindex/);
   const previewRSC = await request('/upload/preview/privacy-draft-track?_rsc=fixture-auth', { cookie: adminCookie, headers: { RSC: '1' } });
@@ -132,9 +144,9 @@ async function checks() {
   await assertDenied(undefined, 'Signed out after authenticated render');
   console.log('PASS named sessions, draft HTML/RSC/noindex/no-store, and request/cache isolation');
 
-  await setControls({ users: { 'admin@fixture.invalid': { accessStatus: 'removed' } } });
+  await setControls({ users: { admin: { accessStatus: 'removed' } } });
   await assertDenied(adminCookie, 'Removed admin with unchanged signed cookie');
-  await setControls({ users: { 'admin@fixture.invalid': { accessStatus: 'active' } }, revokeGeneration: 1, revokeEmail: 'admin@fixture.invalid' });
+  await setControls({ users: { admin: { accessStatus: 'active' } }, revokeGeneration: 1, revokeUsername: 'admin' });
   await assertDenied(adminCookie, 'Revoked backing session');
   const ownerStillValid = await request('/api/tracks?all=true', { cookie: ownerCookie });
   assert.equal((await ownerStillValid.json()).length, 2, 'Removing one admin must preserve the owner session');
@@ -182,7 +194,7 @@ async function main() {
   console.log(`Named-auth ${production ? 'compiled-production' : 'development'} HTTP integration passed.`);
   if (keepAlive) {
     console.log(`Local HTTP fixture retained at ${transport}; browser mode uses --development. Credentials in ${path.join(directory, 'browser.json')}`);
-    await fs.writeFile(path.join(directory, 'browser.json'), JSON.stringify({ url: origin, email: 'owner@fixture.invalid', password }));
+    await fs.writeFile(path.join(directory, 'browser.json'), JSON.stringify({ url: origin, username: 'Dustin', password }));
     await new Promise((resolve) => child.once('exit', resolve));
   } else stop();
 }

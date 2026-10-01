@@ -2,15 +2,17 @@ import { randomBytes } from 'node:crypto';
 import { ObjectId, type ClientSession } from 'mongodb';
 import { z } from 'zod';
 import { authBaseURL, getAuth, passwordResetContext, setupLinkDelivery, SETUP_LINK_SECONDS, type AdminIdentity } from './auth-provider';
-import { AUTH_COLLECTIONS, ensureAuthIndexes, getAuthDatabase, getAuthMongoClient, resetIdentifier, validResetToken, type AdminUserDocument } from './auth-store';
+import { AUTH_COLLECTIONS, createInternalAccountEmail, ensureAuthIndexes, getAuthDatabase, getAuthMongoClient, normalizeUsername, resetIdentifier, validResetToken, type AdminUserDocument } from './auth-store';
 
 export const INVALID_SETUP_LINK = 'This setup link is invalid or expired. Ask the owner for a new link.';
 export class AdminAccountError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }
 }
 
+export const usernameInputSchema = z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_.]+$/).transform(normalizeUsername);
+
 export const accountInputSchema = z.object({
-  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  username: usernameInputSchema,
   name: z.string().trim().min(1).max(100),
 }).strict();
 
@@ -25,7 +27,7 @@ function ownerOnly(actor: AdminIdentity) {
 
 function accountView(user: AdminUserDocument, actorId: string) {
   return {
-    id: user._id.toHexString(), name: user.name, email: user.email, role: user.role,
+    id: user._id.toHexString(), name: user.name, username: user.username, role: user.role,
     status: user.accessStatus,
     linkExpiresAt: user.linkExpiresAt?.toISOString() ?? null,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
@@ -49,13 +51,13 @@ export async function listAdminAccounts(actor: AdminIdentity) {
 export async function createAdminAccount(actor: AdminIdentity, input: unknown) {
   ownerOnly(actor);
   const parsed = accountInputSchema.safeParse(input);
-  if (!parsed.success) throw new AdminAccountError(422, 'Enter a valid name and email address.');
+  if (!parsed.success) throw new AdminAccountError(422, 'Enter a name and a username of 3–30 letters, numbers, underscores, or dots.');
   await ensureAuthIndexes();
   const collection = getAuthDatabase().collection<AdminUserDocument>(AUTH_COLLECTIONS.users);
-  const existing = await collection.findOne({ email: parsed.data.email });
+  const existing = await collection.findOne({ username: parsed.data.username });
   if (existing) {
     if (existing.role !== 'admin' || existing.accessStatus !== 'removed') {
-      throw new AdminAccountError(409, 'An account with that email already exists. Use its existing access controls.');
+      throw new AdminAccountError(409, 'An account with that username already exists. Use its existing access controls.');
     }
     const session = getAuthMongoClient().startSession();
     try {
@@ -78,13 +80,13 @@ export async function createAdminAccount(actor: AdminIdentity, input: unknown) {
   let id: string;
   try {
     const result = await getAuth().api.createUser({ body: {
-      ...parsed.data, password: randomBytes(48).toString('base64url'), role: 'admin',
-      data: { accessStatus: 'pending', authLocked: false },
+      name: parsed.data.name, email: createInternalAccountEmail(), password: randomBytes(48).toString('base64url'), role: 'admin',
+      data: { username: parsed.data.username, accessStatus: 'pending', authLocked: false },
     } });
     id = result.user.id;
   } catch (error) {
-    if (await collection.findOne({ email: parsed.data.email })) {
-      throw new AdminAccountError(409, 'An account with that email already exists.');
+    if (await collection.findOne({ username: parsed.data.username })) {
+      throw new AdminAccountError(409, 'An account with that username already exists.');
     }
     throw error;
   }
@@ -171,7 +173,7 @@ export async function getActivationInfo(token: unknown) {
     accessStatus: { $in: ['pending', 'active'] }, linkExpiresAt: { $gt: new Date() },
   });
   if (!user || user.banned) throw new AdminAccountError(410, INVALID_SETUP_LINK);
-  return { name: user.name, email: user.email, status: user.accessStatus as 'pending' | 'active', expiresAt: verification.expiresAt.toISOString() };
+  return { name: user.name, username: user.username, status: user.accessStatus as 'pending' | 'active', expiresAt: verification.expiresAt.toISOString() };
 }
 
 // A single atomic claim both invalidates every other copied link and stops all
@@ -284,13 +286,13 @@ export async function claimPasswordChange(actor: AdminIdentity) {
 // Hold the same lock before credential verification begins. Otherwise an old
 // password already verified by a concurrent sign-in could mint a new session
 // after a password reset had deleted all previous sessions.
-export async function claimPasswordSignIn(email: string) {
+export async function claimPasswordSignIn(username: string) {
   const adapter = (await getAuth().$context).adapter;
   const user = await adapter.findOne<{ id: string; role: string; accessStatus: string; authLocked?: boolean; banned?: boolean }>({
-    model: 'user', where: [{ field: 'email', value: email.trim().toLowerCase() }],
+    model: 'user', where: [{ field: 'username', value: normalizeUsername(username) }],
   });
   if (!user || user.accessStatus !== 'active' || user.authLocked || user.banned || !['owner', 'admin'].includes(user.role)) {
-    throw new AdminAccountError(401, 'Email or password is incorrect, or this account is not active.');
+    throw new AdminAccountError(401, 'Username or password is incorrect, or this account is not active.');
   }
   const nonce = randomBytes(24).toString('base64url');
   // incrementOne is the adapter's documented atomic guarded-write primitive;

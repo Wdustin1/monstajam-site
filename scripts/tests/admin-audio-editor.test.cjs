@@ -98,7 +98,7 @@ beforeEach(async () => {
   globalThis.fetch = fetchMock;
   document.body.innerHTML = '<div id="root"></div>';
   container = document.getElementById('root'); root = createRoot(container);
-  await act(async () => { root.render(React.createElement(Dashboard, { currentAdmin: { id: 'owner-fixture', name: 'Fixture Owner', email: 'owner@example.invalid', role: 'owner' } })); });
+  await act(async () => { root.render(React.createElement(Dashboard, { currentAdmin: { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' } })); });
 });
 afterEach(async () => { await act(async () => root.unmount()); globalThis.fetch = oldFetch; });
 after(() => { if (oldBlobModule) require.cache[blobPath] = oldBlobModule; else delete require.cache[blobPath]; dom.window.close(); });

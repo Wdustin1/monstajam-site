@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { accountButtonClass, accountInputClass, accountPost, accountRequest } from '@/lib/admin-account-client';
 
-type LinkInfo = { name: string; email: string; status: 'pending' | 'active'; expiresAt: string };
+type LinkInfo = { name: string; username: string; status: 'pending' | 'active'; expiresAt: string };
 
 export default function AdminActivation() {
   const [token, setToken] = useState('');
@@ -64,11 +64,11 @@ export default function AdminActivation() {
         <h1 className="text-2xl font-semibold">{finished ? 'Your password is ready' : info?.status === 'active' ? 'Reset your password' : 'Activate your admin account'}</h1>
         {checking && <p role="status" className="text-slate-300">Checking your link…</p>}
         {linkError && <p role="alert" className="text-sm leading-6 text-rose-300">{linkError}</p>}
-        {finished ? <p role="status" className="text-sm leading-6 text-slate-300">Sign in with {info?.email} and your new password.</p> : info && (
+        {finished ? <p role="status" className="text-sm leading-6 text-slate-300">Sign in with {info?.username} and your new password.</p> : info && (
           <>
             <div className="rounded-md border border-white/15 p-4 text-sm text-slate-300">
               <p className="font-semibold text-white">{info.name}</p>
-              <p className="mt-1 break-all">{info.email}</p>
+              <p className="mt-1 break-all">Username: {info.username}</p>
               <p className="mt-3">This link can be used once. Choose a password for your account.</p>
             </div>
             <form onSubmit={submit}>
