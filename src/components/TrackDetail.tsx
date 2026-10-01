@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePlayer } from '@/context/PlayerContext';
 import { proxyCoverUrl } from '@/lib/proxy-cover';
+import { getPlaybackMode, isSamePlayback } from '@/lib/track-playback';
 import type { TrackWithCredits } from './MusicLibrary';
 
 interface TrackDetailProps {
@@ -14,7 +15,7 @@ interface TrackDetailProps {
 
 export default function TrackDetail({ track, allTracks = [], adminPreview = false }: TrackDetailProps) {
   const [showLyrics, setShowLyrics] = useState(false);
-  const { toggle, currentTrack, isPlaying, setQueue, play } = usePlayer();
+  const { toggle, currentTrack, isPlaying, setQueue } = usePlayer();
 
   const handlePlay = () => {
     // A draft preview must not auto-advance into another track or a singleton loop.
@@ -25,7 +26,8 @@ export default function TrackDetail({ track, allTracks = [], adminPreview = fals
     }
     toggle(track);
   };
-  const isCurrentTrack = currentTrack?.slug === track.slug;
+  const isCurrentTrack = isSamePlayback(currentTrack, track);
+  const isFullSong = getPlaybackMode(track) === 'full';
 
   const titleColor = track.accentCyan ? 'text-[#00ffff]' : 'text-[#ff00ff]';
   const titleShadow = track.accentCyan
@@ -148,7 +150,7 @@ export default function TrackDetail({ track, allTracks = [], adminPreview = fals
                 : <path clipRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" fillRule="evenodd" />
               }
             </svg>
-            {isCurrentTrack && isPlaying ? 'Pause' : 'Play Now'}
+            {isCurrentTrack && isPlaying ? 'Pause' : isFullSong ? 'Play Full Song' : 'Play 45s Preview'}
           </button>
 
           {track.spotifyUrl && track.spotifyUrl !== '#' && (

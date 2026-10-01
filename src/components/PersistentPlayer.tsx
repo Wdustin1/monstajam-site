@@ -1,6 +1,7 @@
 'use client';
 
 import { usePlayer } from '@/context/PlayerContext';
+import { getPlaybackMode } from '@/lib/track-playback';
 import { useEffect, useRef } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward,
@@ -20,7 +21,7 @@ function formatTime(seconds: number) {
 export default function PersistentPlayer() {
   const {
     currentTrack, isPlaying, progress, currentTime, duration,
-    volume, pause, play, toggle, seek, setVolume,
+    volume, pause, play, seek, setVolume,
     next, prev, shuffleOn, repeatOn, toggleShuffle, toggleRepeat,
   } = usePlayer();
 
@@ -56,10 +57,12 @@ export default function PersistentPlayer() {
 
   const handlePlayPause = () => {
     if (!currentTrack) return;
-    isPlaying ? pause() : play(currentTrack);
+    if (isPlaying) pause();
+    else play(currentTrack);
   };
 
   const hasTrack = !!currentTrack;
+  const playbackLabel = currentTrack && getPlaybackMode(currentTrack) === 'full' ? 'Full song' : '45s preview';
 
   if (!hasTrack) return null;
 
@@ -126,7 +129,7 @@ export default function PersistentPlayer() {
               {currentTrack?.subtitle ? ` (${currentTrack.subtitle})` : ''}
             </h4>
             <p className="text-xs truncate mt-0.5" style={{ color: '#00e5ff', opacity: 0.7 }}>
-              {currentTrack?.artist || '—'}
+              {currentTrack?.artist || '—'} · {playbackLabel}
             </p>
           </div>
 
@@ -186,6 +189,7 @@ export default function PersistentPlayer() {
             {hasTrack && (
               <p className="text-xs truncate mt-0.5" style={{ color: '#00e5ff', opacity: 0.7 }}>
                 {currentTrack?.genre}
+                {` • ${playbackLabel}`}
                 {currentTrack?.bpm ? ` • ${currentTrack.bpm} BPM` : ''}
                 {!currentTrack?.audioUrl && (
                   <span className="ml-1 text-yellow-500/70">· no audio</span>

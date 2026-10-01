@@ -15,6 +15,7 @@ const fixture = {
   slug: 'unreleased-track',
   title: 'Unreleased track',
   published: false,
+  playbackMode: 'preview',
   audioUrl: 'https://example.invalid/unreleased.mp3',
   credits: [{ role: 'Producer', name: 'Test producer' }],
 };

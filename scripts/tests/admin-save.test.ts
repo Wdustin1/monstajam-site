@@ -20,6 +20,7 @@ const track = {
   appleMusicUrl: 'https://music.apple.com/us/album/example',
   audioUrl: 'https://example.invalid/audio.mp3', coverUrl: 'https://example.invalid/cover.png',
   published: false, number: 1, credits: [],
+  playbackMode: 'preview', audioAssetId: null,
 };
 const video = {
   id: '507f1f77bcf86cd799439011', title: 'Saved video', artist: 'MonstaJam', duration: '3:45',
@@ -35,7 +36,7 @@ async function unmockedWrite(args: WriteArgs): Promise<Record<string, unknown>> 
   throw new Error(`Unexpected unmocked write: ${JSON.stringify(args)}`);
 }
 const database = {
-  track: { create: unmockedWrite, update: unmockedWrite },
+  track: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => track },
   video: { create: unmockedWrite, update: unmockedWrite },
 };
 const prismaCache = globalThis as unknown as { prisma?: PrismaClient };

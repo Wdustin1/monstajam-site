@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackCreateSchema } from '@/lib/schemas';
+import { toPublicTrack } from '@/lib/track-playback';
 
 // GET /api/tracks — list tracks (published only; admin cookie required for drafts)
 export async function GET(req: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
       include: { credits: true },
       orderBy: { number: 'asc' },
     });
-    return NextResponse.json(tracks, { headers });
+    return NextResponse.json(showAll ? tracks : tracks.map(toPublicTrack), { headers });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Failed to fetch tracks' }, { status: 500, headers });
@@ -54,12 +55,32 @@ export async function POST(req: NextRequest) {
   const { accentCyan, ...trackInput } = parsed.data;
   const trackData: Prisma.TrackCreateInput = {
     ...trackInput,
+    playbackMode: trackInput.playbackMode ?? 'preview',
     genre: trackInput.genre ?? 'Hip-Hop',
     color: trackInput.color ?? 'bg-gradient-to-br from-purple-600 to-blue-500',
     ...(accentCyan != null && { accentCyan }),
   };
 
   try {
+    if (trackInput.audioUrl) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: { audioUrl: ['Upload and process the audio before attaching it to this track.'] },
+      }, { status: 422 });
+    }
+    if (trackInput.audioAssetId) {
+      const asset = await prisma.audioAsset.findUnique({
+        where: { id: trackInput.audioAssetId },
+        select: { status: true, originalPath: true, previewPath: true },
+      });
+      if (!asset || asset.status !== 'ready' || !asset.originalPath || !asset.previewPath) {
+        return NextResponse.json({
+          error: 'Validation failed',
+          details: { audioAssetId: ['Wait for audio processing to finish successfully before saving.'] },
+        }, { status: 422 });
+      }
+      trackData.audioUrl = null;
+    }
     const track = await prisma.track.create({
       data: trackData,
       include: { credits: true },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { isAdminRequest } from '@/lib/auth';
+import { audioToken, isOriginalPath, MAX_AUDIO_BYTES } from '@/lib/audio-storage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -22,10 +23,10 @@ const COVER_CONTENT_TYPES = [
 ];
 
 function uploadLimitsForPath(pathname: string) {
-  if (pathname.startsWith('monstajam/audio/')) {
+  if (isOriginalPath(pathname)) {
     return {
       allowedContentTypes: AUDIO_CONTENT_TYPES,
-      maximumSizeInBytes: 500 * 1024 * 1024,
+      maximumSizeInBytes: MAX_AUDIO_BYTES,
     };
   }
 
@@ -49,10 +50,16 @@ export async function POST(req: NextRequest) {
 
     if (contentType.includes('application/json')) {
       const body = (await req.json()) as HandleUploadBody;
+      if (body.type !== 'blob.generate-client-token') {
+        return NextResponse.json({ error: 'Invalid upload request' }, { status: 400 });
+      }
+      const pathname = body.payload.pathname;
+      uploadLimitsForPath(pathname);
 
       const jsonResponse = await handleUpload({
         body,
         request: req,
+        token: isOriginalPath(pathname) ? audioToken() : process.env.BLOB_READ_WRITE_TOKEN,
         onBeforeGenerateToken: async (pathname) => ({
           ...uploadLimitsForPath(pathname),
           allowOverwrite: false,
@@ -67,9 +74,15 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const folder = (formData.get('bucket') as string) || 'covers';
+    if (folder !== 'covers') {
+      return NextResponse.json({ error: 'Use private direct uploads for audio.' }, { status: 422 });
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+    if (!(file instanceof File) || file.size > 25 * 1024 * 1024 || !COVER_CONTENT_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Choose an image of 25 MB or less.' }, { status: 422 });
     }
 
     const ext = file.name.split('.').pop() || 'bin';
@@ -82,8 +95,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: blob.url });
   } catch (err) {
-    console.error('Upload error:', err);
-    const message = err instanceof Error ? err.message : 'Upload failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('Upload failed', err instanceof Error ? err.name : 'Unknown error');
+    return NextResponse.json({ error: 'Upload could not start. Check your file and try again. Your saved track has not changed.' }, { status: 500 });
   }
 }

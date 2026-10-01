@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getPublishedTrack } from '@/lib/published-track';
+import { toPublicTrack } from '@/lib/track-playback';
 import TrackPageView from '@/components/TrackPageView';
 
 export const dynamic = 'force-dynamic';
@@ -32,11 +33,14 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
       subtitle: true,
       color: true,
       audioUrl: true,
+      audioAssetId: true,
+      playbackMode: true,
+      updatedAt: true,
       coverUrl: true,
       number: true,
     },
     orderBy: { number: 'asc' },
   });
 
-  return <TrackPageView track={track} allTracks={allTracks} />;
+  return <TrackPageView track={toPublicTrack(track)} allTracks={allTracks.map(toPublicTrack)} />;
 }
