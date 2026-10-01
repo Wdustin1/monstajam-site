@@ -29,6 +29,12 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 Run the privacy regression checks with `npm run test:draft-privacy`. Run HTTP checks against an isolated local fixture server with `npm run test:draft-privacy:integration`; after `npm run build`, add `-- --production` to verify the compiled server and production cache headers. These checks use generated local login credentials and a read-only fixture database, never production data. Port 3310 must be free.
 
+## Artwork proxy
+
+Artwork remains public. `/api/cover` only downloads HTTPS artwork from this project's public Blob store and the `/monstajam/covers/` path, as configured in `src/lib/cover-source.ts`. It refuses redirects, limits downloads to 25 MiB and 10 seconds, and decodes/reencodes JPEG, PNG, WebP, or GIF pixels before serving them. Processing is limited to 40 million pixels and 5 seconds; output is capped at 4 MiB. Unsupported or damaged files return a non-cacheable error. A bounded, single-file multipart wrapper is supported for legacy uploads.
+
+Run `npm run test:cover-proxy` for source restrictions, unsafe-content rejection, image compatibility, timeout/size limits, and URL-encoding regression checks. Tests use generated images and mocked downloads, with no production writes.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

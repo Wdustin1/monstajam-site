@@ -1,14 +1,12 @@
-/**
- * Route Vercel Blob cover URLs through our /api/cover proxy.
- * Vercel Blob sometimes wraps responses in multipart/form-data which
- * breaks <img> tags. The proxy strips the wrapper and serves clean images.
- */
+import { parseCoverSource } from './cover-source';
+
+/** Route this project's Blob artwork through image validation and sanitization. */
 export function proxyCoverUrl(url: string | null | undefined): string {
   if (!url) return '';
-  if (url.includes('blob.vercel-storage.com')) {
-    // Decode first to normalize any %-encoded chars, then encode for query param
-    const decoded = decodeURI(url);
-    return `/api/cover?url=${encodeURIComponent(decoded)}`;
+  const source = parseCoverSource(url);
+  if (source) {
+    // Version new URLs so browsers don't reuse the old proxy's immutable cache.
+    return `/api/cover?${new URLSearchParams({ url: source.href, v: '2' })}`;
   }
   return url;
 }

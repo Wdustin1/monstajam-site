@@ -10,7 +10,8 @@
     "seed": "tsx prisma/seed.ts",
     "test:admin-smoke": "tsx scripts/admin-smoke.ts",
     "test:draft-privacy": "tsx --test scripts/tests/draft-privacy.test.ts",
-    "test:draft-privacy:integration": "node scripts/tests/draft-privacy.integration.cjs"
+    "test:draft-privacy:integration": "node scripts/tests/draft-privacy.integration.cjs",
+    "test:cover-proxy": "tsx --test scripts/tests/cover-proxy.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -27,6 +28,7 @@
     "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "0.34.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
