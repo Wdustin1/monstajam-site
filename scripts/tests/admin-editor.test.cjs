@@ -42,6 +42,7 @@ let root;
 let container;
 let navigation;
 const originalFetch = globalThis.fetch;
+const ownerIdentity = { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' };
 
 function fixtures() {
   const track = {
@@ -66,6 +67,7 @@ function fixtures() {
       { ...video, id: 'video-2', title: 'Second video fixture', order: 1 },
     ],
     calls: [], uploads: [], mutationResponses: [], nextMutationGate: null, failNextRead: false,
+    readResponses: {}, session: { user: { ...ownerIdentity, accessStatus: 'active', authLocked: false }, session: { expiresAt: '2099-01-01T00:00:00.000Z' } },
   };
 }
 
@@ -82,7 +84,15 @@ async function fakeFetch(input, init = {}) {
   const body = init.body ? JSON.parse(init.body) : undefined;
   network.calls.push({ input, method, body });
   if (method === 'GET') {
-    if (network.failNextRead) {
+    const queued = network.readResponses[input]?.shift();
+    if (queued) {
+      if (queued.gate) await queued.gate.promise;
+      if (queued.error) throw queued.error;
+      if (queued.raw !== undefined) return new Response(queued.raw, { status: queued.status || 200 });
+      return Response.json(queued.body, { status: queued.status || 200 });
+    }
+    if (input === '/api/auth/get-session') return Response.json(network.session);
+    if (network.failNextRead && (input === '/api/tracks?all=true' || input === '/api/videos?all=true')) {
       network.failNextRead = false;
       return Response.json({ error: 'Fixture read failed' }, { status: 500 });
     }
@@ -173,6 +183,27 @@ async function chooseFile(label, file) {
 function mutations() { return network.calls.filter((call) => call.method !== 'GET'); }
 function isDirty(kind) { return container.textContent.includes(`Unsaved ${kind} changes`); }
 function dialogOpen() { return !!container.querySelector('dialog[open]'); }
+function stat(label) {
+  const heading = [...container.querySelectorAll('div')].find((node) => node.children.length === 0 && node.textContent === label);
+  assert.ok(heading, `Missing statistic ${label}`);
+  return heading.parentElement;
+}
+function statValue(label) { return stat(label).children[1].textContent; }
+function lastFullCheck() { return stat('Last full check').querySelector('time')?.dateTime ?? null; }
+function readiness(label) {
+  const heading = [...container.querySelectorAll('span')].find((node) => node.textContent === label);
+  assert.ok(heading, `Missing readiness status ${label}`);
+  return heading.parentElement.textContent;
+}
+async function renderDashboard() {
+  await act(async () => { root.render(React.createElement(UploadDashboard, { currentAdmin: ownerIdentity })); });
+}
+async function remountWith(overrides) {
+  await act(async () => { root.unmount(); });
+  network = { ...fixtures(), ...overrides };
+  root = createRoot(container);
+  await renderDashboard();
+}
 
 beforeEach(async () => {
   network = fixtures();
@@ -187,8 +218,10 @@ beforeEach(async () => {
   document.body.innerHTML = '<div id="root"></div>';
   container = document.getElementById('root');
   root = createRoot(container);
-  await act(async () => { root.render(React.createElement(UploadDashboard, { currentAdmin: { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' } })); });
-  assert.equal(network.calls.filter((call) => call.method === 'GET').length, 2);
+  await renderDashboard();
+  assert.deepEqual(network.calls.filter((call) => call.method === 'GET').map((call) => call.input).sort(), [
+    '/api/auth/get-session', '/api/tracks?all=true', '/api/videos?all=true',
+  ]);
 });
 
 afterEach(async () => {
@@ -271,6 +304,7 @@ test('session expiry keeps video edits and provides a separate sign-in link befo
   assert.match(container.textContent, /Your session expired/);
   const signIn = container.querySelector('a[href="/upload/login"]');
   assert.equal(signIn.target, '_blank');
+  await press('Retry connection');
   await press('Retry save');
   assert.equal(network.videos[0].title, 'Keep this video edit');
   assert.equal(isDirty('video'), false);
@@ -401,7 +435,8 @@ test('failed library refresh retains loaded records and unsaved form contents', 
   assert.equal(field('Mood').value, 'Keep through refresh');
   assert.ok(article('Live fixture'));
   assert.ok(article('Draft fixture'));
-  assert.match(container.textContent, /Track library failed to load/);
+  assert.match(container.textContent, /Track library unavailable/);
+  assert.match(container.textContent, /Showing previously loaded tracks\./);
   assert.ok(isDirty('track'));
 });
 
@@ -550,3 +585,167 @@ test('Keep editing in the sign-out confirmation sends no logout request and reta
   assert.ok(isDirty('track'));
   assert.equal(location.pathname, '/upload');
 });
+
+test('an initial track-library failure is unavailable rather than empty and cannot pass Ops checks', async () => {
+  await remountWith({ readResponses: { '/api/tracks?all=true': [{ status: 503, body: { error: 'Fixture tracks unavailable' } }] } });
+  assert.match(container.textContent, /Connection needs attention/);
+  assert.match(container.textContent, /Track library unavailable/);
+  assert.doesNotMatch(container.textContent, /No tracks match that search|No tracks yet/);
+  assert.equal(statValue('Tracks'), '—');
+  assert.equal(statValue('Videos'), '2');
+  assert.equal(lastFullCheck(), null);
+  assert.equal(button('Add track').matches(':disabled'), true, 'Creation cannot assume an unloaded library is empty');
+  await press('Ops');
+  assert.match(readiness('Admin library is reachable'), /Needs attention/);
+  assert.match(readiness('All live tracks have audio'), /Not checked/);
+  assert.match(readiness('All live tracks have cover art'), /Not checked/);
+  await press('Tracks');
+  await press('Retry tracks');
+  assert.ok(article('Live fixture'));
+  assert.doesNotMatch(container.textContent, /Track library unavailable|Connection needs attention/);
+  assert.equal(statValue('Tracks'), '2');
+  assert.equal(button('Add track').matches(':disabled'), false);
+});
+
+test('a successfully loaded empty library remains distinguishable from an unavailable library', async () => {
+  await remountWith({ tracks: [], videos: [] });
+  assert.equal(statValue('Tracks'), '0');
+  assert.equal(statValue('Videos'), '0');
+  assert.ok(lastFullCheck());
+  assert.match(container.textContent, /No tracks yet/);
+  assert.doesNotMatch(container.textContent, /library unavailable|Connection needs attention/);
+  await press('Videos');
+  assert.match(container.textContent, /No videos yet/);
+});
+
+test('a partial refresh retains the last known tracks and does not advance the last full check', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 1, 12) });
+  await remountWith({});
+  const previousCheck = lastFullCheck();
+  assert.ok(previousCheck);
+  await edit('Live fixture');
+  await change('Mood', 'Retain this partial-refresh draft');
+  context.mock.timers.tick(60_000);
+  network.readResponses['/api/tracks?all=true'] = [{ status: 503, body: { error: 'Track refresh unavailable' } }];
+  network.videos.push({ ...network.videos[0], id: 'video-3', title: 'New server video' });
+  await press('Reload');
+  assert.ok(article('Live fixture'));
+  assert.match(container.textContent, /Showing previously loaded tracks\./);
+  assert.equal(statValue('Videos'), '3');
+  assert.equal(field('Mood').value, 'Retain this partial-refresh draft');
+  assert.equal(lastFullCheck(), previousCheck);
+  await press('Ops');
+  assert.match(readiness('Admin library is reachable'), /Needs attention/);
+  await press(/^Tracks/);
+  await press('Retry connection');
+  assert.notEqual(lastFullCheck(), previousCheck);
+  assert.equal(field('Mood').value, 'Retain this partial-refresh draft');
+  assert.doesNotMatch(container.textContent, /Showing previously loaded tracks\.|Connection needs attention/);
+});
+
+test('an independently failing video refresh preserves video edits and is visible while the tracks tab is open', async () => {
+  await press('Videos');
+  await edit('Video fixture');
+  await change('Duration', 'Keep this video draft');
+  await press('Tracks');
+  network.readResponses['/api/videos?all=true'] = [{ status: 503, body: { error: 'Videos temporarily unavailable' } }];
+  const previousCheck = lastFullCheck();
+  await press('Reload');
+  assert.match(container.textContent, /Connection needs attention/);
+  assert.equal(lastFullCheck(), previousCheck);
+  assert.ok(article('Live fixture'));
+  await press(/^Videos/);
+  assert.match(container.textContent, /Video library unavailable|Showing previously loaded videos\./);
+  assert.ok(article('Video fixture'));
+  assert.equal(field('Duration').value, 'Keep this video draft');
+  await press('Retry videos');
+  assert.doesNotMatch(container.textContent, /Video library unavailable|Connection needs attention/);
+  assert.equal(field('Duration').value, 'Keep this video draft');
+});
+
+test('an expired library request exposes sign-in recovery and keeps dirty fields and the selected file', async () => {
+  await edit('Live fixture');
+  await change('Mood', 'Keep after session expiry');
+  const file = new dom.window.File(['local-pixels'], 'retained.png', { type: 'image/png' });
+  const picker = await chooseFile('Replace cover art', file);
+  network.readResponses['/api/tracks?all=true'] = [{ status: 401, body: { error: 'Unauthorized' } }];
+  await press('Reload');
+  assert.match(container.textContent, /Sign-in required/);
+  const signIn = [...container.querySelectorAll('a')].find((link) => link.textContent === 'Sign in in a new tab');
+  assert.ok(signIn);
+  assert.equal(signIn.target, '_blank');
+  assert.equal(new URL(signIn.href).pathname, '/upload/login');
+  assert.equal(field('Mood').value, 'Keep after session expiry');
+  assert.equal(field('Replace cover art'), picker);
+  assert.equal(picker.files[0], file);
+  await press('Save changes');
+  assert.equal(mutations().length, 0, 'Known expired identity must not start another upload or mutation');
+  assert.equal(network.uploads.length, 0);
+  await press('Retry connection');
+  assert.doesNotMatch(container.textContent, /Sign-in required|Connection needs attention/);
+  assert.equal(picker.files[0], file);
+  assert.equal(field('Mood').value, 'Keep after session expiry');
+  await press('Save changes');
+  assert.equal(network.uploads.length, 1);
+  assert.equal(network.uploads[0].file, file);
+  assert.equal(network.tracks[0].mood, 'Keep after session expiry');
+});
+
+test('an expired save moves the whole dashboard into sign-in recovery instead of only a field error', async () => {
+  await edit('Live fixture');
+  await change('Mood', 'Keep failed save');
+  network.mutationResponses.push({ status: 401 });
+  await press('Save changes');
+  assert.match(container.textContent, /Sign-in required/);
+  assert.equal(field('Mood').value, 'Keep failed save');
+  assert.equal(mutations().length, 1);
+  await press('Retry save');
+  assert.equal(mutations().length, 1);
+  await press('Retry connection');
+  assert.doesNotMatch(container.textContent, /Sign-in required/);
+  await press('Retry save');
+  assert.equal(network.tracks[0].mood, 'Keep failed save');
+});
+
+test('a failed session lookup is a connection problem, not a claim that the user is signed out', async () => {
+  await remountWith({ readResponses: { '/api/auth/get-session': [{ status: 503, body: { error: 'Session store unavailable' } }] } });
+  assert.match(container.textContent, /Connection needs attention/);
+  assert.doesNotMatch(container.textContent, /Sign-in required/);
+  assert.equal(lastFullCheck(), null);
+  await press('Ops');
+  assert.match(readiness('Admin library is reachable'), /Needs attention/);
+  await press('Retry connection');
+  assert.doesNotMatch(container.textContent, /Connection needs attention/);
+  assert.ok(lastFullCheck());
+  assert.match(readiness('Admin library is reachable'), /Checked/);
+});
+
+test('a confirmed missing session produces persistent sign-in guidance without discarding the form', async () => {
+  await edit('Live fixture');
+  await change('Mood', 'Missing session draft');
+  network.session = null;
+  await press('Reload');
+  assert.match(container.textContent, /Sign-in required/);
+  assert.equal(field('Mood').value, 'Missing session draft');
+  await press('Videos');
+  assert.match(container.textContent, /Sign-in required/);
+  await press(/^Tracks/);
+  assert.equal(field('Mood').value, 'Missing session draft');
+});
+
+for (const payload of [{ error: 'Not a record array' }, [null]]) {
+  test(`malformed successful track data ${JSON.stringify(payload)} retains old records and a retryable error`, async () => {
+    await edit('Live fixture');
+    await change('Mood', 'Preserved under malformed response');
+    const previousCheck = lastFullCheck();
+    network.readResponses['/api/tracks?all=true'] = [{ body: payload }];
+    await press('Reload');
+    assert.match(container.textContent, /Track library unavailable|Connection needs attention/);
+    assert.ok(article('Live fixture'));
+    assert.equal(field('Mood').value, 'Preserved under malformed response');
+    assert.equal(lastFullCheck(), previousCheck);
+    await press('Retry tracks');
+    assert.doesNotMatch(container.textContent, /Track library unavailable|Connection needs attention/);
+    assert.equal(field('Mood').value, 'Preserved under malformed response');
+  });
+}

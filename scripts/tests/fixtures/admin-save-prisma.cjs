@@ -66,6 +66,9 @@ function matches(row, where = {}) {
 
 function read(model, args = {}) {
   refreshControls();
+  if ((model === 'track' && controls.failTrackReads) || (model === 'video' && controls.failVideoReads)) {
+    throw new Error(`Intentional local fixture ${model} read failure`);
+  }
   const failure = Number(controls.failReadGeneration || 0);
   if (failure > consumedReadFailure) {
     consumedReadFailure = failure;

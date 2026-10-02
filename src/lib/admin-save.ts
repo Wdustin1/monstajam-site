@@ -1,5 +1,5 @@
 export class AdminSaveError extends Error {
-  constructor(message: string, readonly fields: Record<string, string> = {}) {
+  constructor(message: string, readonly fields: Record<string, string> = {}, readonly status?: number) {
     super(message);
   }
 }
@@ -13,7 +13,7 @@ export function adminFetch(input: string, init?: RequestInit): Promise<Response>
 export async function readAdminResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null);
   if (response.status === 401) {
-    throw new AdminSaveError('Your session expired. Your edits are still here. Sign in in a new tab, then retry.');
+    throw new AdminSaveError('Your session expired. Your edits are still here. Sign in in a new tab, then retry.', {}, 401);
   }
   if (!response.ok) {
     const fields: Record<string, string> = {};
@@ -26,6 +26,7 @@ export async function readAdminResponse<T>(response: Response): Promise<T> {
       response.status === 422 ? 'Check the highlighted fields and retry.' :
         typeof body?.error === 'string' ? body.error : 'The request failed. Please retry.',
       fields,
+      response.status,
     );
   }
   if (!body) throw new AdminSaveError('The server response was interrupted. Reload the library to check whether the save completed before retrying.');

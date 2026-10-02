@@ -37,6 +37,7 @@ const Dashboard = require('../../src/components/UploadDashboard').default;
 let root;
 let container;
 const oldFetch = globalThis.fetch;
+const fixtureAdmin = { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' };
 
 function track(slug, additions = {}) {
   return { id: slug, slug, title: slug, artist: 'Fixture Artist', genre: 'Hip-Hop', number: 1,
@@ -114,6 +115,10 @@ async function fetchMock(input, init = {}) {
   const method = init.method || 'GET';
   const body = init.body ? JSON.parse(init.body) : null;
   state.calls.push({ input, method, body });
+  if (input === '/api/auth/get-session' && method === 'GET') return Response.json({
+    user: { ...fixtureAdmin, accessStatus: 'active', banned: false, authLocked: false },
+    session: { id: 'audio-editor-session-fixture', userId: fixtureAdmin.id, expiresAt: '2099-01-01T00:00:00.000Z' },
+  });
   if (input === '/api/tracks?all=true') return Response.json(state.tracks);
   if (input === '/api/videos?all=true') return Response.json([]);
   if (input.startsWith('/api/admin/track-title?') && method === 'GET') {
@@ -156,7 +161,7 @@ beforeEach(async () => {
   globalThis.fetch = fetchMock;
   document.body.innerHTML = '<div id="root"></div>';
   container = document.getElementById('root'); root = createRoot(container);
-  await act(async () => { root.render(React.createElement(Dashboard, { currentAdmin: { id: 'owner-fixture', name: 'Fixture Owner', username: 'fixture.owner', role: 'owner' } })); });
+  await act(async () => { root.render(React.createElement(Dashboard, { currentAdmin: fixtureAdmin })); });
 });
 afterEach(async () => { await act(async () => root.unmount()); globalThis.fetch = oldFetch; });
 after(() => {
@@ -247,6 +252,12 @@ test('preparation session expiry retains the selected private original for retry
   assert.match(container.textContent, /session expired/);
   assert.equal(field('Replace audio file').files[0], file);
   assert.equal(state.calls.filter((call) => call.method === 'PUT').length, 0);
+  assert.equal(button('Retry save').disabled, true, 'A known expired session must not start another upload');
+  const sessionChecks = state.calls.filter((call) => call.input === '/api/auth/get-session').length;
+  await click(button('Retry connection'));
+  assert.ok(state.calls.filter((call) => call.input === '/api/auth/get-session').length > sessionChecks);
+  assert.equal(field('Replace audio file').files[0], file, 'Session recovery must preserve the selected original');
+  assert.equal(button('Retry save').disabled, false);
   await click(button('Retry save'));
   assert.equal(state.uploads.length, 1);
   assert.equal(state.tracks[2].audioAssetId, 'new-ready-asset');
@@ -313,6 +324,14 @@ for (const failure of [
     assert.match(container.textContent, failure.message);
     if (failure.response instanceof Error) assert.match(container.textContent, /No new files were uploaded\./);
     assert.equal(field('Track title').matches(':disabled'), false);
+    if (failure.response.status === 401) {
+      assert.equal(button('Retry save').disabled, true);
+      await click(button('Retry connection'));
+      assertSelectedFiles(files);
+      assert.equal(field('Track title').value, 'Keep this title');
+      assert.equal(field('Mood').value, 'Keep this metadata');
+      assertNoUploadOrMutation();
+    }
     await click(button('Retry save'));
     assert.equal(state.uploads.length, 2);
     assert.equal(savedMetadata().length, 1);

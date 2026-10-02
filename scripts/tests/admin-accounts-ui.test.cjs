@@ -360,11 +360,17 @@ test('password change preserves values on failure, sends current/new passwords o
 });
 
 test('dashboard identity links expose account settings to admins and access management only to the owner', async () => {
+  let authenticatedUser = { ...owner, role: 'admin' };
+  network.handler = (call) => call.url === '/api/auth/get-session'
+    ? response({ user: { ...authenticatedUser, accessStatus: 'active', authLocked: false }, session: { expiresAt: expiry } })
+    : null;
   await render(Dashboard, { currentAdmin: { ...owner, role: 'admin', email: 'internal-alias@example.invalid' } });
   assert.ok(container.querySelector('a[href="/upload/account"]'));
   assert.equal(container.querySelector('a[href="/upload/admins"]'), null);
   assert.match(container.textContent, /Signed in as Dustin \(dustin\) · Admin/);
   assert.doesNotMatch(container.textContent, /internal-alias/);
+  authenticatedUser = owner;
   await render(Dashboard, { currentAdmin: owner });
+  await click(button('Reload'));
   assert.ok(container.querySelector('a[href="/upload/admins"]'));
 });
