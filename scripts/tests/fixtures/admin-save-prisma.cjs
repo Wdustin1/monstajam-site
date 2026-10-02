@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { randomBytes } = require('node:crypto');
+const { Prisma } = require('@prisma/client');
 
 const database = new URL(process.env.DATABASE_URL || 'file:///missing');
 const controlPath = process.env.MONSTAJAM_ADMIN_SAVE_CONTROL || '';
@@ -125,7 +126,7 @@ async function mutate(model, operation, args) {
     return structuredClone(row);
   }
   const index = rows.findIndex((row) => matches(row, args.where));
-  if (index < 0) throw Object.assign(new Error('Fixture record not found'), { code: 'P2025' });
+  if (index < 0) throw new Prisma.PrismaClientKnownRequestError('Fixture record not found', { code: 'P2025', clientVersion: Prisma.prismaVersion.client });
   if (operation === 'delete') throw new Error('Permanent deletion is forbidden in the trash/restore fixture.');
   rows[index] = { ...rows[index], ...data, updatedAt: new Date() };
   return structuredClone(rows[index]);
