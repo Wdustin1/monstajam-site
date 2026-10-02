@@ -8,6 +8,7 @@ import { initialPlaybackMode, loadAdminAudioAsset, prepareAdminAudio, type Admin
 import { usePlayer } from '@/context/PlayerContext';
 import { useAdminNavigationGuard } from './useAdminNavigationGuard';
 import { useDiscardConfirmation } from './useDiscardConfirmation';
+import { useAdminLibrary, type LibraryState } from './useAdminLibrary';
 import SelectedMediaPreview from './SelectedMediaPreview';
 import { slugifyTrackTitle, TRACK_TITLE_CONFLICT } from '@/lib/track-title';
 import {
@@ -190,7 +191,7 @@ function StatCard({
   detail,
 }: {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   detail: string;
 }) {
   return (
@@ -198,6 +199,20 @@ function StatCard({
       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</div>
       <div className="mt-3 font-mono text-3xl font-semibold text-white">{value}</div>
       <div className="mt-1 text-sm text-slate-400">{detail}</div>
+    </div>
+  );
+}
+
+function LibraryNotice({ state, kind, onRetry }: { state: LibraryState; kind: 'tracks' | 'videos'; onRetry: () => void }) {
+  const label = kind === 'tracks' ? 'Track' : 'Video';
+  if (state.status === 'loading') return <p role="status" className="mt-4 text-sm text-slate-400">{state.lastSuccessAt ? `Refreshing ${kind}; showing the previous results.` : `Loading ${kind}…`}</p>;
+  if (state.status !== 'error') return null;
+  return (
+    <div role="alert" className="mt-4 rounded-md border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">
+      <p className="font-semibold">{label} library unavailable</p>
+      <p className="mt-1">{state.error?.message}</p>
+      {state.lastSuccessAt && <p className="mt-1">Showing previously loaded {kind}. Last loaded <time dateTime={state.lastSuccessAt.toISOString()}>{formatDate(state.lastSuccessAt.toISOString())}</time>.</p>}
+      <button type="button" onClick={onRetry} className="mt-2 underline">Retry {kind}</button>
     </div>
   );
 }
@@ -411,10 +426,16 @@ function ConfirmDialog({
 export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminIdentity }) {
   const { pause: pausePublicPlayer, isPlaying: publicPlayerPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<AdminTab>('tracks');
-  const [tracks, setTracks] = useState<PublishedTrack[]>([]);
-  const [videos, setVideos] = useState<VideoRecord[]>([]);
-  const [tracksLoading, setTracksLoading] = useState(true);
-  const [videosLoading, setVideosLoading] = useState(true);
+  const { tracks, videos, setTracks, setVideos, trackState, videoState, reload, lastLoadedAt, identity, sessionState, reportError } = useAdminLibrary<PublishedTrack, VideoRecord>(currentAdmin);
+  const tracksLoading = trackState.status === 'loading';
+  const videosLoading = videoState.status === 'loading';
+  const tracksAvailable = trackState.lastSuccessAt !== null;
+  const videosAvailable = videoState.lastSuccessAt !== null;
+  const tracksCurrent = trackState.status === 'ready' && sessionState === 'ready';
+  const videosCurrent = videoState.status === 'ready' && sessionState === 'ready';
+  const libraryCurrent = tracksCurrent && videosCurrent;
+  const sessionExpired = sessionState === 'expired';
+  const connectionNeedsAttention = sessionState === 'error' || trackState.status === 'error' || videoState.status === 'error';
   const [query, setQuery] = useState('');
   const [trackForm, setTrackForm] = useState<TrackFormState>(() => emptyTrackForm());
   const [videoForm, setVideoForm] = useState<VideoFormState>(() => emptyVideoForm());
@@ -427,7 +448,6 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const uploadAttempt = useRef(0);
   const [toast, setToast] = useState<ToastState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
-  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
   const [trackErrors, setTrackErrors] = useState<Record<string, string>>({});
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({});
   const [trackBaseline, setTrackBaseline] = useState(emptyTrackForm);
@@ -437,8 +457,6 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const [videoSaveError, setVideoSaveError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const operation = useRef(false);
-  const trackLoadVersion = useRef(0);
-  const videoLoadVersion = useRef(0);
   const uploadedFiles = useRef<Partial<Record<'audio' | 'covers', { file: File; url: string }>>>({});
   const preparedAudio = useRef<AudioPreparation | undefined>(undefined);
   const audioDetailVersion = useRef(0);
@@ -475,8 +493,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const discard = useDiscardConfirmation();
   const approveLeave = useAdminNavigationGuard(trackDirty || videoDirty, Boolean(busy), navigationBlocked, discard.ask);
 
-  function beginOperation(label: string) {
-    if (operation.current) return false;
+  function beginOperation(label: string, requiresSession = true) {
+    if (operation.current || (requiresSession && sessionExpired)) return false;
     operation.current = true;
     setBusy(label);
     return true;
@@ -494,45 +512,6 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
   }, []);
-
-  const loadTracks = useCallback(async () => {
-    const version = ++trackLoadVersion.current;
-    setTracksLoading(true);
-    try {
-      const res = await adminFetch('/api/tracks?all=true', { credentials: 'include' });
-      if (!res.ok) throw new Error('Track library failed to load.');
-      const next = await res.json();
-      if (version !== trackLoadVersion.current) return;
-      setTracks(next);
-      setLastLoadedAt(new Date());
-    } catch (error) {
-      if (version === trackLoadVersion.current) showToast('error', error instanceof Error ? error.message : 'Track library failed to load.');
-    } finally {
-      if (version === trackLoadVersion.current) setTracksLoading(false);
-    }
-  }, [showToast]);
-
-  const loadVideos = useCallback(async () => {
-    const version = ++videoLoadVersion.current;
-    setVideosLoading(true);
-    try {
-      const res = await adminFetch('/api/videos?all=true', { credentials: 'include' });
-      if (!res.ok) throw new Error('Video library failed to load.');
-      const next = await res.json();
-      if (version !== videoLoadVersion.current) return;
-      setVideos(next);
-      setLastLoadedAt(new Date());
-    } catch (error) {
-      if (version === videoLoadVersion.current) showToast('error', error instanceof Error ? error.message : 'Video library failed to load.');
-    } finally {
-      if (version === videoLoadVersion.current) setVideosLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    loadTracks();
-    loadVideos();
-  }, [loadTracks, loadVideos]);
 
   const metrics = useMemo(() => {
     const liveTracks = tracks.filter((track) => track.published).length;
@@ -602,6 +581,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       setTrackBaseline((current) => ({ ...current, previewStart: String(asset.previewStart) }));
     } catch (error) {
       if (version !== audioDetailVersion.current) return;
+      reportError(error);
       setAudioDetailsError(error instanceof Error ? error.message : 'Saved preview settings could not be loaded.');
     } finally {
       if (version === audioDetailVersion.current) setAudioDetailsLoading(false);
@@ -744,7 +724,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   }
 
   async function handleTrackSubmit() {
-    if (operation.current || tracksLoading || !validateTrackForm()) return;
+    if (operation.current || tracksLoading || !tracksAvailable || !validateTrackForm()) return;
     if (!beginOperation('Saving track…')) return;
 
     setSubmittingTrack(true);
@@ -820,14 +800,12 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
           });
 
       const saved = await readAdminResponse<PublishedTrack>(res);
-      ++trackLoadVersion.current;
-      setTracksLoading(false);
       setTracks((current) => [...current.filter((track) => track.id !== saved.id), saved].sort((a, b) => a.number - b.number));
-      setLastLoadedAt(new Date());
 
       showToast('success', editingSlug ? 'Track changes saved.' : 'Track added to the library.');
       resetTrackForm();
     } catch (error) {
+      reportError(error);
       if (error instanceof AdminSaveError) setTrackErrors(error.fields);
       setTrackSaveError(error instanceof AdminSaveError ? error.message : 'The save could not be confirmed. Reload the library to check before retrying.');
     } finally {
@@ -855,8 +833,6 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         body: JSON.stringify({ published: !track.published }),
       });
       const saved = await readAdminResponse<PublishedTrack>(res);
-      ++trackLoadVersion.current;
-      setTracksLoading(false);
       setTracks((current) => current.map((item) => item.id === saved.id ? saved : item));
       if (editingSlug === saved.slug) {
         setTrackForm((form) => ({ ...form, published: saved.published }));
@@ -864,6 +840,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       }
       showToast('success', !track.published ? 'Track published.' : 'Track moved to draft.');
     } catch (error) {
+      reportError(error);
       showToast('error', error instanceof Error ? error.message : 'Publish status failed to update.');
     } finally { endOperation(); }
   }
@@ -873,12 +850,11 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     try {
       const res = await adminFetch(`/api/tracks/${track.slug}`, { method: 'DELETE', credentials: 'include' });
       await readAdminResponse(res);
-      ++trackLoadVersion.current;
-      setTracksLoading(false);
       setTracks((current) => current.filter((item) => item.id !== track.id));
       showToast('success', 'Track deleted.');
       if (editingSlug === track.slug) resetTrackForm();
     } catch (error) {
+      reportError(error);
       showToast('error', error instanceof Error ? error.message : 'Track delete failed.');
     } finally {
       setConfirm(null);
@@ -897,7 +873,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   }
 
   async function handleVideoSubmit() {
-    if (operation.current || videosLoading || !validateVideoForm()) return;
+    if (operation.current || videosLoading || !videosAvailable || !validateVideoForm()) return;
     const youtubeId = extractYouTubeId(videoForm.youtubeUrl);
     if (!youtubeId) return;
     if (!beginOperation('Saving video…')) return;
@@ -931,13 +907,11 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
           });
 
       const saved = await readAdminResponse<VideoRecord>(res);
-      ++videoLoadVersion.current;
-      setVideosLoading(false);
       setVideos((current) => [...current.filter((video) => video.id !== saved.id), saved].sort((a, b) => a.order - b.order));
-      setLastLoadedAt(new Date());
       showToast('success', editingVideoId ? 'Video changes saved.' : 'Video added.');
       resetVideoForm();
     } catch (error) {
+      reportError(error);
       if (error instanceof AdminSaveError) setVideoErrors(error.fields);
       setVideoSaveError(error instanceof AdminSaveError ? error.message : 'The save could not be confirmed. Reload the library to check before retrying.');
     } finally {
@@ -960,8 +934,6 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         body: JSON.stringify({ published: !video.published }),
       });
       const saved = await readAdminResponse<VideoRecord>(res);
-      ++videoLoadVersion.current;
-      setVideosLoading(false);
       setVideos((current) => current.map((item) => item.id === saved.id ? saved : item));
       if (editingVideoId === saved.id) {
         setVideoForm((form) => ({ ...form, published: saved.published }));
@@ -969,6 +941,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       }
       showToast('success', !video.published ? 'Video published.' : 'Video moved to draft.');
     } catch (error) {
+      reportError(error);
       showToast('error', error instanceof Error ? error.message : 'Video publish status failed to update.');
     } finally { endOperation(); }
   }
@@ -978,12 +951,11 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     try {
       const res = await adminFetch(`/api/videos/${video.id}`, { method: 'DELETE', credentials: 'include' });
       await readAdminResponse(res);
-      ++videoLoadVersion.current;
-      setVideosLoading(false);
       setVideos((current) => current.filter((item) => item.id !== video.id));
       showToast('success', 'Video deleted.');
       if (editingVideoId === video.id) resetVideoForm();
     } catch (error) {
+      reportError(error);
       showToast('error', error instanceof Error ? error.message : 'Video delete failed.');
     } finally {
       setConfirm(null);
@@ -1003,18 +975,19 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
 
   async function reloadLibrary() {
-    if (!beginOperation('Reloading library…')) return;
-    try { await Promise.all([loadTracks(), loadVideos()]); }
+    if (!beginOperation('Reloading library…', false)) return;
+    try { await reload(); }
     finally { endOperation(); }
   }
 
   async function signOut() {
-    if (!await mayDiscard(trackDirty || videoDirty) || !beginOperation('Signing out…')) return;
+    if (!await mayDiscard(trackDirty || videoDirty) || !beginOperation('Signing out…', false)) return;
     try {
       await readAdminResponse(await adminFetch('/api/auth/logout', { method: 'POST', credentials: 'include' }));
       approveLeave();
       window.location.href = '/upload/login';
     } catch (error) {
+      reportError(error);
       showToast('error', error instanceof Error ? error.message : 'Sign out failed. Please retry.');
     } finally { endOperation(); }
   }
@@ -1035,11 +1008,14 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               Upload songs, prep releases, manage videos, and catch missing media before anything goes live.
             </p>
-            <p className="mt-2 text-xs text-slate-400">Signed in as {currentAdmin.name} ({currentAdmin.username}) · {currentAdmin.role === 'owner' ? 'Owner' : 'Admin'}</p>
+            <p className="mt-2 text-xs text-slate-400">{sessionState === 'ready' && identity
+              ? `Signed in as ${identity.name} (${identity.username}) · ${identity.role === 'owner' ? 'Owner' : 'Admin'}`
+              : sessionExpired ? 'Your sign-in has expired or access is no longer active.'
+                : sessionState === 'checking' ? 'Checking your sign-in…' : 'Your sign-in could not be checked.'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a href="/upload/account" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Your account</a>
-            {currentAdmin.role === 'owner' && <a href="/upload/admins" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Admin access</a>}
+            {sessionState === 'ready' && identity?.role === 'owner' && <a href="/upload/admins" className="rounded-md border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40">Admin access</a>}
             <button
               type="button"
               onClick={reloadLibrary}
@@ -1058,11 +1034,22 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
           </div>
         </header>
 
+        {(sessionExpired || connectionNeedsAttention) && <div role="alert" className="mt-5 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">
+          <p className="font-semibold">{sessionExpired ? 'Sign-in required' : 'Connection needs attention'}</p>
+          <p className="mt-1">{sessionExpired
+            ? 'Sign in in a new tab, then return here and retry the connection. Your edits and selected files are still here.'
+            : 'Some dashboard information could not be refreshed. Previously loaded results may be out of date. Your edits and selected files are still here.'}</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {sessionExpired && <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="font-semibold underline">Sign in in a new tab</a>}
+            <button type="button" onClick={reloadLibrary} className="font-semibold underline">Retry connection</button>
+          </div>
+        </div>}
+
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Tracks" value={tracks.length} detail={`${metrics.liveTracks} live, ${metrics.draftTracks} draft`} />
-          <StatCard label="Videos" value={videos.length} detail={`${metrics.liveVideos} live, ${metrics.draftVideos} draft`} />
-          <StatCard label="Media flags" value={metrics.missingAudio + metrics.missingCovers} detail={`${metrics.missingAudio} audio, ${metrics.missingCovers} covers missing`} />
-          <StatCard label="Last check" value={lastLoadedAt ? formatDate(lastLoadedAt.toISOString()) : '--'} detail="Admin library refresh" />
+          <StatCard label="Tracks" value={tracksAvailable ? tracks.length : '—'} detail={tracksAvailable ? `${metrics.liveTracks} live, ${metrics.draftTracks} draft${tracksCurrent ? '' : ' · Last known'}` : tracksLoading ? 'Loading track library' : 'Track library unavailable'} />
+          <StatCard label="Videos" value={videosAvailable ? videos.length : '—'} detail={videosAvailable ? `${metrics.liveVideos} live, ${metrics.draftVideos} draft${videosCurrent ? '' : ' · Last known'}` : videosLoading ? 'Loading video library' : 'Video library unavailable'} />
+          <StatCard label="Media flags" value={tracksAvailable ? metrics.missingAudio + metrics.missingCovers : '—'} detail={tracksAvailable ? `${metrics.missingAudio} audio, ${metrics.missingCovers} covers missing${tracksCurrent ? '' : ' · Last known'}` : 'Waiting for track library'} />
+          <StatCard label="Last full check" value={lastLoadedAt ? <time dateTime={lastLoadedAt.toISOString()}>{formatDate(lastLoadedAt.toISOString())}</time> : 'Not yet'} detail={libraryCurrent ? 'Sign-in and both libraries checked' : tracksLoading || videosLoading || sessionState === 'checking' ? 'Checking connection…' : 'Latest check incomplete'} />
         </div>
 
         <nav className="mt-6 flex flex-wrap gap-2">
@@ -1292,7 +1279,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <button
                   type="button"
                   onClick={handleTrackSubmit}
-                  disabled={submittingTrack || tracksLoading}
+                  disabled={submittingTrack || tracksLoading || sessionExpired || !tracksAvailable}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submittingTrack ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -1305,7 +1292,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <progress aria-label={uploadTransfer.label} aria-valuenow={uploadTransfer.percentage} aria-valuemin={0} aria-valuemax={100} value={uploadTransfer.percentage} max={100} className="mt-1 h-2 w-full accent-cyan-300" />
               </div>}
               {trackDirty && <p className="mt-3 text-sm text-amber-200">Unsaved track changes</p>}
-              {trackSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{trackSaveError} Your edits have been kept. <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></div>}
+              {trackSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{trackSaveError} Your edits have been kept.</div>}
             </section>
 
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
@@ -1313,7 +1300,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-white">Track library</h2>
-                    <p className="mt-1 text-sm text-slate-400">{filteredTracks.length} visible of {tracks.length}</p>
+                    <p className="mt-1 text-sm text-slate-400">{tracksAvailable ? `${filteredTracks.length} visible of ${tracks.length}${tracksCurrent ? '' : ' · Last known results'}` : 'Track count unavailable'}</p>
                   </div>
                   {tracksLoading && <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />}
                 </div>
@@ -1328,10 +1315,11 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 </label>
               </div>
 
+              <LibraryNotice state={trackState} kind="tracks" onRetry={reloadLibrary} />
               <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
-                {!tracksLoading && filteredTracks.length === 0 && (
+                {tracksCurrent && filteredTracks.length === 0 && (
                   <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
-                    No tracks match that search.
+                    {query.trim() ? 'No tracks match that search.' : 'No tracks yet.'}
                   </div>
                 )}
                 {filteredTracks.map((track) => (
@@ -1372,7 +1360,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                       <button
                         type="button"
                         onClick={() => toggleTrackPublish(track)}
-                        className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25"
+                        disabled={sessionExpired}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25 disabled:opacity-50"
                       >
                         {track.published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                         {track.published ? 'Draft' : 'Live'}
@@ -1380,7 +1369,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                       <button
                         type="button"
                         onClick={() => { if (!operation.current) setConfirm({ kind: 'track', item: track }); }}
-                        className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50"
+                        disabled={sessionExpired}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
@@ -1454,7 +1444,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <button
                   type="button"
                   onClick={handleVideoSubmit}
-                  disabled={submittingVideo || videosLoading}
+                  disabled={submittingVideo || videosLoading || sessionExpired || !videosAvailable}
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submittingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Youtube className="h-4 w-4" />}
@@ -1462,19 +1452,20 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 </button>
               </div>
               {videoDirty && <p className="mt-3 text-sm text-amber-200">Unsaved video changes</p>}
-              {videoSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{videoSaveError} Your edits have been kept. <a href="/upload/login" target="_blank" rel="noopener noreferrer" className="underline">Sign in in a new tab</a></div>}
+              {videoSaveError && <div role="alert" className="mt-3 text-sm text-rose-300">{videoSaveError} Your edits have been kept.</div>}
             </section>
 
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
                   <h2 className="text-xl font-semibold text-white">Video library</h2>
-                  <p className="mt-1 text-sm text-slate-400">{videos.length} videos</p>
+                  <p className="mt-1 text-sm text-slate-400">{videosAvailable ? `${videos.length} videos${videosCurrent ? '' : ' · Last known results'}` : 'Video count unavailable'}</p>
                 </div>
                 {videosLoading && <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />}
               </div>
+              <LibraryNotice state={videoState} kind="videos" onRetry={reloadLibrary} />
               <div className="mt-4 max-h-[680px] space-y-3 overflow-y-auto pr-1">
-                {!videosLoading && videos.length === 0 && (
+                {videosCurrent && videos.length === 0 && (
                   <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
                     No videos yet.
                   </div>
@@ -1494,10 +1485,10 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                     </div>
                     <div className="mt-4 grid grid-cols-3 gap-2">
                       <button type="button" onClick={() => startEditVideo(video)} className="rounded-md border border-cyan-300/20 px-2 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/50">Edit</button>
-                      <button type="button" onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25">
+                      <button type="button" disabled={sessionExpired} onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25 disabled:opacity-50">
                         {video.published ? 'Draft' : 'Live'}
                       </button>
-                      <button type="button" onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50">Delete</button>
+                      <button type="button" disabled={sessionExpired} onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50">Delete</button>
                     </div>
                   </article>
                 ))}
@@ -1512,14 +1503,16 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
               <h2 className="text-xl font-semibold text-white">Release readiness</h2>
               <div className="mt-5 space-y-3">
                 {[
-                  { label: 'All live tracks have audio', ok: tracks.filter((track) => track.published && !hasTrackAudio(track)).length === 0 },
-                  { label: 'All live tracks have cover art', ok: tracks.filter((track) => track.published && !track.coverUrl).length === 0 },
-                  { label: 'Admin library is reachable', ok: !tracksLoading && !videosLoading },
-                  { label: 'Drafts are separated from public output', ok: metrics.draftTracks + metrics.draftVideos >= 0 },
+                  { label: 'All live tracks have audio', ok: tracksCurrent ? tracks.filter((track) => track.published && !hasTrackAudio(track)).length === 0 : null },
+                  { label: 'All live tracks have cover art', ok: tracksCurrent ? tracks.filter((track) => track.published && !track.coverUrl).length === 0 : null },
+                  { label: 'Admin library is reachable', ok: libraryCurrent },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between rounded-md border border-white/10 bg-slate-950/50 p-3">
                     <span className="text-sm text-slate-300">{item.label}</span>
-                    {item.ok ? <CheckCircle className="h-5 w-5 text-emerald-300" /> : <AlertTriangle className="h-5 w-5 text-amber-300" />}
+                    <span className="ml-3 inline-flex items-center gap-2 text-xs">
+                      {item.ok ? <CheckCircle aria-hidden="true" className="h-5 w-5 text-emerald-300" /> : <AlertTriangle aria-hidden="true" className="h-5 w-5 text-amber-300" />}
+                      {item.ok === null ? 'Not checked' : item.ok ? 'Checked' : 'Needs attention'}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1527,7 +1520,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
             <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5">
               <h2 className="text-xl font-semibold text-white">Needs attention</h2>
               <div className="mt-5 space-y-3">
-                {tracks.filter((track) => !hasTrackAudio(track) || !track.coverUrl).length === 0 ? (
+                {!tracksCurrent ? <p className="text-sm text-amber-100">Refresh the track library to check for missing media.</p> : tracks.filter((track) => !hasTrackAudio(track) || !track.coverUrl).length === 0 ? (
                   <div className="rounded-md border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-200">
                     No missing track media found.
                   </div>

@@ -45,6 +45,13 @@ Run `npm run test:cover-proxy` for source restrictions, unsafe-content rejection
 
 Run `npm run test:admin-save` for schema/API and response-handling regressions, and `npm run test:admin-editor` for the real React editor with simulated DOM, network failures, and Blob uploads. `npm run test:admin-save:fixture` starts the real dashboard/API on `http://127.0.0.1:3311` using in-memory data and a generated test password; its temporary control file can inject delay, failure, and session expiry for manual browser checks. None of these tests write to production.
 
+### Dashboard connection and sign-in recovery
+
+- Each library distinguishes loading, a successful empty result, and a failed request. Failed refreshes retain the last successful rows and clearly label them as old results; unavailable counts are shown as unknown rather than zero.
+- A persistent notice explains an expired sign-in or a connection failure. Sign in in a separate tab when needed, then use **Retry connection** in the original editor. Retrying checks the current account and both libraries without resetting forms, selected files, or completed uploads. Account controls reflect the newly verified identity.
+- **Last full check** advances only when sign-in and both libraries are successfully checked together. Partial refreshes and individual saves do not claim a complete check. Release-readiness indicators use confirmed data and show when a check is unavailable.
+- Once a sign-in is known to have expired, save/publish/delete actions wait for successful sign-in recovery. Edits remain available in the open editor; refreshing or closing the page still loses unsaved browser-memory work.
+
 ## Upload experience
 
 - Audio and artwork transfers show separate percentage progress. Audio preparation and the final save show their own status; a completed transfer does not imply that the track has been saved.

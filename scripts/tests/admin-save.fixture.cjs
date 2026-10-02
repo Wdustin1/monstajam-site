@@ -2,6 +2,7 @@
  * node scripts/tests/admin-save.fixture.cjs
  * The generated control.json path supports delayMs (0-10000),
  * failMutationGeneration/failReadGeneration (increment to fail once),
+ * failTrackReads/failVideoReads (persistent, independent library failures),
  * expireSession (boolean), and resetGeneration (increment to restore fixtures).
  * Changes affect only this opted-in local fixture process, never the app source.
  */
@@ -24,7 +25,7 @@ let child;
 let stopping = false;
 let serverLog = '';
 let controlPath;
-let state = { delayMs: 0, failMutationGeneration: 0, failReadGeneration: 0, expireSession: false, resetGeneration: 0 };
+let state = { delayMs: 0, failMutationGeneration: 0, failReadGeneration: 0, failTrackReads: false, failVideoReads: false, expireSession: false, resetGeneration: 0 };
 
 async function setControls(values) {
   state = { ...state, ...values };
@@ -67,6 +68,15 @@ async function smoke() {
   await setControls({ failReadGeneration: 1 });
   assert.equal((await request(titlePath, { cookie })).status, 503, 'Unavailable storage must never promise a free title');
   assert.equal((await request(titlePath, { cookie })).status, 200, 'A failed title lookup must be retryable');
+  await setControls({ failTrackReads: true });
+  assert.equal((await request('/api/tracks?all=true', { cookie })).status, 500);
+  assert.equal((await request('/api/tracks?all=true', { cookie })).status, 500, 'Track failure must remain until explicitly restored');
+  assert.equal((await request('/api/videos?all=true', { cookie })).status, 200);
+  await setControls({ failTrackReads: false, failVideoReads: true });
+  assert.equal((await request('/api/tracks?all=true', { cookie })).status, 200);
+  assert.equal((await request('/api/videos?all=true', { cookie })).status, 500);
+  assert.equal((await request('/api/videos?all=true', { cookie })).status, 500, 'Video failure must remain until explicitly restored');
+  await setControls({ failVideoReads: false });
   let save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Fixture read-after-write success' } });
   assert.equal(save.status, 200);
   let read = await request('/api/tracks/admin-save-live', { cookie });
@@ -91,11 +101,17 @@ async function smoke() {
   await setControls({ delayMs: 0, expireSession: true });
   save = await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { mood: 'Must not persist' } });
   assert.equal(save.status, 401);
+  const expiredSession = await request('/api/auth/get-session', { cookie });
+  assert.equal(expiredSession.status, 200);
+  assert.equal(await expiredSession.json(), null, 'Expired fixture must revoke the real backing session');
   await setControls({ expireSession: false, resetGeneration: 1 });
   const relogin = await request('/api/auth/sign-in/username', { method: 'POST', body: { username: 'Dustin', password } });
   assert.equal(relogin.status, 200);
   cookie = relogin.headers.getSetCookie().find((value) => value.includes('monstajam_auth.session_token='))?.split(';')[0];
   assert.ok(cookie, 'Revoked fixture sessions must be replaced through a fresh sign-in');
+  const restoredSession = await request('/api/auth/get-session', { cookie });
+  assert.equal(restoredSession.status, 200);
+  assert.equal((await restoredSession.json()).user.username, 'dustin');
   read = await request('/api/tracks/admin-save-live', { cookie });
   assert.equal((await read.json()).mood, 'Original fixture mood');
   console.log('PASS normal login, title availability/conflict/retry, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
@@ -150,6 +166,7 @@ async function main() {
   console.log(`Control file: ${controlPath}`);
   console.log(`Next PID: ${child.pid}`);
   console.log('Use failMutationGeneration: 2 for the next failure (1 was consumed by startup smoke).');
+  console.log('Use failTrackReads/failVideoReads: true for persistent independent load errors; set false to recover. expireSession: true revokes the real local sessions; set false then sign in again.');
   console.log('All database writes stay in process memory. No upload credentials are configured. Ctrl+C stops the server.');
   console.log('Fixture Live Track has a ready managed asset at 12.5 seconds; Fixture Draft Track uses the legacy Full Songs fallback. Actual audio streaming/conversion is not provided by this UI fixture.');
   await new Promise((resolve) => child.once('exit', resolve));
