@@ -17,7 +17,7 @@ const originalPath = 'monstajam/originals/test.wav';
 const previewBytes = Buffer.from('0123456789');
 const originalBytes = Buffer.from('PRIVATE ORIGINAL WITH MORE THAN PREVIEW');
 type Query = { where: { slug?: string; id?: string } };
-type StoredTrack = { slug: string; published: boolean; audioAssetId: string | null; playbackMode: string | null; genre: string };
+type StoredTrack = { slug: string; published: boolean; audioAssetId: string | null; playbackMode: string | null; genre: string; deletedAt?: Date | null };
 type StoredAsset = { id: string; status: string; originalPath: string; previewPath: string | null };
 let track: StoredTrack | null;
 let asset: StoredAsset | null;
@@ -186,6 +186,34 @@ test('an authenticated admin can preview a draft', async () => {
 
   assert.equal(response.status, 200);
   assert.equal(await response.text(), previewBytes.toString());
+});
+
+for (const method of ['GET', 'HEAD'] as const) {
+  for (const published of [true, false]) {
+    for (const access of [
+      { label: 'public playback', query: '', cookie: undefined },
+      { label: 'admin full audition', query: '?full=true', cookie: secret },
+      { label: 'admin preview audition', query: '?preview=true', cookie: secret },
+    ]) {
+      test(`trashed ${published ? 'published' : 'draft'} audio denies ${method} ${access.label} before any asset or Blob lookup`, async () => {
+        track!.published = published;
+        track!.deletedAt = new Date();
+        const response = await serve({ method, query: access.query, cookie: access.cookie, range: 'bytes=0-1' });
+        assert.equal(response.status, 404);
+        assert.equal(await response.text(), '');
+        assert.deepEqual(calls, [{ kind: 'track' }]);
+        privateHeaders(response);
+      });
+    }
+  }
+}
+
+test('missing legacy trash fields and explicit null both permit active audio, and trash is rechecked on every request', async () => {
+  assert.equal((await serve()).status, 200);
+  track!.deletedAt = new Date();
+  assert.equal((await serve({ cookie: secret, query: '?full=true' })).status, 404);
+  track!.deletedAt = null;
+  assert.equal((await serve()).status, 200);
 });
 
 test('playback-mode changes are checked on each request instead of trusting a prior URL', async () => {

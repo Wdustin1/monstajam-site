@@ -5,6 +5,7 @@ import { getAdminIdentity } from '@/lib/auth-provider';
 import { prisma } from '@/lib/prisma';
 import { toPublicTrack } from '@/lib/track-playback';
 import TrackPageView from '@/components/TrackPageView';
+import { isContentTrashed } from '@/lib/content-trash';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function TrackPreviewPage({ params }: { params: Promise<{ s
 
   const { slug } = await params;
   const track = await prisma.track.findUnique({ where: { slug }, include: { credits: true } });
-  if (!track) notFound();
+  if (!track || isContentTrashed(track)) notFound();
 
   const publicTrack = toPublicTrack(track);
   const audition = {

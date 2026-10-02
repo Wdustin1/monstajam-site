@@ -1,5 +1,6 @@
 /* Start the real local dashboard/API against memory-only records:
  * node scripts/tests/admin-save.fixture.cjs
+ * Add --production for a compiled-server smoke that stops after its checks.
  * The generated control.json path supports delayMs (0-10000),
  * failMutationGeneration/failReadGeneration (increment to fail once),
  * failTrackReads/failVideoReads (persistent, independent library failures),
@@ -18,9 +19,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const port = 3311;
 const base = `http://127.0.0.1:${port}`;
-const origin = `http://localhost:${port}`;
+const production = process.argv.includes('--production');
+const origin = `${production ? 'https' : 'http'}://localhost:${port}`;
 const password = `local-admin-save-${randomUUID()}`;
-const smokeOnly = process.argv.includes('--smoke-only');
+const smokeOnly = production || process.argv.includes('--smoke-only');
 let child;
 let stopping = false;
 let serverLog = '';
@@ -41,8 +43,68 @@ function stop() {
 }
 
 async function request(route, { cookie, body, ...options } = {}) {
-  const headers = { ...options.headers, ...(cookie ? { Cookie: cookie } : {}), ...(body ? { 'Content-Type': 'application/json', Origin: origin } : {}) };
+  const headers = { ...(production ? { 'X-Forwarded-Proto': 'https' } : {}), ...options.headers, ...(cookie ? { Cookie: cookie } : {}),
+    ...(!['GET', 'HEAD'].includes(options.method || 'GET') ? { Origin: origin } : {}),
+    ...(body ? { 'Content-Type': 'application/json' } : {}) };
   return fetch(base + route, { redirect: 'manual', ...options, headers, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(60000) });
+}
+
+async function trashSmoke(cookie) {
+  const savedTrack = (await (await request('/api/tracks?all=true', { cookie })).json())[0];
+  const savedVideo = (await (await request('/api/videos?all=true', { cookie })).json())[0];
+  assert.equal((await request('/api/admin/trash')).status, 401);
+  assert.equal((await request('/api/tracks/admin-save-live', { method: 'DELETE' })).status, 401);
+  for (const route of ['/api/tracks/admin-save-live', '/api/videos/000000000000000000000003']) {
+    assert.equal((await request(route, { method: 'DELETE', cookie })).status, 200);
+    assert.equal((await request(route, { method: 'DELETE', cookie })).status, 200, 'Repeating trash must be safe');
+  }
+  assert.equal((await (await request('/api/tracks?all=true', { cookie })).json()).length, 1);
+  assert.equal((await (await request('/api/videos?all=true', { cookie })).json()).length, 0);
+  const trashed = await (await request('/api/admin/trash', { cookie })).json();
+  assert.equal(trashed.tracks.length, 1);
+  assert.equal(trashed.videos.length, 1);
+  for (const record of [...trashed.tracks, ...trashed.videos]) {
+    assert.equal(record.published, false);
+    assert.ok(Number.isFinite(Date.parse(record.deletedAt)));
+    assert.equal(record.deletedBy, 'dustin');
+  }
+  assert.equal(trashed.tracks[0].audioAssetId, savedTrack.audioAssetId);
+  assert.equal(trashed.tracks[0].story, savedTrack.story);
+  assert.equal(trashed.videos[0].youtubeUrl, savedVideo.youtubeUrl);
+  assert.equal((await request('/api/tracks/admin-save-live')).status, 404);
+  assert.equal((await request('/api/tracks/admin-save-live?preview=true', { cookie })).status, 404);
+  assert.equal((await request('/api/admin/track-title?title=Admin%20save%20live', { cookie })).status, 409);
+  assert.equal((await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { published: true } })).status, 404);
+
+  const trackRestore = '/api/admin/trash/tracks/admin-save-live/restore';
+  const videoRestore = '/api/admin/trash/videos/000000000000000000000003/restore';
+  assert.equal((await request(trackRestore, { method: 'POST', body: {} })).status, 401);
+  await setControls({ failMutationGeneration: 2 });
+  assert.equal((await request(trackRestore, { method: 'POST', cookie, body: {} })).status, 503);
+  assert.equal((await (await request('/api/admin/trash', { cookie })).json()).tracks.length, 1, 'Failed restore must keep the recoverable record');
+  for (const route of [trackRestore, videoRestore]) {
+    const response = await request(route, { method: 'POST', cookie, body: {} });
+    assert.equal(response.status, 200);
+    const restored = await response.json();
+    assert.equal(restored.published, false, 'Restoring never automatically republishes an item');
+    assert.equal(restored.deletedAt, null);
+    assert.equal(restored.deletedBy, null);
+  }
+  const restoredTracks = await (await request('/api/tracks?all=true', { cookie })).json();
+  assert.equal(restoredTracks.find((track) => track.slug === savedTrack.slug).audioAssetId, savedTrack.audioAssetId);
+  for (const [route, revision] of [
+    ['/api/tracks/admin-save-live', savedTrack.updatedAt],
+    ['/api/videos/000000000000000000000003', savedVideo.updatedAt],
+  ]) {
+    assert.equal((await request(route, { method: 'PUT', cookie, body: { published: true, expectedUpdatedAt: revision } })).status, 409,
+      'A stale form saved after trash/restore must not silently republish the recovered draft');
+  }
+  assert.deepEqual(await (await request('/api/admin/trash', { cookie })).json(), { tracks: [], videos: [] });
+  assert.equal((await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { published: true } })).status, 200);
+  assert.equal((await (await request(trackRestore, { method: 'POST', cookie, body: {} })).json()).published, true, 'Replaying restore cannot unpublish an already active item');
+  await setControls({ resetGeneration: 2 });
+  assert.equal((await (await request('/api/tracks?all=true', { cookie })).json()).length, 2);
+  console.log('PASS authenticated trash, preserved media/metadata, hidden active/public records, safe retry and restore-as-draft through real HTTP.');
 }
 
 async function smoke() {
@@ -114,6 +176,7 @@ async function smoke() {
   assert.equal((await restoredSession.json()).user.username, 'dustin');
   read = await request('/api/tracks/admin-save-live', { cookie });
   assert.equal((await read.json()).mood, 'Original fixture mood');
+  await trashSmoke(cookie);
   console.log('PASS normal login, title availability/conflict/retry, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
 }
 
@@ -129,7 +192,7 @@ async function main() {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (/ADMIN_SECRET|DATABASE_URL|BLOB.*TOKEN|AUDIO.*TOKEN|SUPABASE|BETTER_AUTH|AUTH_SECRET|^NODE_OPTIONS$|^NODE_ENV$/.test(key)) delete env[key];
   Object.assign(env, {
-    NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1',
+    NODE_ENV: production ? 'production' : 'development', NEXT_TELEMETRY_DISABLED: '1',
     BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: randomBytes(48).toString('base64url'),
     MONSTAJAM_NAMED_AUTH_FIXTURES: '1', MONSTAJAM_NAMED_AUTH_CONTROL: controlPath,
     MONSTAJAM_NAMED_AUTH_PASSWORD: password, MONSTAJAM_NAMED_CONTENT_FIXTURE: 'admin-save',
@@ -137,9 +200,10 @@ async function main() {
     AUDIO_READ_WRITE_TOKEN: 'disabled-local-admin-save-fixture',
     DATABASE_URL: 'mongodb://127.0.0.1:27019/monstajam_admin_save_test?serverSelectionTimeoutMS=1000&connectTimeoutMS=1000',
     MONSTAJAM_ADMIN_SAVE_FIXTURES: '1', MONSTAJAM_ADMIN_SAVE_CONTROL: controlPath,
+    MONSTAJAM_ADMIN_SAVE_PRODUCTION: production ? '1' : '0',
     NODE_OPTIONS: `--require="${path.join(__dirname, 'fixtures/named-auth.cjs').replaceAll('\\', '/')}"`,
   });
-  child = spawn(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(port)], {
+  child = spawn(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), ...(production ? ['start'] : ['dev', '--webpack']), '--hostname', '127.0.0.1', '--port', String(port)], {
     cwd: root, env, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
   });
   const capture = (data) => { serverLog = (serverLog + data.toString()).slice(-20000); };
@@ -165,7 +229,7 @@ async function main() {
   console.log(`Local fixture credentials: ${credentialsPath}`);
   console.log(`Control file: ${controlPath}`);
   console.log(`Next PID: ${child.pid}`);
-  console.log('Use failMutationGeneration: 2 for the next failure (1 was consumed by startup smoke).');
+  console.log('Use failMutationGeneration: 3 for the next failure (1 and 2 were consumed by startup smoke).');
   console.log('Use failTrackReads/failVideoReads: true for persistent independent load errors; set false to recover. expireSession: true revokes the real local sessions; set false then sign in again.');
   console.log('All database writes stay in process memory. No upload credentials are configured. Ctrl+C stops the server.');
   console.log('Fixture Live Track has a ready managed asset at 12.5 seconds; Fixture Draft Track uses the legacy Full Songs fallback. Actual audio streaming/conversion is not provided by this UI fixture.');

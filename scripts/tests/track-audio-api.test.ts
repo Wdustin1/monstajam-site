@@ -23,6 +23,7 @@ const legacy: Track = {
   appleMusicUrl: 'https://music.apple.com/us/album/example',
   audioUrl: 'https://example.invalid/legacy.mp3', coverUrl: 'https://example.invalid/cover.png',
   playbackMode: null, audioAssetId: null, published: true,
+  deletedAt: null, deletedBy: null,
   createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: new Date('2026-01-01T00:00:00Z'), credits: [],
 };
 const ready: AudioAsset = {

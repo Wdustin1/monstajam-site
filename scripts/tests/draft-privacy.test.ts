@@ -9,6 +9,9 @@ let listTracks: typeof import('../../src/app/api/tracks/route').GET;
 let getPublishedTrack: typeof import('../../src/lib/published-track').getPublishedTrack;
 let publicTrackPage: typeof import('../../src/app/tracks/[slug]/page').default;
 let publicTrackMetadata: typeof import('../../src/app/tracks/[slug]/page').generateMetadata;
+let homePage: typeof import('../../src/app/page').default;
+let genresPage: typeof import('../../src/app/genres/page').default;
+let videosPage: typeof import('../../src/app/videos/page').default;
 
 const testSecret = 'local-track-preview-test';
 
@@ -32,6 +35,10 @@ const database = {
       throw new Error(`Unexpected unmocked track query: ${JSON.stringify(args)}`);
     },
   },
+  video: {
+    async count(args?: { where?: Record<string, unknown> }): Promise<number> { throw new Error(`Unexpected video count: ${JSON.stringify(args)}`); },
+    async findMany(args?: { where?: Record<string, unknown> }): Promise<Record<string, unknown>[]> { throw new Error(`Unexpected video query: ${JSON.stringify(args)}`); },
+  },
 };
 const prismaCache = globalThis as unknown as { prisma?: PrismaClient };
 const originalPrisma = prismaCache.prisma;
@@ -46,6 +53,9 @@ before(async () => {
   const publicPage = await import('../../src/app/tracks/[slug]/page');
   publicTrackPage = publicPage.default;
   publicTrackMetadata = publicPage.generateMetadata;
+  homePage = (await import('../../src/app/page')).default;
+  genresPage = (await import('../../src/app/genres/page')).default;
+  videosPage = (await import('../../src/app/videos/page')).default;
 });
 
 after(() => {
@@ -211,7 +221,9 @@ test('public track lookup excludes draft records at the database boundary', asyn
   });
 
   assert.equal(await getPublishedTrack(fixture.slug), null);
-  assert.deepEqual(findFirst.mock.calls[0].arguments[0].where, { slug: fixture.slug, published: true });
+  assert.deepEqual(findFirst.mock.calls[0].arguments[0].where, {
+    slug: fixture.slug, published: true, OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+  });
 });
 
 test('public track lookup returns a published record', async () => {
@@ -242,3 +254,90 @@ test('published-track metadata remains available', async () => {
 
   assert.equal(metadata.title, `${fixture.title} — MonstaJam`);
 });
+
+// Model Mongo's distinction between a missing field and explicit null. A null
+// equality alone must not accidentally make these legacy fixtures disappear.
+function matchesContent(row: Record<string, unknown>, where: Record<string, unknown> = {}): boolean {
+  return Object.entries(where).every(([key, value]) => {
+    if (key === 'OR') return (value as Record<string, unknown>[]).some((condition) => matchesContent(row, condition));
+    if (key === 'AND') return (Array.isArray(value) ? value : [value]).every((condition) => matchesContent(row, condition));
+    if (value && typeof value === 'object' && 'isSet' in value) return Object.hasOwn(row, key) === value.isSet;
+    return row[key] === value;
+  });
+}
+
+function contentFixtures() {
+  const common = { ...fixture, id: 'legacy', artist: 'Active Artist', genre: 'Hip-Hop', number: 1, color: 'fixture', createdAt: new Date('2026-01-01'), published: true };
+  const rows = [
+    { ...common, slug: 'legacy-active', title: 'Legacy active' },
+    { ...common, id: 'null', slug: 'null-active', title: 'Explicit null active', number: 2, deletedAt: null },
+    { ...common, id: 'trashed', slug: 'trashed-published', title: 'TRASHED_TITLE_SENTINEL', artist: 'Trashed Artist', deletedAt: new Date('2026-02-01'), createdAt: new Date('2026-03-01') },
+    { ...common, id: 'draft', slug: 'active-draft', title: 'DRAFT_TITLE_SENTINEL', published: false },
+  ];
+  const videoRows = [
+    { id: 'legacy-video', title: 'Legacy video', published: true },
+    { id: 'null-video', title: 'Explicit null video', published: true, deletedAt: null },
+    { id: 'trashed-video', title: 'TRASHED_VIDEO_SENTINEL', published: true, deletedAt: new Date() },
+    { id: 'draft-video', title: 'Draft video', published: false },
+  ];
+  mock.method(database.track, 'findFirst', async ({ where }: { where: Record<string, unknown> }) => rows.find((row) => matchesContent(row, where)) ?? null);
+  mock.method(database.track, 'findMany', async (args?: { where?: Record<string, unknown> }) => rows.filter((row) => matchesContent(row, args?.where)));
+  mock.method(database.video, 'findMany', async (args?: { where?: Record<string, unknown> }) => videoRows.filter((row) => matchesContent(row, args?.where)));
+  mock.method(database.video, 'count', async (args?: { where?: Record<string, unknown> }) => videoRows.filter((row) => matchesContent(row, args?.where)).length);
+  return rows;
+}
+
+function findProps(tree: unknown, predicate: (props: Record<string, unknown>) => boolean): Record<string, unknown> | undefined {
+  if (Array.isArray(tree)) {
+    for (const item of tree) { const found = findProps(item, predicate); if (found) return found; }
+  } else if (tree && typeof tree === 'object' && 'props' in tree) {
+    const props = tree.props as Record<string, unknown>;
+    if (predicate(props)) return props;
+    return findProps(props.children, predicate);
+  }
+}
+
+test('public detail and metadata hide a trashed published track while retaining both legacy and explicit-null active records', async () => {
+  contentFixtures();
+  for (const slug of ['legacy-active', 'null-active']) {
+    assert.equal((await getPublishedTrack(slug))?.slug, slug);
+    assert.match((await publicTrackMetadata({ params: Promise.resolve({ slug }) })).title, /active/);
+  }
+  assert.equal(await getPublishedTrack('trashed-published'), null);
+  const params = Promise.resolve({ slug: 'trashed-published' });
+  const isNotFound = (error: unknown) => error instanceof Error && 'digest' in error && error.digest === 'NEXT_HTTP_ERROR_FALLBACK;404';
+  await assert.rejects(publicTrackPage({ params }), isNotFound);
+  await assert.rejects(publicTrackMetadata({ params }), isNotFound);
+});
+
+test('homepage featured track, search library, artist and video counts exclude trashed records', async () => {
+  contentFixtures();
+  const page = await homePage();
+  const hero = findProps(page, (props) => 'trackCount' in props);
+  assert.ok(hero);
+  assert.equal(hero.trackCount, 2);
+  assert.equal(hero.artistCount, 1);
+  assert.equal(hero.videoCount, 2);
+  assert.equal((hero.featuredTrack as { slug: string }).slug, 'legacy-active');
+  const library = findProps(page, (props) => Array.isArray(props.tracks));
+  assert.deepEqual((library?.tracks as { slug: string }[]).map((row) => row.slug), ['legacy-active', 'null-active']);
+});
+
+test('genre browsing, video gallery and related-track player queue receive only active published records', async () => {
+  contentFixtures();
+  const genres = findProps(await genresPage(), (props) => Array.isArray(props.tracks));
+  assert.deepEqual((genres?.tracks as { slug: string }[]).map((row) => row.slug), ['legacy-active', 'null-active']);
+  const videos = findProps(await videosPage(), (props) => Array.isArray(props.videos));
+  assert.deepEqual((videos?.videos as { id: string }[]).map((row) => row.id), ['legacy-video', 'null-video']);
+  const detail = findProps(await publicTrackPage({ params: Promise.resolve({ slug: 'legacy-active' }) }), (props) => Array.isArray(props.allTracks));
+  assert.deepEqual((detail?.allTracks as { slug: string }[]).map((row) => row.slug), ['legacy-active', 'null-active']);
+});
+
+for (const cookie of [undefined, testSecret]) {
+  test(`trashed track details remain hidden from ${cookie ? 'authenticated preview' : 'public'} API requests`, async () => {
+    mock.method(database.track, 'findUnique', async () => ({ ...fixture, published: true, deletedAt: new Date() }));
+    const response = await getTrack('?preview=true', cookie);
+    assert.equal(response.status, 404);
+    assertPrivateResponse(response);
+  });
+}

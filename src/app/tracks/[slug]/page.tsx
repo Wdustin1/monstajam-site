@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getPublishedTrack } from '@/lib/published-track';
 import { toPublicTrack } from '@/lib/track-playback';
 import TrackPageView from '@/components/TrackPageView';
+import { activeContentWhere } from '@/lib/content-trash';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,9 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
   const track = await getPublishedTrack(slug);
   if (!track) notFound();
 
-  // Fetch all published tracks for the player queue
+  // Keep removed tracks out of both the player queue and recommendations.
   const allTracks = await prisma.track.findMany({
-    where: { published: true },
+    where: { published: true, ...activeContentWhere() },
     select: {
       slug: true,
       title: true,

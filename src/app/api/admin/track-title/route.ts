@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { TrackCreateSchema } from '@/lib/schemas';
-import { slugifyTrackTitle, TRACK_TITLE_CONFLICT, trackTitleError } from '@/lib/track-title';
+import { slugifyTrackTitle, TRACK_TITLE_CONFLICT, TRACK_TITLE_TRASH_CONFLICT, trackTitleError } from '@/lib/track-title';
+import { isContentTrashed } from '@/lib/content-trash';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,8 +25,8 @@ export async function GET(request: NextRequest) {
     if (!slug) {
       return NextResponse.json(trackTitleError('Include at least one letter (A–Z) or number in a new track title.'), { status: 422, headers });
     }
-    const existing = await prisma.track.findUnique({ where: { slug }, select: { id: true } });
-    if (existing) return NextResponse.json(trackTitleError(TRACK_TITLE_CONFLICT), { status: 409, headers });
+    const existing = await prisma.track.findUnique({ where: { slug }, select: { id: true, deletedAt: true } });
+    if (existing) return NextResponse.json(trackTitleError(isContentTrashed(existing) ? TRACK_TITLE_TRASH_CONFLICT : TRACK_TITLE_CONFLICT), { status: 409, headers });
     return NextResponse.json({ slug, available: true }, { headers });
   } catch {
     return NextResponse.json({ error: 'The track title could not be checked. Please try again before uploading.' }, { status: 503, headers });

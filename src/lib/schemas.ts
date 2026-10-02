@@ -12,7 +12,9 @@ export const VideoCreateSchema = z.object({
   order:      z.number().int().min(0).optional(),
 });
 
-export const VideoUpdateSchema = VideoCreateSchema.partial();
+const expectedUpdatedAt = z.string().datetime({ offset: true }).optional();
+
+export const VideoUpdateSchema = VideoCreateSchema.partial().extend({ expectedUpdatedAt });
 
 export type VideoCreateInput = z.infer<typeof VideoCreateSchema>;
 export type VideoUpdateInput = z.infer<typeof VideoUpdateSchema>;
@@ -42,7 +44,8 @@ export const TrackCreateSchema = z.object({
 
 export const TrackUpdateSchema = TrackCreateSchema
   .omit({ slug: true, number: true })
-  .partial();
+  .partial()
+  .extend({ expectedUpdatedAt });
 
 export type TrackCreateInput = z.infer<typeof TrackCreateSchema>;
 export type TrackUpdateInput = z.infer<typeof TrackUpdateSchema>;

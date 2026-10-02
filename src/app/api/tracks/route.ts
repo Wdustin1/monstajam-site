@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackCreateSchema } from '@/lib/schemas';
 import { toPublicTrack } from '@/lib/track-playback';
-import { TRACK_TITLE_CONFLICT, trackTitleError } from '@/lib/track-title';
+import { TRACK_TITLE_CREATE_CONFLICT, trackTitleError } from '@/lib/track-title';
+import { activeContentWhere } from '@/lib/content-trash';
 
 const adminHeaders = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
   try {
     const tracks = await prisma.track.findMany({
       where: {
+        AND: [activeContentWhere()],
         ...(!showAll && { published: true }),
         ...(genre && genre !== 'All' && { genre }),
       },
@@ -101,7 +103,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(track, { status: 201, headers: adminHeaders });
   } catch (err) {
     if (isSlugUniqueConflict(err)) {
-      return NextResponse.json(trackTitleError(TRACK_TITLE_CONFLICT), { status: 409, headers: adminHeaders });
+      return NextResponse.json(trackTitleError(TRACK_TITLE_CREATE_CONFLICT), { status: 409, headers: adminHeaders });
     }
     console.error(err);
     return NextResponse.json({ error: 'Failed to create track' }, { status: 500, headers: adminHeaders });

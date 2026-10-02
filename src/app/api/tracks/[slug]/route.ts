@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
 import { getPlaybackMode, toPublicTrack } from '@/lib/track-playback';
+import { activeContentWhere, CONTENT_CHANGED, contentHeaders, getContentMutationAdmin, isContentTrashed, isMissingContentError } from '@/lib/content-trash';
 
 // GET /api/tracks/[slug] — drafts require an explicit authenticated preview
 export async function GET(
@@ -18,7 +19,7 @@ export async function GET(
       where: { slug },
       include: { credits: true },
     });
-    if (!track || (!track.published && !canPreview)) {
+    if (!track || isContentTrashed(track) || (!track.published && !canPreview)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404, headers });
     }
     return NextResponse.json(canPreview ? track : toPublicTrack(track), { headers });
@@ -34,39 +35,42 @@ export async function PUT(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   if (!(await isAdminRequest(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: contentHeaders });
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: contentHeaders });
   }
 
   const parsed = TrackUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 422 }
+      { status: 422, headers: contentHeaders }
     );
   }
 
   const { slug } = await params;
-  const { accentCyan, ...trackInput } = parsed.data;
+  const { accentCyan, expectedUpdatedAt, ...trackInput } = parsed.data;
 
   try {
     const current = await prisma.track.findUnique({
       where: { slug },
-      select: { genre: true, playbackMode: true, audioUrl: true, audioAssetId: true },
+      select: { genre: true, playbackMode: true, audioUrl: true, audioAssetId: true, deletedAt: true, updatedAt: true },
     });
-    if (!current) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!current || isContentTrashed(current)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: contentHeaders });
+    if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== current.updatedAt.getTime()) {
+      return NextResponse.json({ error: CONTENT_CHANGED }, { status: 409, headers: contentHeaders });
+    }
 
     if (trackInput.audioUrl !== undefined && trackInput.audioUrl !== (current.audioUrl ?? '')) {
       return NextResponse.json({
         error: 'Validation failed',
         details: { audioUrl: ['Use a processed audio upload to replace this track\'s audio.'] },
-      }, { status: 422 });
+      }, { status: 422, headers: contentHeaders });
     }
 
     const trackData: Prisma.TrackUpdateInput = {
@@ -84,38 +88,60 @@ export async function PUT(
         return NextResponse.json({
           error: 'Validation failed',
           details: { audioAssetId: ['Wait for audio processing to finish successfully before saving.'] },
-        }, { status: 422 });
+        }, { status: 422, headers: contentHeaders });
       }
       trackData.audioUrl = null;
     }
 
     const track = await prisma.track.update({
-      where: { slug },
+      where: { slug, updatedAt: current.updatedAt, AND: [activeContentWhere()] },
       data: trackData,
       include: { credits: true },
     });
-    return NextResponse.json(track);
+    return NextResponse.json(track, { headers: contentHeaders });
   } catch (err) {
+    if (isMissingContentError(err)) {
+      try {
+        const current = await prisma.track.findUnique({ where: { slug }, select: { deletedAt: true } });
+        const active = current && !isContentTrashed(current);
+        return NextResponse.json({ error: active ? CONTENT_CHANGED : 'Not found' }, { status: active ? 409 : 404, headers: contentHeaders });
+      } catch {
+        return NextResponse.json({ error: 'Could not check the track. Reload the library before trying again.' }, { status: 503, headers: contentHeaders });
+      }
+    }
     console.error(err);
-    return NextResponse.json({ error: 'Failed to update track' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update track' }, { status: 500, headers: contentHeaders });
   }
 }
 
-// DELETE /api/tracks/[slug] (admin only)
+// DELETE /api/tracks/[slug] — move to Trash without removing media or credits
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  if (!(await isAdminRequest(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const admin = await getContentMutationAdmin(req);
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: contentHeaders });
   }
 
   const { slug } = await params;
   try {
-    await prisma.track.delete({ where: { slug } });
-    return NextResponse.json({ ok: true });
+    await prisma.track.update({
+      where: { slug, AND: [activeContentWhere()] },
+      data: { published: false, deletedAt: new Date(), deletedBy: admin.username },
+    });
+    return NextResponse.json({ ok: true }, { headers: contentHeaders });
   } catch (err) {
+    if (isMissingContentError(err)) {
+      try {
+        const current = await prisma.track.findUnique({ where: { slug }, select: { deletedAt: true } });
+        if (current && isContentTrashed(current)) return NextResponse.json({ ok: true }, { headers: contentHeaders });
+        return NextResponse.json({ error: current ? 'This track changed. Refresh the library before trying again.' : 'Not found' }, { status: current ? 409 : 404, headers: contentHeaders });
+      } catch {
+        return NextResponse.json({ error: 'Could not check Trash. Refresh before trying again.' }, { status: 503, headers: contentHeaders });
+      }
+    }
     console.error(err);
-    return NextResponse.json({ error: 'Failed to delete track' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to move track to Trash' }, { status: 500, headers: contentHeaders });
   }
 }

@@ -5,7 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import { NextRequest } from 'next/server';
 import { adminFetch, AdminSaveError, formChanged, readAdminResponse } from '../../src/lib/admin-save';
 
-type WriteArgs = { data: Record<string, unknown>; where?: Record<string, string> };
+type WriteArgs = { data: Record<string, unknown>; where?: Record<string, unknown> };
 type WriteCall = { model: 'track' | 'video'; method: 'create' | 'update'; args: WriteArgs };
 let createTrack: typeof import('../../src/app/api/tracks/route').POST;
 let updateTrack: typeof import('../../src/app/api/tracks/[slug]/route').PUT;
@@ -32,13 +32,14 @@ const emptyTrackMetadata = { bpm: null, mood: null, story: null, spotifyUrl: nul
 const emptyVideoMetadata = { artist: null, duration: null };
 const trackCreateInput = { slug: track.slug, title: track.title, artist: track.artist, number: 1 };
 const videoCreateInput = { title: video.title, youtubeUrl: video.youtubeUrl, youtubeId: video.youtubeId };
+const savedRevision = new Date('2026-01-01T12:00:00.000Z');
 
 async function unmockedWrite(args: WriteArgs): Promise<Record<string, unknown>> {
   throw new Error(`Unexpected unmocked write: ${JSON.stringify(args)}`);
 }
 const database = {
-  track: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => track },
-  video: { create: unmockedWrite, update: unmockedWrite },
+  track: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...track, updatedAt: savedRevision }) },
+  video: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...video, updatedAt: savedRevision }) },
 };
 const prismaCache = globalThis as unknown as { prisma?: PrismaClient };
 const originalPrisma = prismaCache.prisma;
@@ -101,7 +102,7 @@ test('track update persists explicit null for every editable optional metadata f
 
   assert.equal(response.status, 200);
   assert.deepEqual(writes[0].args.data, emptyTrackMetadata);
-  assert.deepEqual(writes[0].args.where, { slug: track.slug });
+  assert.deepEqual(writes[0].args.where, { slug: track.slug, updatedAt: savedRevision, AND: [{ OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }] }] });
   assert.deepEqual(await response.json(), { ...track, ...emptyTrackMetadata });
 });
 
@@ -128,7 +129,7 @@ test('video update persists cleared artist and duration', async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(writes[0].args.data, emptyVideoMetadata);
-  assert.deepEqual(writes[0].args.where, { id: video.id });
+  assert.deepEqual(writes[0].args.where, { id: video.id, updatedAt: savedRevision, AND: [{ OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }] }] });
   assert.deepEqual(await response.json(), { ...video, ...emptyVideoMetadata });
 });
 

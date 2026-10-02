@@ -27,6 +27,8 @@ model Track {
   audioAssetId  String?  @db.ObjectId
   coverUrl      String?
   published     Boolean  @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -59,6 +61,8 @@ model Video {
   youtubeId   String   // extracted video ID for embed/thumbnail
   duration    String?  // e.g. "3:52"
   published   Boolean  @default(true)
+  deletedAt   DateTime?
+  deletedBy   String?
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

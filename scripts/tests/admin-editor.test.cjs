@@ -66,7 +66,7 @@ function fixtures() {
       { ...video, id: 'video-1', title: 'Video fixture', order: 0 },
       { ...video, id: 'video-2', title: 'Second video fixture', order: 1 },
     ],
-    calls: [], uploads: [], mutationResponses: [], nextMutationGate: null, failNextRead: false,
+    calls: [], uploads: [], mutationResponses: [], nextMutationGate: null, failNextRead: false, mutationRevision: 0,
     readResponses: {}, session: { user: { ...ownerIdentity, accessStatus: 'active', authLocked: false }, session: { expiresAt: '2099-01-01T00:00:00.000Z' } },
   };
 }
@@ -96,8 +96,12 @@ async function fakeFetch(input, init = {}) {
       network.failNextRead = false;
       return Response.json({ error: 'Fixture read failed' }, { status: 500 });
     }
-    if (input === '/api/tracks?all=true') return Response.json(structuredClone(network.tracks));
-    if (input === '/api/videos?all=true') return Response.json(structuredClone(network.videos));
+    if (input === '/api/tracks?all=true') return Response.json(structuredClone(network.tracks.filter((row) => !row.deletedAt)));
+    if (input === '/api/videos?all=true') return Response.json(structuredClone(network.videos.filter((row) => !row.deletedAt)));
+    if (input === '/api/admin/trash') return Response.json({
+      tracks: structuredClone(network.tracks.filter((row) => row.deletedAt)),
+      videos: structuredClone(network.videos.filter((row) => row.deletedAt)),
+    });
     if (input.startsWith('/api/admin/track-title?')) {
       const title = new URL(input, 'http://localhost').searchParams.get('title');
       const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -113,12 +117,28 @@ async function fakeFetch(input, init = {}) {
   const failure = network.mutationResponses.shift();
   if (failure) return Response.json(failure.body || { error: 'Fixture save failed' }, { status: failure.status });
   if (input === '/api/auth/logout') return Response.json({ ok: true });
+  if (method === 'POST' && input.startsWith('/api/admin/trash/')) {
+    const [, , , , kind, key, action] = input.split('/');
+    assert.equal(action, 'restore');
+    const rows = kind === 'tracks' ? network.tracks : network.videos;
+    const record = rows.find((row) => row.slug === decodeURIComponent(key) || row.id === decodeURIComponent(key));
+    assert.ok(record, 'Restore target must remain in fixture storage');
+    if (record.deletedAt) Object.assign(record, { deletedAt: null, deletedBy: null, published: false,
+      updatedAt: new Date(Date.UTC(2026, 9, 1, 12) + (++network.mutationRevision * 1000)).toISOString() });
+    return Response.json(record);
+  }
   const records = input.startsWith('/api/tracks') ? network.tracks : network.videos;
   if (method === 'PUT') {
     const key = input.split('/').at(-1);
     const index = records.findIndex((record) => record.slug === key || record.id === key);
     assert.ok(index >= 0, `Fixture update target missing: ${key}`);
-    records[index] = { ...records[index], ...body, updatedAt: '2026-01-02T12:00:00Z' };
+    if (records[index].deletedAt) return Response.json({ error: 'Not found' }, { status: 404 });
+    if (body.expectedUpdatedAt && body.expectedUpdatedAt !== records[index].updatedAt) {
+      return Response.json({ error: 'This item changed since you started editing. Reload and review it before saving.' }, { status: 409 });
+    }
+    const data = { ...body };
+    delete data.expectedUpdatedAt;
+    records[index] = { ...records[index], ...data, updatedAt: new Date(Date.UTC(2026, 9, 1, 12) + (++network.mutationRevision * 1000)).toISOString() };
     return Response.json(records[index]);
   }
   if (method === 'POST') {
@@ -128,7 +148,10 @@ async function fakeFetch(input, init = {}) {
   }
   if (method === 'DELETE') {
     const key = input.split('/').at(-1);
-    records.splice(records.findIndex((record) => record.slug === key || record.id === key), 1);
+    const record = records.find((row) => row.slug === key || row.id === key);
+    assert.ok(record, 'Trash target must remain in fixture storage');
+    if (!record.deletedAt) Object.assign(record, { deletedAt: '2026-10-01T12:00:00.000Z', deletedBy: ownerIdentity.username, published: false,
+      updatedAt: new Date(Date.UTC(2026, 9, 1, 12) + (++network.mutationRevision * 1000)).toISOString() });
     return Response.json({ ok: true });
   }
   throw new Error(`Unsupported fixture request ${method} ${input}`);
@@ -405,7 +428,7 @@ test('quick publish blocks dirty edits and synchronizes the pristine editor with
   await change('Mood', 'Original mood');
   assert.equal(isDirty('track'), false);
   await press('Draft', article('Live fixture'));
-  assert.deepEqual(mutations()[0].body, { published: false });
+  assert.deepEqual(mutations()[0].body, { published: false, expectedUpdatedAt: '2026-01-01T12:00:00Z' });
   assert.ok(button(/^Save as draftHidden/));
   assert.equal(isDirty('track'), false, 'Quick publish must update the baseline as well as the form');
   await press('New track');
@@ -420,7 +443,7 @@ test('quick video publish also respects dirty state and updates the editor after
   assert.equal(mutations().length, 0);
   await change('Duration', '3:45');
   await press('Draft', article('Video fixture'));
-  assert.deepEqual(mutations()[0].body, { published: false });
+  assert.deepEqual(mutations()[0].body, { published: false, expectedUpdatedAt: '2026-01-01T12:00:00Z' });
   assert.ok(button(/^Save video as draftHidden/));
   assert.equal(isDirty('video'), false);
   await press('New video');
@@ -544,21 +567,21 @@ test('Navigation API traversal cancels on Keep and one Discard approves only its
   assert.deepEqual(navigation.traversedKeys, ['approved-destination']);
 });
 
-test('canceling delete preserves edits; a delayed double-click delete runs once without clearing another form', async () => {
+test('canceling trash preserves edits; a delayed double-click moves one item without clearing another form', async () => {
   await edit('Live fixture');
   await change('Mood', 'Unsaved track must remain');
-  await press('Delete', article('Live fixture'));
-  let dialog = container.querySelector('dialog[aria-label="Delete track"]');
+  await press('Move to Trash', article('Live fixture'));
+  let dialog = container.querySelector('dialog[aria-label="Move track to Trash"]');
   assert.ok(dialog?.hasAttribute('open'));
   await press('Cancel', dialog);
   assert.equal(mutations().length, 0);
   assert.equal(field('Mood').value, 'Unsaved track must remain');
 
-  await press('Delete', article('Draft fixture'));
-  dialog = container.querySelector('dialog[aria-label="Delete track"]');
+  await press('Move to Trash', article('Draft fixture'));
+  dialog = container.querySelector('dialog[aria-label="Move track to Trash"]');
   const gate = deferred();
   network.nextMutationGate = gate;
-  const confirmDelete = button('Delete', dialog);
+  const confirmDelete = button('Move to Trash', dialog);
   await act(async () => { confirmDelete.click(); confirmDelete.click(); });
   assert.equal(mutations().length, 1);
   assert.equal(mutations()[0].method, 'DELETE');
@@ -567,7 +590,8 @@ test('canceling delete preserves edits; a delayed double-click delete runs once 
   assert.ok(field('Mood').matches(':disabled'));
   assert.equal(button('Cancel', dialog).disabled, true);
   await act(async () => { gate.resolve(); });
-  assert.equal(network.tracks.length, 1);
+  assert.equal(network.tracks.length, 2, 'Trash must preserve the saved record');
+  assert.equal(network.tracks.filter((track) => !track.deletedAt).length, 1);
   assert.equal(network.tracks[0].slug, 'live-fixture');
   assert.equal(field('Mood').value, 'Unsaved track must remain');
   assert.ok(isDirty('track'));
@@ -591,7 +615,7 @@ test('an initial track-library failure is unavailable rather than empty and cann
   assert.match(container.textContent, /Connection needs attention/);
   assert.match(container.textContent, /Track library unavailable/);
   assert.doesNotMatch(container.textContent, /No tracks match that search|No tracks yet/);
-  assert.equal(statValue('Tracks'), '—');
+  assert.equal(statValue('Tracks'), '\u2014');
   assert.equal(statValue('Videos'), '2');
   assert.equal(lastFullCheck(), null);
   assert.equal(button('Add track').matches(':disabled'), true, 'Creation cannot assume an unloaded library is empty');
@@ -749,3 +773,257 @@ for (const payload of [{ error: 'Not a record array' }, [null]]) {
     assert.equal(field('Mood').value, 'Preserved under malformed response');
   });
 }
+
+function withTrashedTrack() {
+  const rows = fixtures();
+  Object.assign(rows.tracks[1], { deletedAt: '2026-10-01T12:00:00.000Z', deletedBy: 'fixture.owner', published: false });
+  return rows;
+}
+
+test('Trash loads only when opened and an empty result offers no permanent delete action', async () => {
+  assert.equal(network.calls.some((call) => call.input === '/api/admin/trash'), false);
+  await press('Trash');
+  assert.equal(network.calls.filter((call) => call.input === '/api/admin/trash').length, 1);
+  assert.match(container.textContent, /Trash is empty\./);
+  assert.ok(button('Refresh Trash'));
+  assert.equal([...container.querySelectorAll('button')].some((node) => /purge|permanently delete|empty trash/i.test(node.textContent)), false);
+});
+
+test('trashing the edited track requires confirmation, preserves its saved record, and discards unsaved fields only after success', async () => {
+  const before = structuredClone(network.tracks[0]);
+  await edit('Live fixture');
+  await change('Mood', 'Unsaved target metadata');
+  const file = new dom.window.File(['local-art'], 'unsaved-target.png', { type: 'image/png' });
+  const picker = await chooseFile('Replace cover art', file);
+  await press('Move to Trash', article('Live fixture'));
+  let dialog = container.querySelector('dialog[aria-label="Move track to Trash"]');
+  assert.ok(dialog?.hasAttribute('open'));
+  assert.match(dialog.textContent, /unsaved/i);
+  assert.match(dialog.textContent, /restore.*draft/i);
+  await press('Cancel', dialog);
+  assert.equal(mutations().length, 0);
+  assert.equal(field('Mood').value, 'Unsaved target metadata');
+  assert.equal(picker.files[0], file);
+  await press('Move to Trash', article('Live fixture'));
+  dialog = container.querySelector('dialog[aria-label="Move track to Trash"]');
+  await press('Move to Trash', dialog);
+  assert.equal(network.tracks.length, 2);
+  const trashed = network.tracks.find((track) => track.id === before.id);
+  assert.ok(trashed.deletedAt);
+  assert.equal(trashed.published, false);
+  assert.equal(trashed.mood, before.mood);
+  assert.equal(trashed.audioUrl, before.audioUrl);
+  assert.equal(trashed.coverUrl, before.coverUrl);
+  assert.equal(network.uploads.length, 0);
+  assert.equal(field('Track title').value, '');
+  assert.equal(isDirty('track'), false);
+  await press('Trash');
+  assert.ok(article('Live fixture'));
+  await press('Restore as draft', article('Live fixture'));
+  assert.equal(network.tracks[0].deletedAt, null);
+  assert.equal(network.tracks[0].published, false);
+  assert.equal(mutations().filter((call) => call.method === 'PUT').length, 0, 'Restoring must not republish');
+  await press('Tracks');
+  assert.match(article('Live fixture').textContent, /Draft/);
+});
+
+test('restoring another track retains the active editor draft and selected file', async () => {
+  await remountWith(withTrashedTrack());
+  await edit('Live fixture');
+  await change('Mood', 'Keep while restoring another track');
+  const file = new dom.window.File(['kept-art'], 'keep-across-restore.png', { type: 'image/png' });
+  await chooseFile('Replace cover art', file);
+  await press('Trash');
+  await press('Restore as draft', article('Draft fixture'));
+  assert.equal(network.tracks[1].published, false);
+  assert.equal(network.tracks[1].deletedAt, null);
+  assert.equal(network.uploads.length, 0);
+  assert.equal(mutations().length, 1);
+  assert.equal(mutations()[0].input, '/api/admin/trash/tracks/draft-fixture/restore');
+  await press(/^Tracks/);
+  assert.equal(field('Track title').value, 'Live fixture');
+  assert.equal(field('Mood').value, 'Keep while restoring another track');
+  assert.match(field('Replace cover art').closest('label').textContent, /keep-across-restore\.png/);
+  assert.ok(isDirty('track'));
+  assert.ok(article('Draft fixture'));
+  await press('Save changes');
+  assert.equal(network.uploads.length, 1);
+  assert.equal(network.uploads[0].file, file, 'Changing tabs and restoring another item must preserve the selected File');
+});
+
+test('video trash and restore retain its metadata and return it to the library as a draft', async () => {
+  const before = structuredClone(network.videos[0]);
+  await press('Videos');
+  await press('Move to Trash', article('Video fixture'));
+  const dialog = container.querySelector('dialog[aria-label="Move video to Trash"]');
+  assert.ok(dialog?.hasAttribute('open'));
+  await press('Move to Trash', dialog);
+  assert.equal(network.videos.length, 2);
+  assert.ok(network.videos[0].deletedAt);
+  assert.equal(network.videos[0].youtubeUrl, before.youtubeUrl);
+  assert.equal(network.videos[0].duration, before.duration);
+  await press('Trash');
+  await press('Restore as draft', article('Video fixture'));
+  assert.equal(network.videos[0].published, false);
+  assert.equal(network.videos[0].deletedAt, null);
+  assert.equal(network.videos[0].youtubeId, before.youtubeId);
+  await press('Videos');
+  assert.match(article('Video fixture').textContent, /Draft/);
+});
+
+test('a failed restore keeps the item in Trash and the same action can retry successfully', async () => {
+  await remountWith(withTrashedTrack());
+  await press('Trash');
+  network.mutationResponses.push({ status: 503, body: { error: 'Could not restore this track. Refresh Trash before trying again.' } });
+  await press('Restore as draft', article('Draft fixture'));
+  assert.ok(network.tracks[1].deletedAt);
+  assert.ok(article('Draft fixture'));
+  assert.match(container.textContent, /Could not restore this track/);
+  await press('Restore as draft', article('Draft fixture'));
+  assert.equal(network.tracks[1].deletedAt, null);
+  assert.equal(network.tracks[1].published, false);
+  assert.equal(mutations().length, 2);
+  assert.match(container.textContent, /Trash is empty\./);
+});
+
+test('a delayed double-click restore sends one request and never duplicates the active record', async () => {
+  await remountWith(withTrashedTrack());
+  await press('Trash');
+  const gate = deferred();
+  network.nextMutationGate = gate;
+  const restore = button('Restore as draft', article('Draft fixture'));
+  await act(async () => { restore.click(); restore.click(); });
+  assert.equal(mutations().length, 1);
+  assert.ok(restore.matches(':disabled'));
+  await act(async () => { gate.resolve(); });
+  assert.equal(network.tracks.filter((track) => track.id === 'track-2').length, 1);
+  await press('Tracks');
+  assert.equal([...container.querySelectorAll('article h3')].filter((node) => node.textContent === 'Draft fixture').length, 1);
+});
+
+test('a failed Trash load is retryable and never claims the bin is empty', async () => {
+  await remountWith(withTrashedTrack());
+  network.readResponses['/api/admin/trash'] = [{ status: 503, body: { error: 'Trash temporarily unavailable' } }];
+  await press('Trash');
+  assert.match(container.textContent, /Trash could not be loaded/);
+  assert.doesNotMatch(container.textContent, /Trash is empty\./);
+  await press('Retry Trash');
+  assert.ok(article('Draft fixture'));
+  assert.doesNotMatch(container.textContent, /Trash could not be loaded/);
+});
+
+test('an expired Trash load uses dashboard sign-in recovery without losing another dirty form', async () => {
+  await remountWith(withTrashedTrack());
+  await edit('Live fixture');
+  await change('Mood', 'Keep through trash sign-in');
+  network.readResponses['/api/admin/trash'] = [{ status: 401, body: { error: 'Sign in to view Trash.' } }];
+  await press('Trash');
+  assert.match(container.textContent, /Sign-in required/);
+  assert.ok([...container.querySelectorAll('a')].some((link) => link.textContent === 'Sign in in a new tab' && link.target === '_blank'));
+  await press('Retry connection');
+  assert.doesNotMatch(container.textContent, /Sign-in required/);
+  assert.ok(article('Draft fixture'));
+  await press(/^Tracks/);
+  assert.equal(field('Mood').value, 'Keep through trash sign-in');
+  assert.ok(isDirty('track'));
+});
+
+test('a failed move to Trash preserves the current unsaved metadata and selected file', async () => {
+  await edit('Live fixture');
+  await change('Mood', 'Retain failed-trash edits');
+  const file = new dom.window.File(['keep'], 'failed-trash.png', { type: 'image/png' });
+  const picker = await chooseFile('Replace cover art', file);
+  network.mutationResponses.push({ status: 500, body: { error: 'Failed to move track to Trash' } });
+  await press('Move to Trash', article('Live fixture'));
+  await press('Move to Trash', container.querySelector('dialog[aria-label="Move track to Trash"]'));
+  assert.equal(network.tracks[0].deletedAt, undefined);
+  assert.equal(network.tracks[0].published, true);
+  assert.ok(article('Live fixture'));
+  assert.equal(field('Mood').value, 'Retain failed-trash edits');
+  assert.equal(picker.files[0], file);
+  assert.equal(network.uploads.length, 0);
+  assert.match(container.textContent, /Failed to move track to Trash/);
+});
+
+test('a stale Trash card accepts an already restored live result without silently unpublishing it', async () => {
+  await remountWith(withTrashedTrack());
+  await press('Trash');
+  Object.assign(network.tracks[1], { deletedAt: null, deletedBy: null, published: true });
+  await press('Restore as draft', article('Draft fixture'));
+  assert.equal(network.tracks[1].published, true);
+  assert.match(container.textContent, /already restored and is live/);
+  assert.equal(mutations().filter((call) => call.method === 'PUT').length, 0);
+  await press('Tracks');
+  assert.match(article('Draft fixture').textContent, /Live/);
+});
+
+test('malformed Trash data cannot appear empty or replace a previously loaded recoverable item', async () => {
+  await remountWith(withTrashedTrack());
+  await press('Trash');
+  network.readResponses['/api/admin/trash'] = [{ body: { tracks: [null], videos: [] } }];
+  await press('Refresh Trash');
+  assert.match(container.textContent, /Trash could not be loaded|Showing previously loaded items/);
+  assert.doesNotMatch(container.textContent, /Trash is empty\./);
+  assert.ok(article('Draft fixture'));
+  assert.equal(button('Restore as draft', article('Draft fixture')).disabled, true);
+  await press('Retry Trash');
+  assert.equal(button('Restore as draft', article('Draft fixture')).disabled, false);
+});
+
+test('a stale track save after trash and restore cannot republish, and opening the latest version requires discarding old edits', async () => {
+  const originalRevision = network.tracks[0].updatedAt;
+  await edit('Live fixture');
+  await change('Mood', 'Stale track edit');
+  const file = new dom.window.File(['pending-art'], 'stale-edit.png', { type: 'image/png' });
+  const picker = await chooseFile('Replace cover art', file);
+  // Another admin trashed and restored this item while this form remained open.
+  const restoredRevision = '2026-10-01T12:30:00.000Z';
+  Object.assign(network.tracks[0], { deletedAt: null, deletedBy: null, published: false, updatedAt: restoredRevision });
+  await press('Reload');
+  assert.equal(field('Mood').value, 'Stale track edit');
+  await press('Save changes');
+  assert.equal(mutations()[0].body.expectedUpdatedAt, originalRevision, 'Reload must not silently authorize the stale form against the latest record');
+  assert.equal(network.tracks[0].published, false);
+  assert.equal(network.tracks[0].mood, 'Original mood');
+  assert.equal(picker.files[0], file);
+  assert.equal(field('Mood').value, 'Stale track edit');
+  assert.match(container.textContent, /changed since you started editing/);
+  await edit('Live fixture');
+  assert.ok(dialogOpen());
+  await press('Keep editing');
+  assert.equal(field('Mood').value, 'Stale track edit');
+  await edit('Live fixture');
+  await press('Discard changes');
+  assert.equal(field('Mood').value, 'Original mood');
+  assert.equal(isDirty('track'), false);
+  await change('Mood', 'Reviewed latest track');
+  await press('Save changes');
+  assert.equal(mutations().at(-1).body.expectedUpdatedAt, restoredRevision);
+  assert.equal(network.tracks[0].published, false);
+  assert.equal(network.tracks[0].mood, 'Reviewed latest track');
+});
+
+test('a stale video save keeps its original revision across reload and can recover by reopening the latest draft', async () => {
+  const originalRevision = network.videos[0].updatedAt;
+  await press('Videos');
+  await edit('Video fixture');
+  await change('Duration', '9:59');
+  const restoredRevision = '2026-10-01T12:30:00.000Z';
+  Object.assign(network.videos[0], { deletedAt: null, deletedBy: null, published: false, updatedAt: restoredRevision });
+  await press('Reload');
+  await press('Save changes');
+  assert.equal(mutations()[0].body.expectedUpdatedAt, originalRevision);
+  assert.equal(network.videos[0].published, false);
+  assert.equal(network.videos[0].duration, '3:45');
+  assert.equal(field('Duration').value, '9:59');
+  assert.match(container.textContent, /changed since you started editing/);
+  await edit('Video fixture');
+  assert.ok(dialogOpen());
+  await press('Discard changes');
+  assert.equal(field('Duration').value, '3:45');
+  await change('Duration', '4:05');
+  await press('Save changes');
+  assert.equal(mutations().at(-1).body.expectedUpdatedAt, restoredRevision);
+  assert.equal(network.videos[0].duration, '4:05');
+  assert.equal(network.videos[0].published, false);
+});

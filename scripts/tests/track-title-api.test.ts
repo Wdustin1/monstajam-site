@@ -3,7 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { NextRequest } from 'next/server';
 import { adminAuthorization } from '../../src/lib/auth';
-import { slugifyTrackTitle, TRACK_TITLE_CONFLICT } from '../../src/lib/track-title';
+import { slugifyTrackTitle, TRACK_TITLE_CONFLICT, TRACK_TITLE_TRASH_CONFLICT, TRACK_TITLE_CREATE_CONFLICT } from '../../src/lib/track-title';
 import { TrackUpdateSchema } from '../../src/lib/schemas';
 import { mockNamedAdminSession } from './fixtures/admin-session';
 
@@ -109,7 +109,7 @@ test('available title returns its canonical slug with one minimal unique lookup'
   assert.equal(response.status, 200);
   privateResponse(response);
   assert.deepEqual(await response.json(), { slug: 'cold-world', available: true });
-  assert.deepEqual(reads, [{ where: { slug: 'cold-world' }, select: { id: true } }]);
+  assert.deepEqual(reads, [{ where: { slug: 'cold-world' }, select: { id: true, deletedAt: true } }]);
   assert.deepEqual(writes, []);
 });
 
@@ -120,9 +120,19 @@ for (const published of [false, true]) {
     assert.equal(response.status, 409);
     privateResponse(response);
     assert.deepEqual(await response.json(), { error: TRACK_TITLE_CONFLICT, details: { title: [TRACK_TITLE_CONFLICT] } });
-    assert.deepEqual(reads, [{ where: { slug: 'cold-world' }, select: { id: true } }]);
+    assert.deepEqual(reads, [{ where: { slug: 'cold-world' }, select: { id: true, deletedAt: true } }]);
   });
 }
+
+test('a trashed track reserves its link with specific restore guidance', async () => {
+  occupied = { id: 'trashed-id', slug: 'cold-world', deletedAt: new Date(), published: false };
+  const response = await check('Cold World');
+  assert.equal(response.status, 409);
+  privateResponse(response);
+  assert.deepEqual(await response.json(), { error: TRACK_TITLE_TRASH_CONFLICT, details: { title: [TRACK_TITLE_TRASH_CONFLICT] } });
+  assert.equal(reads.length, 1);
+  assert.deepEqual(writes, []);
+});
 
 for (const title of [undefined, '', '   ', '!!!', '你好 🎵', 'a'.repeat(201)]) {
   test(`invalid title ${title === undefined ? '(missing)' : JSON.stringify(title.slice(0, 12))} fails before any database lookup`, async () => {
@@ -166,7 +176,7 @@ for (const target of [['slug'], 'tracks_slug_key', 'Track_slug_key', 'slug_1']) 
     const response = await post();
     assert.equal(response.status, 409);
     privateResponse(response);
-    assert.deepEqual(await response.json(), { error: TRACK_TITLE_CONFLICT, details: { title: [TRACK_TITLE_CONFLICT] } });
+    assert.deepEqual(await response.json(), { error: TRACK_TITLE_CREATE_CONFLICT, details: { title: [TRACK_TITLE_CREATE_CONFLICT] } });
     assert.equal(writes.length, 1);
     assert.deepEqual(reads, [], 'Final create relies on the unique index, not another pre-create lookup');
   });
@@ -178,7 +188,7 @@ test('a concurrent save after a successful preflight still receives the same use
   createError = uniqueError('tracks_slug_key');
   const response = await post();
   assert.equal(response.status, 409);
-  assert.deepEqual(await response.json(), { error: TRACK_TITLE_CONFLICT, details: { title: [TRACK_TITLE_CONFLICT] } });
+  assert.deepEqual(await response.json(), { error: TRACK_TITLE_CREATE_CONFLICT, details: { title: [TRACK_TITLE_CREATE_CONFLICT] } });
   assert.equal(reads.length, 1, 'Only the preflight reads the slug');
   assert.equal(writes.length, 1);
 });

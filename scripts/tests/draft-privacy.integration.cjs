@@ -22,6 +22,7 @@ const keepAlive = process.argv.includes('--keep-alive');
 const production = process.argv.includes('--production');
 const origin = `${production ? 'https' : 'http'}://localhost:${port}`;
 const privateMarkers = ['PRIVATE_FIXTURE_TITLE_9d2a', 'PRIVATE_FIXTURE_STORY_7e3b', 'private-fixture-a8f4.mp3', 'private-fixture-cover-6c8a'];
+const trashedMarkers = ['TRASHED_FIXTURE_TITLE_1b7c', 'TRASHED_FIXTURE_STORY_8f2e', 'trashed-fixture-cover-4ae1', 'trashed-fixture-original-94ae.mp3', 'TRASHED_DRAFT_FIXTURE_TITLE_763c', 'TRASHED_VIDEO_FIXTURE_TITLE_439d', 'TRASHED0001'];
 let child;
 let serverLog = '';
 let stopping = false;
@@ -75,7 +76,9 @@ async function assertLoginRedirect(response, context) {
 
 function assertPrivateAbsent(body, context) {
   for (const marker of privateMarkers) assert.ok(!body.includes(marker), `${context} leaked ${marker}`);
+  assertTrashedAbsent(body, context);
 }
+function assertTrashedAbsent(body, context) { for (const marker of trashedMarkers) assert.ok(!body.includes(marker), `${context} leaked ${marker}`); }
 
 async function assertNotFound(response, context) {
   // Next returns 200 once loading.tsx has started streaming a not-found page.
@@ -129,6 +132,12 @@ async function runChecks() {
   assertPrivateAbsent(await prefetchDraft.text(), 'Public draft RSC prefetch payload');
   console.log('PASS public draft HTML, metadata, and RSC privacy');
 
+  for (const slug of ['privacy-trashed-track', 'privacy-trashed-draft']) {
+    await assertNotFound(await request(`/tracks/${slug}`, { headers: { 'User-Agent': 'Googlebot' } }), 'Trashed public page and metadata');
+    const trashedRsc = await request(`/tracks/${slug}?_rsc=trash-prefetch`, { headers: { RSC: '1', 'Next-Router-Prefetch': '1', 'Next-Url': '/' } });
+    assertPrivateAbsent(await trashedRsc.text(), 'Trashed public RSC prefetch');
+  }
+
   const home = await request('/');
   assert.equal(home.status, 200);
   const homeBody = await home.text();
@@ -138,7 +147,12 @@ async function runChecks() {
   assert.equal(listing.status, 200);
   const tracks = await listing.json();
   assert.deepEqual(tracks.map((track) => track.slug), ['privacy-public-track']);
-  console.log('PASS public page and API listings exclude draft');
+  for (const route of ['/genres', '/videos', '/api/videos']) {
+    const response = await request(route);
+    assert.equal(response.status, 200);
+    assertPrivateAbsent(await response.text(), `${route} public listing`);
+  }
+  console.log('PASS public pages and API listings exclude drafts and trash');
 
   const previewPath = '/upload/preview/privacy-draft-track';
   for (const [description, headers] of [['signed out', {}], ['invalid cookie', { Cookie: 'admin_session=intentionally-wrong' }]]) {
@@ -156,12 +170,14 @@ async function runChecks() {
   const preview = await request(previewPath, { headers: { Cookie: cookie, 'User-Agent': 'Googlebot' } });
   assert.equal(preview.status, 200, 'Authenticated draft preview must load');
   const previewBody = await preview.text();
+  assertTrashedAbsent(previewBody, 'Authenticated active draft preview');
   for (const marker of privateMarkers) assert.ok(previewBody.includes(marker), `Preview is missing fixture field ${marker}`);
   assert.match(previewBody, /<meta\s+name="robots"\s+content="[^"]*noindex/);
   const previewRsc = await request(previewPath + '?_rsc=authorized-preview', { headers: { RSC: '1', Cookie: cookie } });
   assert.equal(previewRsc.status, 200);
   assert.match(previewRsc.headers.get('content-type') || '', /text\/x-component/);
   const previewRscBody = await previewRsc.text();
+  assertTrashedAbsent(previewRscBody, 'Authenticated active draft preview RSC');
   for (const marker of privateMarkers) assert.ok(previewRscBody.includes(marker), `Preview RSC is missing ${marker}`);
   const previewCaching = preview.headers.get('cache-control') || '';
   // Next dev emits no-cache/must-revalidate. Require stronger private/no-store
@@ -172,6 +188,26 @@ async function runChecks() {
   } else assert.match(previewCaching, /(?:private|no-store|no-cache)/);
   console.log(`PASS authenticated preview content, noindex, and ${production ? 'production private/no-store caching' : 'development cache revalidation'}`);
   console.log(`Preview Cache-Control: ${previewCaching}`);
+
+  for (const slug of ['privacy-trashed-track', 'privacy-trashed-draft']) {
+    await assertNotFound(await request(`/upload/preview/${slug}`, { headers: { Cookie: cookie, 'User-Agent': 'Googlebot' } }), 'Authenticated trashed saved preview');
+    const rsc = await request(`/upload/preview/${slug}?_rsc=trash-admin-preview`, { headers: { Cookie: cookie, RSC: '1' } });
+    assertPrivateAbsent(await rsc.text(), 'Authenticated trashed saved preview RSC');
+    for (const headers of [{}, { Cookie: cookie }]) {
+      const detail = await request(`/api/tracks/${slug}?preview=true`, { headers });
+      assert.equal(detail.status, 404);
+      assertPrivateAbsent(await detail.text(), 'Trashed track API detail');
+      for (const method of ['GET', 'HEAD']) {
+        for (const query of ['', '?full=true', '?preview=true']) {
+          const playback = await request(`/api/audio/${slug}${query}`, { method, headers: { ...headers, Range: 'bytes=0-1' } });
+          assert.equal(playback.status, 404, `Trashed audio ${method} ${query} must be denied`);
+          assert.match(playback.headers.get('cache-control') || '', /no-store/);
+          assert.equal(await playback.text(), '');
+        }
+      }
+    }
+  }
+  console.log('PASS trash denied for admin saved previews, API details, and every GET/HEAD playback mode');
 
   const adminListing = await request('/api/tracks?all=true', { headers: { Cookie: cookie } });
   assert.equal(adminListing.status, 200);

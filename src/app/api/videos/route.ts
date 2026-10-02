@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { VideoCreateSchema } from '@/lib/schemas';
+import { activeContentWhere } from '@/lib/content-trash';
 
 // GET /api/videos — list videos
 export async function GET(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const videos = await prisma.video.findMany({
-      where: all ? {} : { published: true },
+      where: { AND: [activeContentWhere()], ...(!all && { published: true }) },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
     return NextResponse.json(videos, { headers });
