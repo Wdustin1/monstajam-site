@@ -6,6 +6,7 @@ import { TrackCreateSchema } from '@/lib/schemas';
 import { toPublicTrack } from '@/lib/track-playback';
 import { TRACK_TITLE_CREATE_CONFLICT, trackTitleError } from '@/lib/track-title';
 import { activeContentWhere } from '@/lib/content-trash';
+import { publishingError, SAVE_DRAFT_FIRST } from '@/lib/publishing-review';
 
 const adminHeaders = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 
@@ -68,8 +69,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { accentCyan, ...trackInput } = parsed.data;
+  if (trackInput.published === true) return NextResponse.json(publishingError(SAVE_DRAFT_FIRST), { status: 422, headers: adminHeaders });
   const trackData: Prisma.TrackCreateInput = {
     ...trackInput,
+    published: false,
     playbackMode: trackInput.playbackMode ?? 'preview',
     genre: trackInput.genre ?? 'Hip-Hop',
     color: trackInput.color ?? 'bg-gradient-to-br from-purple-600 to-blue-500',

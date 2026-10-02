@@ -96,15 +96,63 @@ async function trashSmoke(cookie) {
     ['/api/tracks/admin-save-live', savedTrack.updatedAt],
     ['/api/videos/000000000000000000000003', savedVideo.updatedAt],
   ]) {
-    assert.equal((await request(route, { method: 'PUT', cookie, body: { published: true, expectedUpdatedAt: revision } })).status, 409,
+    assert.equal((await request(route, { method: 'PUT', cookie, body: { published: true, expectedUpdatedAt: revision, ...(route.includes('/tracks/') ? { reviewedPlaybackMode: 'preview' } : {}) } })).status, 409,
       'A stale form saved after trash/restore must not silently republish the recovered draft');
   }
   assert.deepEqual(await (await request('/api/admin/trash', { cookie })).json(), { tracks: [], videos: [] });
-  assert.equal((await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { published: true } })).status, 200);
+  const review = await (await request('/api/admin/publishing/tracks/admin-save-live', { cookie })).json();
+  assert.equal(review.canPublish, true);
+  assert.equal((await request('/api/tracks/admin-save-live', { method: 'PUT', cookie, body: { published: true, expectedUpdatedAt: review.expectedUpdatedAt, reviewedPlaybackMode: review.playbackMode } })).status, 200);
   assert.equal((await (await request(trackRestore, { method: 'POST', cookie, body: {} })).json()).published, true, 'Replaying restore cannot unpublish an already active item');
   await setControls({ resetGeneration: 2 });
   assert.equal((await (await request('/api/tracks?all=true', { cookie })).json()).length, 2);
   console.log('PASS authenticated trash, preserved media/metadata, hidden active/public records, safe retry and restore-as-draft through real HTTP.');
+}
+
+async function publishingSmoke(cookie) {
+  const trackRoute = '/api/tracks/admin-save-live';
+  const videoRoute = '/api/videos/000000000000000000000003';
+  const reviewRoute = '/api/admin/publishing/tracks/admin-save-live';
+  assert.equal((await request(reviewRoute)).status, 401);
+  for (const route of [trackRoute, videoRoute]) assert.equal((await request(route, { method: 'PUT', cookie, body: { published: false } })).status, 200);
+  const publishBody = (review) => ({ published: true, expectedUpdatedAt: review.expectedUpdatedAt, reviewedPlaybackMode: review.playbackMode });
+  let review = await (await request(reviewRoute, { cookie })).json();
+  assert.equal(review.canPublish, true);
+  assert.equal(review.playbackMode, 'preview');
+  assert.equal(review.audio.previewDuration, 45);
+  assert.equal('originalPath' in review.audio, false);
+  assert.equal('previewPath' in review.audio, false);
+  assert.ok(review.checks.some((check) => check.status === 'warning'), 'Missing artwork must remain a review warning');
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: { published: true } })).status, 422);
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: { ...publishBody(review), mood: 'Mixed unchecked metadata' } })).status, 422);
+  for (const audioStatus of ['missing', 'processing', 'failed']) {
+    await setControls({ audioStatus });
+    const blocked = await (await request(reviewRoute, { cookie })).json();
+    assert.equal(blocked.canPublish, false, `${audioStatus} audio cannot be published`);
+    assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: publishBody(blocked) })).status, 422);
+  }
+  await setControls({ audioStatus: 'ready', previewDuration: 0 });
+  assert.equal((await (await request(reviewRoute, { cookie })).json()).canPublish, false);
+  await setControls({ previewDuration: 45 });
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: { mood: 'Updated after review' } })).status, 200);
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: publishBody(review) })).status, 409);
+  review = await (await request(reviewRoute, { cookie })).json();
+  await setControls({ failMutationGeneration: 3 });
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: publishBody(review) })).status, 500);
+  assert.equal((await (await request(reviewRoute, { cookie })).json()).track.published, false);
+  assert.equal((await request(trackRoute, { method: 'PUT', cookie, body: publishBody(review) })).status, 200);
+  assert.equal((await (await request('/api/tracks/admin-save-live')).json()).published, true);
+  const videoReview = await (await request('/api/admin/publishing/videos/000000000000000000000003', { cookie })).json();
+  assert.equal(videoReview.canPublish, true);
+  assert.equal((await request(videoRoute, { method: 'PUT', cookie, body: { published: true, expectedUpdatedAt: videoReview.expectedUpdatedAt } })).status, 200);
+  const videoInput = { title: 'New video draft', youtubeUrl: 'https://www.youtube.com/watch?v=LOCAL000002', youtubeId: 'LOCAL000002' };
+  assert.equal((await request('/api/videos', { method: 'POST', cookie, body: { ...videoInput, published: true } })).status, 422);
+  const newVideo = await request('/api/videos', { method: 'POST', cookie, body: videoInput });
+  assert.equal(newVideo.status, 201);
+  assert.equal((await newVideo.json()).published, false);
+  assert.equal((await request('/api/tracks', { method: 'POST', cookie, body: { slug: 'new-draft-check', title: 'New draft check', artist: 'Fixture', number: 3, published: true } })).status, 422);
+  await setControls({ resetGeneration: 3, audioStatus: null, previewDuration: 45 });
+  console.log('PASS saved publishing review, draft-only creation, managed-audio readiness, mode/revision confirmation, failed publication retry and explicit track/video publication through real HTTP.');
 }
 
 async function smoke() {
@@ -177,6 +225,7 @@ async function smoke() {
   read = await request('/api/tracks/admin-save-live', { cookie });
   assert.equal((await read.json()).mood, 'Original fixture mood');
   await trashSmoke(cookie);
+  await publishingSmoke(cookie);
   console.log('PASS normal login, title availability/conflict/retry, actual API read-after-write, failed-save retention/retry, delay, session expiry 401, and fixture reset.');
 }
 
@@ -229,7 +278,7 @@ async function main() {
   console.log(`Local fixture credentials: ${credentialsPath}`);
   console.log(`Control file: ${controlPath}`);
   console.log(`Next PID: ${child.pid}`);
-  console.log('Use failMutationGeneration: 3 for the next failure (1 and 2 were consumed by startup smoke).');
+  console.log('Use failMutationGeneration: 4 for the next failure (1, 2 and 3 were consumed by startup smoke).');
   console.log('Use failTrackReads/failVideoReads: true for persistent independent load errors; set false to recover. expireSession: true revokes the real local sessions; set false then sign in again.');
   console.log('All database writes stay in process memory. No upload credentials are configured. Ctrl+C stops the server.');
   console.log('Fixture Live Track has a ready managed asset at 12.5 seconds; Fixture Draft Track uses the legacy Full Songs fallback. Actual audio streaming/conversion is not provided by this UI fixture.');

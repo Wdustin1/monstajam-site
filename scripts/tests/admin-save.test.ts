@@ -38,8 +38,8 @@ async function unmockedWrite(args: WriteArgs): Promise<Record<string, unknown>> 
   throw new Error(`Unexpected unmocked write: ${JSON.stringify(args)}`);
 }
 const database = {
-  track: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...track, updatedAt: savedRevision }) },
-  video: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...video, updatedAt: savedRevision }) },
+  track: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...track, createdAt: savedRevision, updatedAt: savedRevision }) },
+  video: { create: unmockedWrite, update: unmockedWrite, findUnique: async () => ({ ...video, createdAt: savedRevision, updatedAt: savedRevision }) },
 };
 const prismaCache = globalThis as unknown as { prisma?: PrismaClient };
 const originalPrisma = prismaCache.prisma;

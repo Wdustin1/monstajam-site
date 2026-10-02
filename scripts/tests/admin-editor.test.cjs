@@ -66,7 +66,7 @@ function fixtures() {
       { ...video, id: 'video-1', title: 'Video fixture', order: 0 },
       { ...video, id: 'video-2', title: 'Second video fixture', order: 1 },
     ],
-    calls: [], uploads: [], mutationResponses: [], nextMutationGate: null, failNextRead: false, mutationRevision: 0,
+    calls: [], uploads: [], mutationResponses: [], nextMutationGate: null, failNextRead: false, mutationRevision: 0, audioAssets: {},
     readResponses: {}, session: { user: { ...ownerIdentity, accessStatus: 'active', authLocked: false }, session: { expiresAt: '2099-01-01T00:00:00.000Z' } },
   };
 }
@@ -75,6 +75,20 @@ function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
   return { promise, resolve };
+}
+
+function publishingReview(kind, record) {
+  const checks = [{ key: 'saved', label: 'Saved version', status: 'ready', message: 'The saved version is ready for review.' }];
+  const common = { kind: kind === 'tracks' ? 'track' : 'video', expectedUpdatedAt: record.updatedAt, checks };
+  if (kind === 'videos') return { ...common, video: structuredClone(record), canPublish: true };
+  const asset = network.audioAssets[record.audioAssetId];
+  const status = asset?.status || (record.audioUrl ? 'legacy' : 'missing');
+  const canPublish = status === 'ready';
+  checks.push({ key: 'audio', label: 'Audio preparation', status: canPublish ? 'ready' : 'blocked', message: canPublish ? 'Original and preview are ready.' : `Audio is ${status}. Save a ready audio file before publishing.` });
+  if (!record.coverUrl) checks.push({ key: 'artwork', label: 'Cover art', status: 'warning', message: 'No artwork has been added.' });
+  return { ...common, track: structuredClone(record), canPublish,
+    playbackMode: record.playbackMode || (record.genre === 'Full Songs' ? 'full' : 'preview'),
+    audio: { status, previewStart: asset?.previewStart ?? null, previewDuration: asset?.previewDuration ?? null } };
 }
 
 async function fakeFetch(input, init = {}) {
@@ -102,6 +116,15 @@ async function fakeFetch(input, init = {}) {
       tracks: structuredClone(network.tracks.filter((row) => row.deletedAt)),
       videos: structuredClone(network.videos.filter((row) => row.deletedAt)),
     });
+    if (input.startsWith('/api/admin/publishing/')) {
+      const [, , , , kind, key] = input.split('/');
+      const record = (kind === 'tracks' ? network.tracks : network.videos).find((row) => row.slug === decodeURIComponent(key) || row.id === decodeURIComponent(key));
+      return record && !record.deletedAt ? Response.json(publishingReview(kind, record)) : Response.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (input.startsWith('/api/audio-assets/')) {
+      const asset = network.audioAssets[input.split('/').at(-1)];
+      return asset ? Response.json(asset) : Response.json({ error: 'Not found' }, { status: 404 });
+    }
     if (input.startsWith('/api/admin/track-title?')) {
       const title = new URL(input, 'http://localhost').searchParams.get('title');
       const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -142,7 +165,8 @@ async function fakeFetch(input, init = {}) {
     return Response.json(records[index]);
   }
   if (method === 'POST') {
-    const saved = { id: `new-${records.length}`, createdAt: '2026-01-02T12:00:00Z', ...body };
+    assert.equal(body.published, false, 'New records must be saved as drafts before their publishing review');
+    const saved = { id: `new-${records.length}`, createdAt: '2026-01-02T12:00:00Z', updatedAt: '2026-01-02T12:00:00Z', ...body };
     records.push(saved);
     return Response.json(saved, { status: 201 });
   }
@@ -206,6 +230,21 @@ async function chooseFile(label, file) {
 function mutations() { return network.calls.filter((call) => call.method !== 'GET'); }
 function isDirty(kind) { return container.textContent.includes(`Unsaved ${kind} changes`); }
 function dialogOpen() { return !!container.querySelector('dialog[open]'); }
+function publishDialog(kind = 'track') {
+  const dialog = container.querySelector(`dialog[aria-label="Review ${kind} for publishing"][open]`);
+  assert.ok(dialog, `Missing ${kind} publishing review`);
+  return dialog;
+}
+async function acknowledgeReview(kind = 'track') {
+  const label = [...publishDialog(kind).querySelectorAll('label')].find((node) => node.textContent.includes(kind === 'track' ? 'I checked the preview and playback setting.' : 'I checked the video preview.'));
+  assert.ok(label, 'Publishing requires an explicit preview acknowledgement');
+  await click(label.querySelector('input[type="checkbox"]'));
+}
+async function readyDraft(mode = 'preview', status = 'ready') {
+  Object.assign(network.tracks[1], { audioAssetId: 'ready-draft-asset', audioUrl: null, playbackMode: mode });
+  network.audioAssets['ready-draft-asset'] = { id: 'ready-draft-asset', status, previewStart: 12.5, previewDuration: status === 'ready' ? 45 : null };
+  await press('Reload');
+}
 function stat(label) {
   const heading = [...container.querySelectorAll('div')].find((node) => node.children.length === 0 && node.textContent === label);
   assert.ok(heading, `Missing statistic ${label}`);
@@ -429,7 +468,8 @@ test('quick publish blocks dirty edits and synchronizes the pristine editor with
   assert.equal(isDirty('track'), false);
   await press('Draft', article('Live fixture'));
   assert.deepEqual(mutations()[0].body, { published: false, expectedUpdatedAt: '2026-01-01T12:00:00Z' });
-  assert.ok(button(/^Save as draftHidden/));
+  assert.equal(network.tracks[0].published, false);
+  assert.ok(button('Review & publish', article('Live fixture')));
   assert.equal(isDirty('track'), false, 'Quick publish must update the baseline as well as the form');
   await press('New track');
   assert.equal(dialogOpen(), false);
@@ -444,7 +484,8 @@ test('quick video publish also respects dirty state and updates the editor after
   await change('Duration', '3:45');
   await press('Draft', article('Video fixture'));
   assert.deepEqual(mutations()[0].body, { published: false, expectedUpdatedAt: '2026-01-01T12:00:00Z' });
-  assert.ok(button(/^Save video as draftHidden/));
+  assert.equal(network.videos[0].published, false);
+  assert.ok(button('Review & publish', article('Video fixture')));
   assert.equal(isDirty('video'), false);
   await press('New video');
   assert.equal(dialogOpen(), false);
@@ -1026,4 +1067,241 @@ test('a stale video save keeps its original revision across reload and can recov
   assert.equal(mutations().at(-1).body.expectedUpdatedAt, restoredRevision);
   assert.equal(network.videos[0].duration, '4:05');
   assert.equal(network.videos[0].published, false);
+});
+
+test('new tracks and videos save as drafts without silently publishing', async () => {
+  await change('Track title', 'Saved before review');
+  await change('Artist', 'Fixture artist');
+  await press('Add track');
+  assert.equal(network.tracks.at(-1).published, false);
+  assert.equal(mutations().at(-1).body.published, false);
+  assert.ok(article('Saved before review').querySelector('a[href="/upload/preview/saved-before-review"]'));
+  assert.equal(dialogOpen(), false);
+  await press('Videos');
+  await change('Video title', 'Saved video draft');
+  await change('YouTube URL', 'https://www.youtube.com/watch?v=LOCAL000003');
+  await press('Add video');
+  assert.equal(network.videos.at(-1).published, false);
+  assert.equal(mutations().at(-1).body.published, false);
+  assert.ok(button('Review & publish', article('Saved video draft')));
+});
+
+for (const mode of ['preview', 'full']) {
+  test(`publishing a ready ${mode} track requires reviewing its saved mode and explicit acknowledgement`, async () => {
+    await readyDraft(mode);
+    await press('Review & publish', article('Draft fixture'));
+    const dialog = publishDialog();
+    assert.equal(mutations().length, 0, 'Opening a review cannot publish');
+    assert.match(dialog.textContent, mode === 'full' ? /full song|entire song/i : /45.second|45.sec/i);
+    const auditionUrl = new URL(dialog.querySelector('audio[aria-label="Listener playback preview"]').src);
+    assert.equal(auditionUrl.searchParams.get(mode === 'full' ? 'full' : 'preview'), 'true');
+    assert.equal(auditionUrl.searchParams.has(mode === 'full' ? 'preview' : 'full'), false);
+    assert.equal(auditionUrl.searchParams.get('v'), '2026-01-01T12:00:00Z', 'The audition must stay tied to the reviewed mode and revision');
+    assert.match(dialog.textContent, /No artwork has been added/);
+    assert.equal(button('Publish track', dialog).disabled, true);
+    await acknowledgeReview();
+    assert.equal(button('Publish track', dialog).disabled, false, 'Missing artwork is a warning, not a publication block');
+    await press('Publish track', dialog);
+    assert.deepEqual(mutations().at(-1).body, { published: true, expectedUpdatedAt: '2026-01-01T12:00:00Z', reviewedPlaybackMode: mode });
+    assert.equal(network.tracks[1].published, true);
+    assert.equal(container.querySelector('dialog[open]'), null);
+  });
+}
+
+for (const status of ['missing', 'processing', 'failed', 'legacy']) {
+  test(`${status} audio cannot publish through a saved track review`, async () => {
+    if (status === 'processing' || status === 'failed') await readyDraft('preview', status);
+    else if (status === 'missing') {
+      network.tracks[1].audioUrl = null;
+      await press('Reload');
+    }
+    await press('Review & publish', article('Draft fixture'));
+    assert.match(publishDialog().textContent, new RegExp(`Audio is ${status}`));
+    await acknowledgeReview();
+    assert.equal(button('Publish track', publishDialog()).disabled, true);
+    await press('Publish track', publishDialog());
+    assert.equal(mutations().length, 0);
+    await press('Keep draft', publishDialog());
+    assert.equal(network.tracks[1].published, false);
+  });
+}
+
+test('canceling publication leaves the saved draft and a separate dirty form with its selected file untouched', async () => {
+  await readyDraft();
+  await edit('Live fixture');
+  await change('Mood', 'Other unsaved draft');
+  const file = new dom.window.File(['local-art'], 'unsaved-cover.png', { type: 'image/png' });
+  await chooseFile('Replace cover art', file);
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  await press('Keep draft', publishDialog());
+  assert.equal(mutations().length, 0);
+  assert.equal(network.tracks[1].published, false);
+  assert.equal(field('Mood').value, 'Other unsaved draft');
+  assert.equal(field('Replace cover art').files[0], file);
+});
+
+test('a dirty publishing target must save before reviewing, while a saved review never publishes unsaved metadata', async () => {
+  await readyDraft();
+  await edit('Draft fixture');
+  await change('Mood', 'Unsaved target changes');
+  await press('Review & publish', article('Draft fixture'));
+  assert.equal(container.querySelector('dialog[open]'), null);
+  assert.equal(network.calls.filter((call) => call.input.includes('/api/admin/publishing/')).length, 0);
+  assert.equal(field('Mood').value, 'Unsaved target changes');
+  assert.equal(mutations().length, 0);
+});
+
+test('failed review loading is retryable and cannot leave an enabled publication action', async () => {
+  await readyDraft();
+  const route = '/api/admin/publishing/tracks/draft-fixture';
+  network.readResponses[route] = [{ status: 503, body: { error: 'Readiness is temporarily unavailable.' } }];
+  await press('Review & publish', article('Draft fixture'));
+  assert.match(publishDialog().textContent, /Readiness is temporarily unavailable/);
+  assert.equal(mutations().length, 0);
+  await press('Reload review', publishDialog());
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  await acknowledgeReview();
+  await press('Publish track', publishDialog());
+  assert.equal(network.tracks[1].published, true);
+});
+
+test('a reviewed stale revision fails safely and a fresh review requires a new acknowledgement', async () => {
+  await readyDraft();
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  network.tracks[1].updatedAt = '2026-10-01T16:00:00.000Z';
+  network.tracks[1].playbackMode = 'full';
+  await press('Publish track', publishDialog());
+  assert.equal(network.tracks[1].published, false);
+  assert.equal(mutations()[0].body.expectedUpdatedAt, '2026-01-01T12:00:00Z');
+  assert.match(publishDialog().textContent, /changed|reload/i);
+  await press('Reload review', publishDialog());
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  assert.match(publishDialog().textContent, /full song|entire song/i);
+  await acknowledgeReview();
+  await press('Publish track', publishDialog());
+  assert.deepEqual(mutations().at(-1).body, { published: true, expectedUpdatedAt: '2026-10-01T16:00:00.000Z', reviewedPlaybackMode: 'full' });
+  assert.equal(network.tracks[1].published, true);
+});
+
+test('a failed publication retains the review and other unsaved files for an explicit retry', async () => {
+  await readyDraft();
+  await edit('Live fixture');
+  await change('Mood', 'Keep after publish failure');
+  const file = new dom.window.File(['local-art'], 'retained-publish-art.png', { type: 'image/png' });
+  await chooseFile('Replace cover art', file);
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  network.mutationResponses.push({ status: 500, body: { error: 'Publication could not be saved.' } });
+  await press('Publish track', publishDialog());
+  assert.equal(network.tracks[1].published, false);
+  assert.match(publishDialog().textContent, /Publication could not be saved/);
+  assert.equal(field('Mood').value, 'Keep after publish failure');
+  assert.equal(field('Replace cover art').files[0], file);
+  await press('Reload review', publishDialog());
+  await acknowledgeReview();
+  await press('Publish track', publishDialog());
+  assert.equal(network.tracks[1].published, true);
+  assert.equal(field('Mood').value, 'Keep after publish failure');
+  assert.equal(field('Replace cover art').files[0], file);
+});
+
+test('same-tick repeated publishing makes only one request while its outcome is pending', async () => {
+  await readyDraft();
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  const gate = deferred();
+  network.nextMutationGate = gate;
+  const publish = button('Publish track', publishDialog());
+  await act(async () => { publish.click(); publish.click(); });
+  assert.equal(mutations().length, 1);
+  await act(async () => { gate.resolve(); });
+  assert.equal(network.tracks[1].published, true);
+});
+
+test('video publication requires its own preview acknowledgement and saved revision', async () => {
+  network.videos[1].published = false;
+  await press('Reload');
+  await press('Videos');
+  await press('Review & publish', article('Second video fixture'));
+  assert.equal(button('Publish video', publishDialog('video')).disabled, true);
+  assert.equal(mutations().length, 0);
+  await acknowledgeReview('video');
+  await press('Publish video', publishDialog('video'));
+  assert.deepEqual(mutations()[0].body, { published: true, expectedUpdatedAt: '2026-01-01T12:00:00Z' });
+  assert.equal(network.videos[1].published, true);
+});
+
+test('a playback error blocks even an acknowledged review until playback is checked again', async () => {
+  await readyDraft();
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  const player = publishDialog().querySelector('audio[aria-label="Listener playback preview"]');
+  assert.ok(player);
+  const auditionUrl = new URL(player.src);
+  assert.equal(auditionUrl.pathname, '/api/audio/draft-fixture');
+  assert.equal(auditionUrl.searchParams.get('preview'), 'true');
+  assert.equal(auditionUrl.searchParams.get('v'), '2026-01-01T12:00:00Z');
+  assert.equal(player.src.includes('full=true'), false, 'The public-mode audition must not bypass the saved preview setting');
+  await act(async () => { player.dispatchEvent(new dom.window.Event('error')); });
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  assert.match(publishDialog().textContent, /Audio could not be played/);
+  assert.equal(mutations().length, 0);
+  await press('Reload review', publishDialog());
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  await acknowledgeReview();
+  assert.equal(button('Publish track', publishDialog()).disabled, false);
+});
+
+test('an expired publishing request requires session recovery and retains other selected files', async () => {
+  await readyDraft();
+  await edit('Live fixture');
+  await change('Mood', 'Retain through publishing login');
+  const file = new dom.window.File(['local-art'], 'login-retained.png', { type: 'image/png' });
+  await chooseFile('Replace cover art', file);
+  await press('Review & publish', article('Draft fixture'));
+  await acknowledgeReview();
+  network.mutationResponses.push({ status: 401, body: { error: 'Unauthorized' } });
+  await press('Publish track', publishDialog());
+  assert.match(container.textContent, /Sign-in required/);
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  assert.equal(network.tracks[1].published, false);
+  await press('Keep draft', publishDialog());
+  await press('Retry connection');
+  assert.equal(field('Mood').value, 'Retain through publishing login');
+  assert.equal(field('Replace cover art').files[0], file);
+  await press('Review & publish', article('Draft fixture'));
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  await acknowledgeReview();
+  await press('Publish track', publishDialog());
+  assert.equal(network.tracks[1].published, true);
+});
+
+test('closing an in-flight review cannot reopen it or replace a later review with its stale response', async () => {
+  await readyDraft();
+  const gate = deferred();
+  network.readResponses['/api/admin/publishing/tracks/draft-fixture'] = [{ gate, body: publishingReview('tracks', network.tracks[1]) }];
+  await press('Review & publish', article('Draft fixture'));
+  assert.match(publishDialog().textContent, /Checking saved details/);
+  await press('Keep draft', publishDialog());
+  network.tracks[1].playbackMode = 'full';
+  await press('Review & publish', article('Draft fixture'));
+  assert.match(publishDialog().textContent, /Visitors will hear: Full song/);
+  await act(async () => { gate.resolve(); });
+  assert.match(publishDialog().textContent, /Visitors will hear: Full song/);
+  assert.equal(mutations().length, 0);
+});
+
+test('malformed successful review data cannot expose an enabled Publish action', async () => {
+  await readyDraft();
+  const malformed = publishingReview('tracks', network.tracks[1]);
+  malformed.expectedUpdatedAt = 'not-a-date';
+  network.readResponses['/api/admin/publishing/tracks/draft-fixture'] = [{ body: malformed }];
+  await press('Review & publish', article('Draft fixture'));
+  assert.match(publishDialog().textContent, /could not be checked/);
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
+  assert.equal(mutations().length, 0);
+  await press('Reload review', publishDialog());
+  assert.equal(button('Publish track', publishDialog()).disabled, true);
 });

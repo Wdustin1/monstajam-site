@@ -43,7 +43,7 @@ function track(slug, additions = {}) {
   return { id: slug, slug, title: slug, artist: 'Fixture Artist', genre: 'Hip-Hop', number: 1,
     bpm: 100, mood: 'Mood', story: null, spotifyUrl: null, appleMusicUrl: null,
     audioUrl: 'https://example.invalid/legacy.mp3', coverUrl: null, published: true,
-    createdAt: '2026-01-01T00:00:00Z', ...additions };
+    createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', ...additions };
 }
 function button(text, scope = container) {
   const result = [...scope.querySelectorAll('button')].find((node) => node.textContent.trim() === text);
@@ -121,6 +121,13 @@ async function fetchMock(input, init = {}) {
   });
   if (input === '/api/tracks?all=true') return Response.json(state.tracks);
   if (input === '/api/videos?all=true') return Response.json([]);
+  if (input.startsWith('/api/admin/publishing/tracks/') && method === 'GET') {
+    const saved = state.tracks.find((row) => row.slug === input.split('/').at(-1));
+    assert.ok(saved, 'Review must use an existing saved record');
+    return Response.json({ kind: 'track', track: saved, expectedUpdatedAt: saved.updatedAt, playbackMode: saved.playbackMode || 'preview',
+      canPublish: Boolean(saved.audioAssetId), audio: { status: saved.audioAssetId ? 'ready' : 'legacy', previewStart: 0, previewDuration: 45 },
+      checks: [{ key: 'audio', label: 'Audio preparation', status: saved.audioAssetId ? 'ready' : 'blocked', message: 'Review the prepared preview before publishing.' }] });
+  }
   if (input.startsWith('/api/admin/track-title?') && method === 'GET') {
     if (state.preflightGate) await state.preflightGate.promise;
     const response = state.preflightResponses.shift();
@@ -141,6 +148,7 @@ async function fetchMock(input, init = {}) {
   if (input === '/api/tracks' && method === 'POST') {
     const response = state.metadataResponses.shift();
     if (response) return Response.json(response.body, { status: response.status });
+    assert.equal(body.published, false, 'An upload can only create a draft before publication review');
     const saved = track(body.slug, { ...body, id: 'new-fixture-id' });
     state.tracks.push(saved);
     return Response.json(saved, { status: 201 });
@@ -436,4 +444,45 @@ test('editing an existing title keeps its existing URL without running a new-tra
   assert.equal(state.uploads.length, 0);
   assert.equal(state.tracks[2].slug, 'legacy-preview');
   assert.equal(state.tracks[2].title, 'legacy-full');
+});
+
+test('review after saving uploads once, saves a draft, then requires explicit publication of the saved playback mode', async () => {
+  const files = await newTrack('Reviewed full song');
+  await click(fullCheckbox());
+  await click([...container.querySelectorAll('button')].find((node) => node.textContent.startsWith('Save as draft')));
+  assert.ok([...container.querySelectorAll('button')].some((node) => node.textContent.startsWith('Review after saving')));
+  await click(button('Add track'));
+  assert.equal(state.uploads.length, 2);
+  assert.deepEqual(state.uploads.map((entry) => entry.file), [files.audio, files.cover]);
+  assert.equal(savedMetadata().length, 1);
+  assert.equal(savedMetadata()[0].body.published, false);
+  const saved = state.tracks.find((row) => row.slug === 'reviewed-full-song');
+  assert.equal(saved.published, false);
+  const dialog = container.querySelector('dialog[aria-label="Review track for publishing"][open]');
+  assert.ok(dialog);
+  assert.match(dialog.textContent, /full song|entire song/i);
+  assert.equal(button('Publish track', dialog).disabled, true);
+  assert.equal(state.calls.filter((call) => call.method === 'PUT').length, 0);
+  await click(dialog.querySelector('input[type="checkbox"]'));
+  await click(button('Publish track', dialog));
+  assert.deepEqual(state.calls.filter((call) => call.method === 'PUT').at(-1).body,
+    { published: true, expectedUpdatedAt: saved.updatedAt, reviewedPlaybackMode: 'full' });
+  assert.equal(state.uploads.length, 2, 'Publication must reuse the previously saved audio and artwork');
+  assert.equal(state.tracks.find((row) => row.slug === saved.slug).published, true);
+});
+
+test('review-after-save waits for successful metadata persistence and retries without reuploading files', async () => {
+  const files = await newTrack('Retry review draft');
+  await click([...container.querySelectorAll('button')].find((node) => node.textContent.startsWith('Save as draft')));
+  state.metadataResponses.push({ status: 500, body: { error: 'Draft metadata unavailable.' } });
+  await click(button('Add track'));
+  assertSelectedFiles(files);
+  assert.equal(state.uploads.length, 2);
+  assert.equal(container.querySelector('dialog[aria-label="Review track for publishing"][open]'), null);
+  assert.equal(state.calls.filter((call) => call.input.includes('/api/admin/publishing/')).length, 0);
+  await click(button('Retry save'));
+  assert.equal(state.uploads.length, 2);
+  assert.equal(savedMetadata().at(-1).body.published, false);
+  assert.ok(container.querySelector('dialog[aria-label="Review track for publishing"][open]'));
+  assert.equal(state.tracks.find((row) => row.slug === 'retry-review-draft').published, false);
 });

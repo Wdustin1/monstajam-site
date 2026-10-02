@@ -46,7 +46,7 @@ async function unexpected(): Promise<never> { throw new Error('Unexpected databa
 const database = {
   track: { findUnique: unexpected, findMany: unexpected, update: unexpected, delete: unexpected },
   video: { findUnique: unexpected, findMany: unexpected, update: unexpected, delete: unexpected },
-  credit: { deleteMany: unexpected }, audioAsset: { delete: unexpected, update: unexpected },
+  credit: { deleteMany: unexpected }, audioAsset: { findUnique: unexpected, delete: unexpected, update: unexpected },
 };
 const cache = globalThis as typeof globalThis & { prisma?: PrismaClient };
 const previousPrisma = cache.prisma;
@@ -87,6 +87,7 @@ beforeEach(() => {
   mockNamedAdminSession(session);
   mock.method(console, 'error', () => {});
   rows = { track: [structuredClone(baseTrack)], video: [structuredClone(baseVideo)] };
+  mock.method(database.audioAsset, 'findUnique', async () => ({ status: 'ready', originalPath: 'private/original.wav', previewPath: 'private/preview.mp3', previewStart: 0, previewDuration: 45 }));
   reads = []; writes = []; applied = 0; failDatabase = false; beforeUpdate = undefined;
   for (const model of ['track', 'video'] as const) {
     mock.method(database[model], 'findUnique', async (query: Query) => {
@@ -213,7 +214,7 @@ for (const model of ['track', 'video'] as const) {
 
   test(`${model} repeating restore after republishing never unpublishes or changes the live record`, async () => {
     await move(model); await restore(model);
-    assert.equal((await update(model, { published: true })).status, 200);
+    assert.equal((await update(model, { published: true, expectedUpdatedAt: (rows[model][0].updatedAt as Date).toISOString(), ...(model === 'track' && { reviewedPlaybackMode: 'full' }) })).status, 200);
     const live = structuredClone(rows[model][0]); const previousWrites = applied;
     const response = await restore(model);
     assert.equal(response.status, 200); assert.equal((await response.json()).published, true);

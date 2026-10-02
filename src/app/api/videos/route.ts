@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { VideoCreateSchema } from '@/lib/schemas';
-import { activeContentWhere } from '@/lib/content-trash';
+import { activeContentWhere, contentHeaders } from '@/lib/content-trash';
+import { publishingError, SAVE_DRAFT_FIRST } from '@/lib/publishing-review';
 
 // GET /api/videos — list videos
 export async function GET(req: NextRequest) {
@@ -29,27 +30,29 @@ export async function GET(req: NextRequest) {
 // POST /api/videos — create video (admin only)
 export async function POST(req: NextRequest) {
   if (!(await isAdminRequest(req))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: contentHeaders });
   }
 
   let body: unknown;
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: contentHeaders });
   }
 
   const parsed = VideoCreateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 422 }
+      { status: 422, headers: contentHeaders }
     );
   }
 
+  if (parsed.data.published === true) return NextResponse.json(publishingError(SAVE_DRAFT_FIRST), { status: 422, headers: contentHeaders });
+
   try {
-    const video = await prisma.video.create({ data: parsed.data });
-    return NextResponse.json(video, { status: 201 });
+    const video = await prisma.video.create({ data: { ...parsed.data, published: false } });
+    return NextResponse.json(video, { status: 201, headers: contentHeaders });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: 'Failed to create video' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create video' }, { status: 500, headers: contentHeaders });
   }
 }
