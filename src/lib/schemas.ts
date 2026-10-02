@@ -45,7 +45,7 @@ export const TrackCreateSchema = z.object({
 export const TrackUpdateSchema = TrackCreateSchema
   .omit({ slug: true, number: true })
   .partial()
-  .extend({ expectedUpdatedAt });
+  .extend({ expectedUpdatedAt, reviewedPlaybackMode: z.enum(['preview', 'full']).optional() });
 
 export type TrackCreateInput = z.infer<typeof TrackCreateSchema>;
 export type TrackUpdateInput = z.infer<typeof TrackUpdateSchema>;

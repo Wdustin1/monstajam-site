@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/auth';
 import { VideoUpdateSchema } from '@/lib/schemas';
 import { activeContentWhere, CONTENT_CHANGED, contentHeaders, getContentMutationAdmin, isContentTrashed, isMissingContentError } from '@/lib/content-trash';
+import { getVideoPublishingReview, publishingError, publishingFailure, REVIEW_AGAIN, SAVE_DRAFT_FIRST } from '@/lib/publishing-review';
 
 // PUT /api/videos/[id] — update (admin only)
 export async function PUT(
@@ -29,10 +30,18 @@ export async function PUT(
   const { id } = await params;
   const { expectedUpdatedAt, ...videoInput } = parsed.data;
   try {
-    const current = await prisma.video.findUnique({ where: { id }, select: { deletedAt: true, updatedAt: true } });
+    const current = await prisma.video.findUnique({ where: { id } });
     if (!current || isContentTrashed(current)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: contentHeaders });
     if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== current.updatedAt.getTime()) {
       return NextResponse.json({ error: CONTENT_CHANGED }, { status: 409, headers: contentHeaders });
+    }
+    if (!current.published && videoInput.published === true) {
+      if (!expectedUpdatedAt) return NextResponse.json(publishingError(REVIEW_AGAIN), { status: 422, headers: contentHeaders });
+      if (Object.keys(videoInput).some(key => key !== 'published')) return NextResponse.json(publishingError(SAVE_DRAFT_FIRST), { status: 422, headers: contentHeaders });
+    }
+    if (videoInput.published ?? current.published) {
+      const review = getVideoPublishingReview({ ...current, ...videoInput });
+      if (!review.canPublish) return NextResponse.json(publishingFailure(review.checks), { status: 422, headers: contentHeaders });
     }
     const video = await prisma.video.update({ where: { id, updatedAt: current.updatedAt, AND: [activeContentWhere()] }, data: videoInput });
     return NextResponse.json(video, { headers: contentHeaders });

@@ -168,7 +168,7 @@ async function main() {
     assert.deepEqual(await db.collection('videos').findOne({ _id: videoIds[0] }), restoredVideo);
     checked('timestamp CAS and editor expected revisions prevent stale publishing after trash-and-restore');
 
-    assert.equal((await trackRoute.PUT(request('/api/tracks/trash-track-0', 'PUT', { published: true, expectedUpdatedAt: restoredTrack.updatedAt.toISOString() }), contextTrack())).status, 200);
+    assert.equal((await trackRoute.PUT(request('/api/tracks/trash-track-0', 'PUT', { published: true, expectedUpdatedAt: restoredTrack.updatedAt.toISOString(), reviewedPlaybackMode: 'full' }), contextTrack())).status, 200);
     assert.equal((await videoRoute.PUT(request(`/api/videos/${videoIds[0]}`, 'PUT', { published: true, expectedUpdatedAt: restoredVideo.updatedAt.toISOString() }), contextVideo())).status, 200);
     const republishedTrack = await db.collection('tracks').findOne({ _id: trackIds[0] });
     const republishedVideo = await db.collection('videos').findOne({ _id: videoIds[0] });

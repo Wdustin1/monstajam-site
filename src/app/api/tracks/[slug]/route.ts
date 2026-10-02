@@ -5,6 +5,7 @@ import { isAdminRequest } from '@/lib/auth';
 import { TrackUpdateSchema } from '@/lib/schemas';
 import { getPlaybackMode, toPublicTrack } from '@/lib/track-playback';
 import { activeContentWhere, CONTENT_CHANGED, contentHeaders, getContentMutationAdmin, isContentTrashed, isMissingContentError } from '@/lib/content-trash';
+import { audioReviewSelect, getTrackPublishingReview, publishingError, publishingFailure, REVIEW_AGAIN, SAVE_DRAFT_FIRST } from '@/lib/publishing-review';
 
 // GET /api/tracks/[slug] — drafts require an explicit authenticated preview
 export async function GET(
@@ -54,16 +55,25 @@ export async function PUT(
   }
 
   const { slug } = await params;
-  const { accentCyan, expectedUpdatedAt, ...trackInput } = parsed.data;
+  const { accentCyan, expectedUpdatedAt, reviewedPlaybackMode, ...trackInput } = parsed.data;
 
   try {
     const current = await prisma.track.findUnique({
       where: { slug },
-      select: { genre: true, playbackMode: true, audioUrl: true, audioAssetId: true, deletedAt: true, updatedAt: true },
+      include: { credits: true },
     });
     if (!current || isContentTrashed(current)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: contentHeaders });
     if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== current.updatedAt.getTime()) {
       return NextResponse.json({ error: CONTENT_CHANGED }, { status: 409, headers: contentHeaders });
+    }
+    const publishing = !current.published && trackInput.published === true;
+    if (publishing) {
+      if (!expectedUpdatedAt || reviewedPlaybackMode !== getPlaybackMode(current)) {
+        return NextResponse.json(publishingError(REVIEW_AGAIN), { status: 422, headers: contentHeaders });
+      }
+      if (accentCyan !== undefined || Object.keys(trackInput).some(key => key !== 'published')) {
+        return NextResponse.json(publishingError(SAVE_DRAFT_FIRST), { status: 422, headers: contentHeaders });
+      }
     }
 
     if (trackInput.audioUrl !== undefined && trackInput.audioUrl !== (current.audioUrl ?? '')) {
@@ -79,10 +89,11 @@ export async function PUT(
       ...(accentCyan != null && { accentCyan }),
     };
 
+    let attachedAsset;
     if (trackInput.audioAssetId) {
       const asset = await prisma.audioAsset.findUnique({
         where: { id: trackInput.audioAssetId },
-        select: { status: true, originalPath: true, previewPath: true },
+        select: audioReviewSelect,
       });
       if (!asset || asset.status !== 'ready' || !asset.originalPath || !asset.previewPath) {
         return NextResponse.json({
@@ -90,7 +101,18 @@ export async function PUT(
           details: { audioAssetId: ['Wait for audio processing to finish successfully before saving.'] },
         }, { status: 422, headers: contentHeaders });
       }
+      attachedAsset = asset;
       trackData.audioUrl = null;
+    }
+
+    if (trackInput.published ?? current.published) {
+      const effective = {
+        ...current, ...trackInput,
+        playbackMode: trackInput.playbackMode ?? getPlaybackMode(current),
+        ...(trackInput.audioAssetId && { audioUrl: null }),
+      };
+      const review = await getTrackPublishingReview(effective, { allowLegacyLive: current.published && !current.audioAssetId, asset: attachedAsset });
+      if (!review.canPublish) return NextResponse.json(publishingFailure(review.checks), { status: 422, headers: contentHeaders });
     }
 
     const track = await prisma.track.update({

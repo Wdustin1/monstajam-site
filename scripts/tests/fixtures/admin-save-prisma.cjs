@@ -84,7 +84,7 @@ function matches(row, where = {}) {
 
 function read(model, args = {}) {
   refreshControls();
-  if ((model === 'track' && controls.failTrackReads) || (model === 'video' && controls.failVideoReads)) {
+  if ((model === 'track' && controls.failTrackReads) || (model === 'video' && controls.failVideoReads) || (model === 'audioAsset' && controls.failAudioReads)) {
     throw new Error(`Intentional local fixture ${model} read failure`);
   }
   const failure = Number(controls.failReadGeneration || 0);
@@ -92,7 +92,11 @@ function read(model, args = {}) {
     consumedReadFailure = failure;
     throw new Error('Intentional local fixture read failure');
   }
-  let result = (model === 'track' ? tracks : model === 'video' ? videos : audioAssets).filter((row) => matches(row, args.where));
+  const assetRows = controls.audioStatus === 'missing' ? [] : audioAssets.map((row) => ({ ...row,
+    ...(controls.audioStatus ? { status: controls.audioStatus } : {}),
+    ...(controls.previewDuration !== undefined ? { previewDuration: controls.previewDuration } : {}),
+  }));
+  let result = (model === 'track' ? tracks : model === 'video' ? videos : assetRows).filter((row) => matches(row, args.where));
   const orderBy = args.orderBy ? (Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy]) : [];
   result.sort((a, b) => {
     for (const order of orderBy) for (const [field, direction] of Object.entries(order)) {

@@ -164,11 +164,14 @@ test('new tracks without audio retain draft creation and optional metadata clear
   assert.equal(stored?.spotifyUrl, null);
 });
 
-test('existing no-audio publish behavior is not changed by audio attachment validation', async () => {
+test('direct creation cannot publish a track before its saved draft has been reviewed', async () => {
+  const original = structuredClone(stored);
   const response = await post({ ...createInput, published: true });
 
-  assert.equal(response.status, 201);
-  assert.equal(stored?.published, true);
+  assert.equal(response.status, 422);
+  assert.match((await response.json()).error, /draft.*review/i);
+  assert.deepEqual(stored, original);
+  assert.equal(writes.length, 0);
 });
 
 for (const includeAsset of [false, true]) {
@@ -275,7 +278,7 @@ test('managed audio metadata updates preserve attachment and clear optional fiel
   for (const key of Object.keys(changes) as (keyof typeof changes)[]) assert.equal(stored![key], null);
   assert.equal(stored?.audioAssetId, assetId);
   assert.equal(stored?.audioUrl, null);
-  assert.equal(reads.includes('asset'), false, 'unchanged audio must not be reprocessed');
+  assert.equal(reads.includes('asset'), true, 'live metadata saves recheck asset readiness without reprocessing audio');
 });
 
 for (const mode of [null, 'all', true]) {

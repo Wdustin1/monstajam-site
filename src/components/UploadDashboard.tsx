@@ -11,6 +11,9 @@ import { useDiscardConfirmation } from './useDiscardConfirmation';
 import { useAdminLibrary, type LibraryState } from './useAdminLibrary';
 import SelectedMediaPreview from './SelectedMediaPreview';
 import AdminTrash, { type TrashItem, type TrashKind } from './AdminTrash';
+import PublishingReviewDialog, { type PublishingTarget } from './PublishingReviewDialog';
+import type { PublishingReview } from '@/lib/publishing-types';
+import { extractYouTubeId } from '@/lib/youtube';
 import { slugifyTrackTitle, TRACK_TITLE_CONFLICT } from '@/lib/track-title';
 import {
   AlertTriangle,
@@ -151,22 +154,8 @@ const emptyVideoForm = (): VideoFormState => ({
   artist: '',
   youtubeUrl: '',
   duration: '',
-  published: true,
+  published: false,
 });
-
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /youtube\.com\/watch\?v=([^&]+)/,
-    /youtu\.be\/([^?&]+)/,
-    /youtube\.com\/embed\/([^?&]+)/,
-    /youtube\.com\/shorts\/([^?&]+)/,
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
 
 function formatDate(value?: string) {
   if (!value) return 'Not recorded';
@@ -452,6 +441,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const uploadAttempt = useRef(0);
   const [toast, setToast] = useState<ToastState>(null);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [publishingTarget, setPublishingTarget] = useState<PublishingTarget | null>(null);
   const [trackErrors, setTrackErrors] = useState<Record<string, string>>({});
   const [videoErrors, setVideoErrors] = useState<Record<string, string>>({});
   const [trackBaseline, setTrackBaseline] = useState(emptyTrackForm);
@@ -717,7 +707,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     if (trackForm.bpm && (Number(trackForm.bpm) < 40 || Number(trackForm.bpm) > 300)) {
       errors.bpm = 'BPM must be between 40 and 300.';
     }
-    if (trackForm.published && !hasAudio) {
+    if (editingTrack?.published && trackForm.published && !hasAudio) {
       errors.audio = 'Live tracks need an audio file. Save as draft if the audio is not ready.';
     }
     if (trackForm.audioFile && trackForm.audioFile.size > 500 * 1024 * 1024) {
@@ -758,6 +748,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       let coverUrl: string | undefined;
       const previewStart = Number(trackForm.previewStart || 0);
       const currentTrack = editingSlug ? tracks.find((track) => track.slug === editingSlug) : undefined;
+      const reviewAfterSaving = trackForm.published && !currentTrack?.published;
       if (trackForm.audioFile || (currentTrack?.audioAssetId && savedAudio && previewStart !== savedAudio.previewStart)) {
         const source = trackForm.audioFile
           ? { originalUrl: await uploadFile(trackForm.audioFile, 'audio'), originalName: trackForm.audioFile.name }
@@ -782,7 +773,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         spotifyUrl: trackForm.spotifyUrl.trim() || null,
         appleMusicUrl: trackForm.appleMusicUrl.trim() || null,
         color: GENRE_COLORS[trackForm.genre] ?? GENRE_COLORS.Other,
-        published: trackForm.published,
+        published: reviewAfterSaving ? false : trackForm.published,
         playbackMode: trackForm.playbackMode,
       };
 
@@ -811,8 +802,9 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       const saved = await readAdminResponse<PublishedTrack>(res);
       setTracks((current) => [...current.filter((track) => track.id !== saved.id), saved].sort((a, b) => a.number - b.number));
 
-      showToast('success', editingSlug ? 'Track changes saved.' : 'Track added to the library.');
+      showToast('success', reviewAfterSaving ? 'Draft saved. Review it before publishing.' : editingSlug ? 'Track changes saved.' : 'Track saved as a draft. Use Review & publish when ready.');
       resetTrackForm();
+      if (reviewAfterSaving) openPublishingReview({ kind: 'track', key: saved.slug });
     } catch (error) {
       reportError(error);
       if (error instanceof AdminSaveError) setTrackErrors(error.fields);
@@ -829,12 +821,12 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
       showToast('error', 'Save or discard your track edits before changing its publish status in the library.');
       return;
     }
+    if (!track.published) {
+      if (!operation.current && !sessionExpired) openPublishingReview({ kind: 'track', key: track.slug });
+      return;
+    }
     if (!beginOperation('Updating track status…')) return;
     try {
-      if (!track.published && !track.audioUrl && !track.audioAssetId) {
-        showToast('error', 'Add audio before publishing this track.');
-        return;
-      }
       const res = await adminFetch(`/api/tracks/${track.slug}`, {
         method: 'PUT',
         credentials: 'include',
@@ -892,13 +884,15 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     setVideoSaveError(null);
     setToast(null);
     try {
+      const currentVideo = editingVideoId ? videos.find((video) => video.id === editingVideoId) : undefined;
+      const reviewAfterSaving = videoForm.published && !currentVideo?.published;
       const payload = {
         title: videoForm.title.trim(),
         artist: videoForm.artist.trim() || null,
         youtubeUrl: videoForm.youtubeUrl.trim(),
         youtubeId,
         duration: videoForm.duration.trim() || null,
-        published: videoForm.published,
+        published: reviewAfterSaving ? false : videoForm.published,
         order: editingVideoId ? undefined : videos.length,
         expectedUpdatedAt: editingVideoId ? videoRevision : undefined,
       };
@@ -919,8 +913,9 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
       const saved = await readAdminResponse<VideoRecord>(res);
       setVideos((current) => [...current.filter((video) => video.id !== saved.id), saved].sort((a, b) => a.order - b.order));
-      showToast('success', editingVideoId ? 'Video changes saved.' : 'Video added.');
+      showToast('success', reviewAfterSaving ? 'Draft saved. Review it before publishing.' : editingVideoId ? 'Video changes saved.' : 'Video saved as a draft. Use Review & publish when ready.');
       resetVideoForm();
+      if (reviewAfterSaving) openPublishingReview({ kind: 'video', key: saved.id });
     } catch (error) {
       reportError(error);
       if (error instanceof AdminSaveError) setVideoErrors(error.fields);
@@ -934,6 +929,10 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   async function toggleVideoPublish(video: VideoRecord) {
     if (editingVideoId === video.id && videoDirty) {
       showToast('error', 'Save or discard your video edits before changing its publish status in the library.');
+      return;
+    }
+    if (!video.published) {
+      if (!operation.current && !sessionExpired) openPublishingReview({ kind: 'video', key: video.id });
       return;
     }
     if (!beginOperation('Updating video status…')) return;
@@ -985,6 +984,51 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   };
 
   const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
+
+  function stopEditorPlayback() {
+    pausePublicPlayer();
+    fullAudition.current?.pause();
+    previewAudition.current?.pause();
+    selectedAudition.current?.pause();
+  }
+
+  function openPublishingReview(target: PublishingTarget) {
+    stopEditorPlayback();
+    setPublishingTarget(target);
+  }
+
+  async function publishReviewedItem(review: PublishingReview) {
+    if (!beginOperation('Publishing reviewed item…')) throw new AdminSaveError('Sign in and wait for the current request to finish before publishing.');
+    try {
+      if (review.kind === 'track') {
+        const res = await adminFetch(`/api/tracks/${encodeURIComponent(review.track.slug)}`, {
+          method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ published: true, expectedUpdatedAt: review.expectedUpdatedAt, reviewedPlaybackMode: review.playbackMode }),
+        });
+        const saved = await readAdminResponse<PublishedTrack>(res);
+        setTracks((current) => [...current.filter((track) => track.id !== saved.id), saved].sort((a, b) => a.number - b.number));
+        // Adopt the reviewed saved metadata only for this unchanged editor. Other
+        // drafts and local file selections are never reset by publication.
+        if (editingSlug === saved.slug) {
+          resetTrackForm();
+        }
+        showToast('success', 'Track published.');
+      } else {
+        const res = await adminFetch(`/api/videos/${encodeURIComponent(review.video.id)}`, {
+          method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ published: true, expectedUpdatedAt: review.expectedUpdatedAt }),
+        });
+        const saved = await readAdminResponse<VideoRecord>(res);
+        setVideos((current) => [...current.filter((video) => video.id !== saved.id), saved].sort((a, b) => a.order - b.order));
+        if (editingVideoId === saved.id) resetVideoForm();
+        showToast('success', 'Video published.');
+      }
+      setPublishingTarget(null);
+    } catch (error) {
+      reportError(error);
+      throw error;
+    } finally { endOperation(); }
+  }
 
   async function handleRestore(kind: TrashKind, item: TrashItem): Promise<boolean> {
     if (!beginOperation('Restoring from Trash…')) return false;
@@ -1311,8 +1355,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <Toggle
                   checked={trackForm.published}
                   onChange={(published) => setTrackForm((form) => ({ ...form, published }))}
-                  label={trackForm.published ? 'Publish live' : 'Save as draft'}
-                  help={trackForm.published ? 'Requires audio and appears publicly.' : 'Hidden from the public library.'}
+                  label={trackForm.published ? editingTrack?.published ? 'Keep live' : 'Review after saving' : 'Save as draft'}
+                  help={trackForm.published ? editingTrack?.published ? 'Saved changes update this published song.' : 'Save a draft, then check the preview before publishing.' : 'Hidden from the public library.'}
                 />
                 <button
                   type="button"
@@ -1402,7 +1446,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                         className="inline-flex items-center justify-center gap-1 rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25 disabled:opacity-50"
                       >
                         {track.published ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                        {track.published ? 'Draft' : 'Live'}
+                        {track.published ? 'Draft' : 'Review & publish'}
                       </button>
                       <button
                         type="button"
@@ -1476,8 +1520,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                 <Toggle
                   checked={videoForm.published}
                   onChange={(published) => setVideoForm((form) => ({ ...form, published }))}
-                  label={videoForm.published ? 'Publish video' : 'Save video as draft'}
-                  help={videoForm.published ? 'Appears on the public video page.' : 'Hidden until approved.'}
+                  label={videoForm.published ? videos.find((video) => video.id === editingVideoId)?.published ? 'Keep live' : 'Review after saving' : 'Save video as draft'}
+                  help={videoForm.published ? videos.find((video) => video.id === editingVideoId)?.published ? 'Saved changes update this published video.' : 'Save a draft, then check the preview before publishing.' : 'Hidden until reviewed and published.'}
                 />
                 <button
                   type="button"
@@ -1524,7 +1568,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                     <div className="mt-4 grid grid-cols-3 gap-2">
                       <button type="button" onClick={() => startEditVideo(video)} className="rounded-md border border-cyan-300/20 px-2 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/50">Edit</button>
                       <button type="button" disabled={sessionExpired} onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25 disabled:opacity-50">
-                        {video.published ? 'Draft' : 'Live'}
+                        {video.published ? 'Draft' : 'Review & publish'}
                       </button>
                       <button type="button" disabled={sessionExpired} onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50">Move to Trash</button>
                     </div>
@@ -1594,6 +1638,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <ConfirmDialog confirm={confirm} busy={Boolean(busy)} onCancel={() => setConfirm(null)} onConfirm={confirmDelete} />
+      {publishingTarget && <PublishingReviewDialog target={publishingTarget} disabled={sessionExpired} onClose={() => { if (!operation.current) setPublishingTarget(null); }} onPublish={publishReviewedItem} onError={reportError} onPlayback={stopEditorPlayback} />}
       {discard.dialog}
     </section>
   );

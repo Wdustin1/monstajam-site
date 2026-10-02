@@ -61,6 +61,15 @@ Run `npm run test:admin-save` for schema/API and response-handling regressions, 
 
 Upload regressions are included in `scripts/tests/admin-audio-editor.test.cjs`, `scripts/tests/selected-media-preview.test.cjs`, and `scripts/tests/track-title-api.test.ts`. The local admin-save fixture exercises title-check authorization, draft conflicts, and failed-check recovery without production data.
 
+## Review before publishing
+
+- New songs and videos are saved as drafts. Use **Review & publish** in the library to open the saved details and media, or enable **Review after saving** in the editor to open that step after a successful draft save. Closing the review keeps the draft and any unrelated unsaved work.
+- Song reviews show artwork, metadata, credits, the saved playback mode, and a player using the same full-song or preview selection visitors will receive. The existing saved-page preview remains available for an admin's full-song audition. Confirm the preview and playback setting, then choose **Publish track**. Video reviews show the saved YouTube embed and require a separate **Publish video** confirmation.
+- Required metadata and ready managed audio are checked on the server. Missing, processing, failed, or incomplete audio blocks publication. Missing artwork is a warning because the site has a default cover. The video URL must match its YouTube ID; availability and embedding permissions still need to be checked by playing the preview.
+- Publishing rechecks readiness and the exact saved revision. A change by another admin requires reloading and reviewing again. Publication requests cannot include new metadata: save those changes as a draft first. Failed or uncertain publication keeps the review open and offers **Reload review** to check the saved status before retrying.
+- Existing live edits keep their normal save workflow and are checked for media readiness; unpublishing remains a single action. Already-live legacy audio can stay unchanged while metadata is edited, but legacy drafts need a processed upload before publication. No existing content is republished, unpublished, or migrated by this release.
+- Private review endpoints live under `/api/admin/publishing/tracks/[slug]` and `/api/admin/publishing/videos/[id]`. They require a current admin session, return uncached responses, and exclude trashed items. New-content APIs always create drafts and reject direct create-and-publish requests.
+
 ## Trash and Restore
 
 - **Move to Trash** hides a song or video from the active library and website after confirmation. Saved details, credits, artwork and audio references remain intact. Unsaved edits to that item are discarded only after the move succeeds; unrelated editor work stays in place.
