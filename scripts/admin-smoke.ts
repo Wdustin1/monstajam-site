@@ -1,4 +1,7 @@
+// This manual smoke leaves its synthetic draft in Trash for review or restoration.
+// DELETE hides the record; it does not permanently remove saved metadata or files.
 type Track = {
+  id: string;
   slug: string;
   title: string;
   artist: string;
@@ -9,6 +12,8 @@ type Track = {
   published: boolean;
   audioUrl: string | null;
   coverUrl: string | null;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
 };
 
 const baseUrl = process.env.ADMIN_SMOKE_BASE_URL;
@@ -57,15 +62,16 @@ async function jsonRequest<T>(path: string, init: RequestInit = {}) {
   return body as T;
 }
 
-async function cleanup() {
+async function moveSmokeTrackToTrashOnFailure() {
   try {
     await request(`/api/tracks/${smokeSlug}`, { method: 'DELETE' });
   } catch {
-    // Cleanup is best-effort; the create path may not have run.
+    // Best-effort hiding only; the create path may not have run. Records stay in Trash.
   }
 }
 
 async function main() {
+  console.info('Admin smoke creates and edits a synthetic draft, then moves it to Trash. The fixture remains in Trash; no permanent cleanup is performed.');
   await jsonRequest('/api/auth/sign-in/username', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,18 +108,29 @@ async function main() {
   });
 
   const after = await jsonRequest<Track[]>('/api/tracks?all=true');
-  if (after.some((track) => track.slug === smokeSlug)) throw new Error('Smoke track cleanup failed.');
+  if (after.some((track) => track.slug === smokeSlug)) throw new Error('Smoke track is still in the active library after moving to Trash.');
+  const trash = await jsonRequest<{ tracks: Track[] }>('/api/admin/trash');
+  const trashed = trash.tracks.find((track) => track.slug === smokeSlug);
+  if (!trashed || trashed.published || !trashed.deletedAt || !Number.isFinite(Date.parse(trashed.deletedAt)) || !trashed.deletedBy) {
+    throw new Error('Smoke track was not retained as an unpublished record in Trash.');
+  }
+  const preservedFields = ['id', 'slug', 'title', 'artist', 'genre', 'number', 'bpm', 'mood', 'audioUrl', 'coverUrl'] as const;
+  if (preservedFields.some((field) => trashed[field] !== edited[field])) {
+    throw new Error('Moving the smoke track to Trash changed its saved metadata.');
+  }
 
   console.log(JSON.stringify({
     ok: true,
     beforeCount: before.length,
     afterCount: after.length,
-    createdEditedDeleted: smokeSlug,
+    createdEditedTrashed: smokeSlug,
+    retainedInTrash: true,
   }, null, 2));
 }
 
 main().catch(async (error) => {
-  await cleanup();
+  await moveSmokeTrackToTrashOnFailure();
+  console.error(`The smoke draft ${smokeSlug}, if created, may remain in Trash. No permanent cleanup was attempted.`);
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

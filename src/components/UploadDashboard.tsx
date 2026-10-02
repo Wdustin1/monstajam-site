@@ -10,6 +10,7 @@ import { useAdminNavigationGuard } from './useAdminNavigationGuard';
 import { useDiscardConfirmation } from './useDiscardConfirmation';
 import { useAdminLibrary, type LibraryState } from './useAdminLibrary';
 import SelectedMediaPreview from './SelectedMediaPreview';
+import AdminTrash, { type TrashItem, type TrashKind } from './AdminTrash';
 import { slugifyTrackTitle, TRACK_TITLE_CONFLICT } from '@/lib/track-title';
 import {
   AlertTriangle,
@@ -68,7 +69,7 @@ interface VideoRecord {
   updatedAt?: string;
 }
 
-type AdminTab = 'tracks' | 'videos' | 'ops';
+type AdminTab = 'tracks' | 'videos' | 'trash' | 'ops';
 type ToastState = { type: 'success' | 'error'; message: string } | null;
 type ConfirmState =
   | { kind: 'track'; item: PublishedTrack }
@@ -388,15 +389,15 @@ function ConfirmDialog({
   const noun = confirm.kind === 'track' ? 'track' : 'video';
 
   return (
-    <dialog ref={dialog} onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }} aria-label={`Delete ${noun}`} className="fixed inset-0 m-auto bg-transparent p-4 text-white backdrop:bg-black/75">
+    <dialog ref={dialog} onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }} aria-label={`Move ${noun} to Trash`} className="fixed inset-0 m-auto bg-transparent p-4 text-white backdrop:bg-black/75">
       <div className="w-full max-w-md rounded-lg border border-rose-400/30 bg-slate-950 p-6 shadow-2xl shadow-black/60">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-md bg-rose-400/10 text-rose-300">
             <Trash2 className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Delete {noun}</h3>
-            <p className="mt-1 text-sm text-slate-400">This removes &quot;{title}&quot; from the database.</p>
+            <h3 className="text-lg font-semibold text-white">Move {noun} to Trash</h3>
+            <p className="mt-1 text-sm text-slate-400">&quot;{title}&quot; will be hidden from the website. Its saved details and files will be kept, and you can restore it as a draft from Trash.</p>
             <p className="mt-1 text-sm text-slate-400">Any unsaved edits to this item will also be discarded.</p>
           </div>
         </div>
@@ -415,7 +416,7 @@ function ConfirmDialog({
             disabled={busy}
             className="rounded-md bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400"
           >
-            {busy ? 'Deleting…' : 'Delete'}
+            {busy ? 'Moving…' : 'Move to Trash'}
           </button>
         </div>
       </div>
@@ -426,6 +427,7 @@ function ConfirmDialog({
 export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminIdentity }) {
   const { pause: pausePublicPlayer, isPlaying: publicPlayerPlaying } = usePlayer();
   const [activeTab, setActiveTab] = useState<AdminTab>('tracks');
+  const [trashRevision, setTrashRevision] = useState(0);
   const { tracks, videos, setTracks, setVideos, trackState, videoState, reload, lastLoadedAt, identity, sessionState, reportError } = useAdminLibrary<PublishedTrack, VideoRecord>(currentAdmin);
   const tracksLoading = trackState.status === 'loading';
   const videosLoading = videoState.status === 'loading';
@@ -441,6 +443,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const [videoForm, setVideoForm] = useState<VideoFormState>(() => emptyVideoForm());
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [trackRevision, setTrackRevision] = useState<string | undefined>(undefined);
+  const [videoRevision, setVideoRevision] = useState<string | undefined>(undefined);
   const [submittingTrack, setSubmittingTrack] = useState(false);
   const [submittingVideo, setSubmittingVideo] = useState(false);
   const [uploadPhase, setUploadPhase] = useState('');
@@ -547,6 +551,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     selectedAudition.current?.pause();
     const empty = emptyTrackForm();
     setEditingSlug(null);
+    setTrackRevision(undefined);
     setTrackForm(empty);
     setTrackBaseline(empty);
     setTrackFormVersion((value) => value + 1);
@@ -564,6 +569,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   const resetVideoForm = () => {
     const empty = emptyVideoForm();
     setEditingVideoId(null);
+    setVideoRevision(undefined);
     setVideoForm(empty);
     setVideoBaseline(empty);
     setVideoSaveError(null);
@@ -590,7 +596,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
   const startEditTrack = async (track: PublishedTrack) => {
     if (operation.current) return;
-    if (editingSlug === track.slug) {
+    if (editingSlug === track.slug && trackRevision === track.updatedAt) {
       setActiveTab('tracks');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -600,6 +606,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     previewAudition.current?.pause();
     selectedAudition.current?.pause();
     setEditingSlug(track.slug);
+    setTrackRevision(track.updatedAt);
     setTrackErrors({});
     setUploadPhase('');
     const form: TrackFormState = {
@@ -636,7 +643,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
   const startEditVideo = async (video: VideoRecord) => {
     if (operation.current) return;
-    if (editingVideoId === video.id) {
+    if (editingVideoId === video.id && videoRevision === video.updatedAt) {
       fullAudition.current?.pause();
       previewAudition.current?.pause();
       selectedAudition.current?.pause();
@@ -648,6 +655,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
     previewAudition.current?.pause();
     selectedAudition.current?.pause();
     setEditingVideoId(video.id);
+    setVideoRevision(video.updatedAt);
     setVideoErrors({});
     const form: VideoFormState = {
       title: video.title,
@@ -780,6 +788,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
       if (audioAssetId) payload.audioAssetId = audioAssetId;
       if (coverUrl) payload.coverUrl = coverUrl;
+      if (editingSlug) payload.expectedUpdatedAt = trackRevision;
 
       const res = editingSlug
         ? await adminFetch(`/api/tracks/${editingSlug}`, {
@@ -830,11 +839,12 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ published: !track.published }),
+        body: JSON.stringify({ published: !track.published, expectedUpdatedAt: editingSlug === track.slug ? trackRevision : track.updatedAt }),
       });
       const saved = await readAdminResponse<PublishedTrack>(res);
       setTracks((current) => current.map((item) => item.id === saved.id ? saved : item));
       if (editingSlug === saved.slug) {
+        setTrackRevision(saved.updatedAt);
         setTrackForm((form) => ({ ...form, published: saved.published }));
         setTrackBaseline((form) => ({ ...form, published: saved.published }));
       }
@@ -846,16 +856,16 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   }
 
   async function handleDeleteTrack(track: PublishedTrack) {
-    if (!beginOperation('Deleting track…')) return;
+    if (!beginOperation('Moving track to Trash…')) return;
     try {
       const res = await adminFetch(`/api/tracks/${track.slug}`, { method: 'DELETE', credentials: 'include' });
       await readAdminResponse(res);
       setTracks((current) => current.filter((item) => item.id !== track.id));
-      showToast('success', 'Track deleted.');
+      showToast('success', 'Track moved to Trash. You can restore it as a draft.');
       if (editingSlug === track.slug) resetTrackForm();
     } catch (error) {
       reportError(error);
-      showToast('error', error instanceof Error ? error.message : 'Track delete failed.');
+      showToast('error', error instanceof Error ? error.message : 'The move to Trash could not be confirmed. Refresh the library before retrying.');
     } finally {
       setConfirm(null);
       endOperation();
@@ -890,6 +900,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         duration: videoForm.duration.trim() || null,
         published: videoForm.published,
         order: editingVideoId ? undefined : videos.length,
+        expectedUpdatedAt: editingVideoId ? videoRevision : undefined,
       };
 
       const res = editingVideoId
@@ -931,11 +942,12 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ published: !video.published }),
+        body: JSON.stringify({ published: !video.published, expectedUpdatedAt: editingVideoId === video.id ? videoRevision : video.updatedAt }),
       });
       const saved = await readAdminResponse<VideoRecord>(res);
       setVideos((current) => current.map((item) => item.id === saved.id ? saved : item));
       if (editingVideoId === saved.id) {
+        setVideoRevision(saved.updatedAt);
         setVideoForm((form) => ({ ...form, published: saved.published }));
         setVideoBaseline((form) => ({ ...form, published: saved.published }));
       }
@@ -947,16 +959,16 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
   }
 
   async function handleDeleteVideo(video: VideoRecord) {
-    if (!beginOperation('Deleting video…')) return;
+    if (!beginOperation('Moving video to Trash…')) return;
     try {
       const res = await adminFetch(`/api/videos/${video.id}`, { method: 'DELETE', credentials: 'include' });
       await readAdminResponse(res);
       setVideos((current) => current.filter((item) => item.id !== video.id));
-      showToast('success', 'Video deleted.');
+      showToast('success', 'Video moved to Trash. You can restore it as a draft.');
       if (editingVideoId === video.id) resetVideoForm();
     } catch (error) {
       reportError(error);
-      showToast('error', error instanceof Error ? error.message : 'Video delete failed.');
+      showToast('error', error instanceof Error ? error.message : 'The move to Trash could not be confirmed. Refresh the library before retrying.');
     } finally {
       setConfirm(null);
       endOperation();
@@ -974,9 +986,34 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
 
   const youtubePreviewId = extractYouTubeId(videoForm.youtubeUrl);
 
+  async function handleRestore(kind: TrashKind, item: TrashItem): Promise<boolean> {
+    if (!beginOperation('Restoring from Trash…')) return false;
+    try {
+      const identifier = kind === 'tracks' ? item.slug! : item.id;
+      const res = await adminFetch(`/api/admin/trash/${kind}/${encodeURIComponent(identifier)}/restore`, { method: 'POST', credentials: 'include' });
+      let published: boolean;
+      if (kind === 'tracks') {
+        const saved = await readAdminResponse<PublishedTrack>(res);
+        setTracks((current) => [...current.filter((track) => track.id !== saved.id), saved].sort((a, b) => a.number - b.number));
+        published = saved.published;
+      } else {
+        const saved = await readAdminResponse<VideoRecord>(res);
+        setVideos((current) => [...current.filter((video) => video.id !== saved.id), saved].sort((a, b) => a.order - b.order));
+        published = saved.published;
+      }
+      const noun = kind === 'tracks' ? 'Track' : 'Video';
+      showToast('success', published ? `${noun} was already restored and is live. Its current status has been kept.` : `${noun} restored as a draft. Review it in ${kind === 'tracks' ? 'Tracks' : 'Videos'} before publishing.`);
+      return true;
+    } catch (error) {
+      reportError(error);
+      showToast('error', error instanceof Error ? error.message : 'Restore could not be confirmed. Refresh Trash or retry Restore as draft.');
+      return false;
+    } finally { endOperation(); }
+  }
+
   async function reloadLibrary() {
     if (!beginOperation('Reloading library…', false)) return;
-    try { await reload(); }
+    try { await reload(); setTrashRevision((value) => value + 1); }
     finally { endOperation(); }
   }
 
@@ -1056,6 +1093,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
           {[
             { id: 'tracks' as const, label: 'Tracks', icon: Music },
             { id: 'videos' as const, label: 'Videos', icon: Video },
+            { id: 'trash' as const, label: 'Trash', icon: Trash2 },
             { id: 'ops' as const, label: 'Ops', icon: LayoutDashboard },
           ].map(({ id, label, icon: Icon }) => (
             <button
@@ -1373,7 +1411,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                         className="inline-flex items-center justify-center gap-1 rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Delete
+                        Move to Trash
                       </button>
                     </div>
                     <a
@@ -1488,7 +1526,7 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
                       <button type="button" disabled={sessionExpired} onClick={() => toggleVideoPublish(video)} className="rounded-md border border-white/10 px-2 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/25 disabled:opacity-50">
                         {video.published ? 'Draft' : 'Live'}
                       </button>
-                      <button type="button" disabled={sessionExpired} onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50">Delete</button>
+                      <button type="button" disabled={sessionExpired} onClick={() => { if (!operation.current) setConfirm({ kind: 'video', item: video }); }} className="rounded-md border border-rose-300/20 px-2 py-2 text-xs font-semibold text-rose-200 transition hover:border-rose-300/50 disabled:opacity-50">Move to Trash</button>
                     </div>
                   </article>
                 ))}
@@ -1496,6 +1534,8 @@ export default function UploadDashboard({ currentAdmin }: { currentAdmin: AdminI
             </section>
           </div>
         )}
+
+        {activeTab === 'trash' && <AdminTrash key={trashRevision} disabled={sessionExpired} onError={reportError} onRestore={handleRestore} />}
 
         {activeTab === 'ops' && (
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">

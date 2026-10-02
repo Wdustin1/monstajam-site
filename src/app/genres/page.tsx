@@ -3,6 +3,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
 import { toPublicTrack } from '@/lib/track-playback';
+import { activeContentWhere } from '@/lib/content-trash';
 
 export const metadata = {
   title: 'Browse Genres — MonstaJam',
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function GenresPage() {
   const tracks = await prisma.track.findMany({
-    where: { published: true },
+    where: { published: true, ...activeContentWhere() },
     include: { credits: true },
     orderBy: { number: 'asc' },
   });

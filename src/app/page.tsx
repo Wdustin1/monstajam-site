@@ -8,15 +8,16 @@ import MusicLibrary from '@/components/MusicLibrary';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
 import { toPublicTrack } from '@/lib/track-playback';
+import { activeContentWhere } from '@/lib/content-trash';
 
 export default async function Home() {
   const [trackRecords, videoCount] = await Promise.all([
     prisma.track.findMany({
-      where: { published: true },
+      where: { published: true, ...activeContentWhere() },
       include: { credits: true },
       orderBy: { number: 'asc' },
     }),
-    prisma.video.count({ where: { published: true } }),
+    prisma.video.count({ where: { published: true, ...activeContentWhere() } }),
   ]);
   const tracks = trackRecords.map(toPublicTrack);
   const artistCount = new Set(tracks.map((t: { artist: string }) => t.artist)).size;

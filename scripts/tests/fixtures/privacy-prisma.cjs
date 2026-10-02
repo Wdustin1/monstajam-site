@@ -27,18 +27,34 @@ const tracks = [
   { ...shared, id: '000000000000000000000002', slug: 'privacy-draft-track', number: 2,
     title: 'PRIVATE_FIXTURE_TITLE_9d2a', story: 'PRIVATE_FIXTURE_STORY_7e3b',
     coverUrl: '/favicon.png?private-fixture-cover-6c8a',
-    audioUrl: 'https://example.invalid/private-fixture-a8f4.mp3', published: false },
+    audioUrl: 'https://example.invalid/private-fixture-a8f4.mp3', published: false, deletedAt: null },
+  { ...shared, id: '000000000000000000000004', slug: 'privacy-trashed-track', number: 3,
+    title: 'TRASHED_FIXTURE_TITLE_1b7c', story: 'TRASHED_FIXTURE_STORY_8f2e',
+    coverUrl: '/favicon.png?trashed-fixture-cover-4ae1',
+    audioUrl: 'https://example.invalid/trashed-fixture-original-94ae.mp3', published: true,
+    audioAssetId: '000000000000000000000007',
+    deletedAt: new Date('2026-01-03T00:00:00Z'), deletedBy: 'fixture-admin' },
+  { ...shared, id: '000000000000000000000005', slug: 'privacy-trashed-draft', number: 4,
+    title: 'TRASHED_DRAFT_FIXTURE_TITLE_763c', published: false,
+    audioAssetId: '000000000000000000000008', deletedAt: new Date('2026-01-03T00:00:00Z') },
 ];
 const videos = [{ id: '000000000000000000000003', title: 'Local Fixture Video',
   artist: 'Local Test Artist', youtubeUrl: 'https://example.invalid/local-video',
   youtubeId: 'LOCAL000001', published: true, order: 1, duration: '3:00',
-  createdAt: shared.createdAt, updatedAt: shared.updatedAt }];
+  createdAt: shared.createdAt, updatedAt: shared.updatedAt },
+  { id: '000000000000000000000006', title: 'TRASHED_VIDEO_FIXTURE_TITLE_439d',
+    artist: 'Trashed Fixture Artist', youtubeUrl: 'https://example.invalid/trashed-video',
+    youtubeId: 'TRASHED0001', published: true, order: 2, duration: '4:00',
+    deletedAt: new Date('2026-01-03T00:00:00Z'), createdAt: shared.createdAt, updatedAt: shared.updatedAt }];
 
 function matches(row, where = {}) {
   return Object.entries(where).every(([key, value]) => {
     if (key === 'AND') return (Array.isArray(value) ? value : [value]).every((item) => matches(row, item));
     if (key === 'OR') return value.some((item) => matches(row, item));
     if (value && typeof value === 'object') {
+      if ('isSet' in value && Object.hasOwn(row, key) !== value.isSet) return false;
+      if ('not' in value && row[key] === value.not) return false;
+      if ('isSet' in value || 'not' in value) return true;
       if ('equals' in value) return row[key] === value.equals;
       if ('in' in value) return value.in.includes(row[key]);
       throw new Error('Unsupported fixture filter: ' + key);

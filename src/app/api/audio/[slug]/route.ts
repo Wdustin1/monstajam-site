@@ -4,6 +4,7 @@ import { isAdminRequest } from '@/lib/auth';
 import { getPrivateAudio, audioToken } from '@/lib/audio-storage';
 import { getPlaybackMode } from '@/lib/track-playback';
 import { head } from '@vercel/blob';
+import { isContentTrashed } from '@/lib/content-trash';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,7 @@ async function serve(req: NextRequest, slug: string, metadataOnly = false) {
   try {
     const admin = await isAdminRequest(req);
     const track = await prisma.track.findUnique({ where: { slug } });
-    if (!track || (!track.published && !admin) || !track.audioAssetId) return new Response(null, { status: 404, headers: baseHeaders });
+    if (!track || isContentTrashed(track) || (!track.published && !admin) || !track.audioAssetId) return new Response(null, { status: 404, headers: baseHeaders });
     // Explicit full audition is admin-only, even for a published preview track.
     if (req.nextUrl.searchParams.get('full') === 'true' && !admin) return new Response(null, { status: 403, headers: baseHeaders });
     const asset = await prisma.audioAsset.findUnique({ where: { id: track.audioAssetId } });

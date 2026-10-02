@@ -2,6 +2,7 @@ import VideoGallery from '@/components/VideoGallery';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { prisma } from '@/lib/prisma';
+import { activeContentWhere } from '@/lib/content-trash';
 
 export const metadata = {
   title: 'Music Video Gallery — MonstaJam',
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function VideosPage() {
   const videos = await prisma.video.findMany({
-    where: { published: true },
+    where: { published: true, ...activeContentWhere() },
     orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
   });
 

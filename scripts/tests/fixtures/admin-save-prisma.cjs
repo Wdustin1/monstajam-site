@@ -5,12 +5,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { randomBytes } = require('node:crypto');
+const { Prisma } = require('@prisma/client');
 
 const database = new URL(process.env.DATABASE_URL || 'file:///missing');
 const controlPath = process.env.MONSTAJAM_ADMIN_SAVE_CONTROL || '';
 const temporaryRoot = path.resolve(os.tmpdir()) + path.sep;
 if (
-  process.env.MONSTAJAM_ADMIN_SAVE_FIXTURES !== '1' || process.env.NODE_ENV !== 'development' ||
+  process.env.MONSTAJAM_ADMIN_SAVE_FIXTURES !== '1' ||
+  !(process.env.NODE_ENV === 'development' || (process.env.NODE_ENV === 'production' && process.env.MONSTAJAM_ADMIN_SAVE_PRODUCTION === '1')) ||
   database.protocol !== 'mongodb:' || !['127.0.0.1', 'localhost', '[::1]'].includes(database.hostname) ||
   database.pathname !== '/monstajam_admin_save_test' || database.username || database.password ||
   !path.resolve(controlPath).startsWith(temporaryRoot) || !fs.existsSync(controlPath) ||
@@ -61,7 +63,23 @@ refreshControls();
 fs.watchFile(controlPath, { persistent: false, interval: 100 }, refreshControls);
 
 function matches(row, where = {}) {
-  return Object.entries(where).every(([key, value]) => row[key] === value);
+  const equal = (left, right) => left instanceof Date || right instanceof Date
+    ? new Date(left).getTime() === new Date(right).getTime() : left === right;
+  return Object.entries(where).every(([key, value]) => {
+    if (key === 'AND') return (Array.isArray(value) ? value : [value]).every((part) => matches(row, part));
+    if (key === 'OR') return value.some((part) => matches(row, part));
+    if (key === 'NOT') return (Array.isArray(value) ? value : [value]).every((part) => !matches(row, part));
+    if (value && typeof value === 'object' && !(value instanceof Date)) {
+      return Object.entries(value).every(([operator, expected]) => {
+        if (operator === 'isSet') return Object.hasOwn(row, key) === expected;
+        if (operator === 'equals') return equal(row[key], expected);
+        if (operator === 'not') return Object.hasOwn(row, key) && !equal(row[key], expected);
+        if (operator === 'in') return expected.includes(row[key]);
+        throw new Error('Unsupported local fixture filter: ' + operator);
+      });
+    }
+    return equal(row[key], value);
+  });
 }
 
 function read(model, args = {}) {
@@ -108,8 +126,8 @@ async function mutate(model, operation, args) {
     return structuredClone(row);
   }
   const index = rows.findIndex((row) => matches(row, args.where));
-  if (index < 0) throw new Error('Fixture record not found');
-  if (operation === 'delete') return structuredClone(rows.splice(index, 1)[0]);
+  if (index < 0) throw new Prisma.PrismaClientKnownRequestError('Fixture record not found', { code: 'P2025', clientVersion: Prisma.prismaVersion.client });
+  if (operation === 'delete') throw new Error('Permanent deletion is forbidden in the trash/restore fixture.');
   rows[index] = { ...rows[index], ...data, updatedAt: new Date() };
   return structuredClone(rows[index]);
 }
